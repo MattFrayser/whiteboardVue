@@ -27,6 +27,9 @@ export class DrawTool extends Tool {
     onMouseUp(worldPos, e) {
         if (this.currentStroke && this.currentStroke.data.points.length > 1) {
             this.engine.objectManager.addObject(this.currentStroke)
+            if (this.engine.toolbar) {
+                this.engine.toolbar.updateUndoRedoButtons()
+            }
         }
         this.currentStroke = null
         this.isDrawing = false

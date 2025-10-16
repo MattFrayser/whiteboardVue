@@ -1,10 +1,12 @@
 // src/core/ObjectManager.js
+import { Stroke } from '../objects/Stroke'
+
 export class ObjectManager {
     constructor() {
         this.objects = []
         this.selectedObjects = []
-        this.history = []
-        this.historyIndex = -1
+        this.history = ['[]']  
+        this.historyIndex = 0
         this.clipboard = []
     }
     
@@ -109,7 +111,7 @@ export class ObjectManager {
     }
     
     redo() {
-        if (this.historyIndex < this.history.length - 1) {
+        if (this.historyIndex < this.history.length) {
             this.historyIndex++
             this.loadState(this.history[this.historyIndex])
         }
@@ -123,10 +125,9 @@ export class ObjectManager {
     
     createObjectFromData(data) {
         const typeMap = {
-            'stroke': () => import('../objects/Stroke'),
+            'stroke': Stroke,
         }
-        
-        // simplified
+
         const ObjectClass = typeMap[data.type]
         if (ObjectClass) {
             return new ObjectClass(data.id, data.data)

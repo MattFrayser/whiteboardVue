@@ -16,9 +16,14 @@ export class DrawingEngine {
         this.currentTool = this.tools.draw
         this.currentColor = '#000000'
         this.currentWidth = 5
+        this.toolbar = null
 
         this.setupEventListeners()
         this.resize()
+    }
+
+    setToolbar(toolbar) {
+        this.toolbar = toolbar
     }
 
     setupEventListeners() {            
@@ -106,6 +111,9 @@ export class DrawingEngine {
                 this.objectManager.undo()
             }
             this.render()
+            if (this.toolbar) {
+                this.toolbar.updateUndoRedoButtons()
+            }
         }
         
         // Delete
