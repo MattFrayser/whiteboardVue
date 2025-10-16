@@ -21,7 +21,7 @@ export class Rectangle extends DrawingObject {
       this.data.y2 += dy
     }
 
-    render() {
+    render(ctx) {
         const bounds = this.getBounds()
 
         ctx.strokeStyle = this.data.color

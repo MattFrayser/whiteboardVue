@@ -1,5 +1,6 @@
 // src/core/ObjectManager.js
 import { Stroke } from '../objects/Stroke'
+import { Rectangle } from '../objects/Rectangle'
 
 export class ObjectManager {
     constructor() {
@@ -126,6 +127,7 @@ export class ObjectManager {
     createObjectFromData(data) {
         const typeMap = {
             'stroke': Stroke,
+            'rectangle': Rectangle,
         }
 
         const ObjectClass = typeMap[data.type]

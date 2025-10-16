@@ -18,7 +18,14 @@ export class Toolbar {
 
     setupEventListeners() {
 
-        // TODO: add toolBtns, keyboard shortcuts
+        // TODO: keyboard shortcuts
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tool = btn.dataset.tool
+                this.engine.setTool(tool)
+                this.updateToolButtons()
+            })
+        })
 
         // Color Picker
         const colorPicker = document.getElementById('colorPicker')
@@ -206,5 +213,30 @@ export class Toolbar {
 
         undoBtn.disabled = objectManager.historyIndex <= 0
         redoBtn.disabled = objectManager.historyIndex >= objectManager.history.length - 1
+    }
+
+    updateToolButtons() {
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.classList.remove('active')
+            if (btn.dataset.tool === this.getCurrentToolName()) {
+                btn.classList.add('active')
+            }
+        })
+
+        const canvas = this.engine.canvas
+        if (this.getCurrentToolName() === 'rectangle') {
+            canvas.style.cursor = 'crosshair'
+        } else {
+            canvas.style.cursor = 'default'
+        }
+    }
+
+    getCurrentToolName() {
+        for (const [name, tool] of Object.entries(this.engine.tools)) {
+            if (tool === this.engine.currentTool) {
+                return name
+            }
+        }
+        return null
     }
 }
