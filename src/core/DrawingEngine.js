@@ -2,6 +2,7 @@ import { ObjectManager } from './ObjectManager'
 import { Coordinates } from './Coordinates'
 import { DrawTool } from '../tools/DrawTool'
 import { RectangleTool } from '../tools/RectangleTool'
+import { CircleTool } from '../tools/CircleTool'
 
 export class DrawingEngine {
     constructor(canvas) {
@@ -12,7 +13,8 @@ export class DrawingEngine {
 
         this.tools = {
             draw: new DrawTool(this),
-            rectangle: new RectangleTool(this)
+            rectangle: new RectangleTool(this),
+            circle: new CircleTool(this)
         }
 
         this.currentTool = this.tools.draw
