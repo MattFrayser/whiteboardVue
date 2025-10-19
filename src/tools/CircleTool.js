@@ -17,18 +17,17 @@ export class CircleTool extends Tool {
             y2: worldPos.y,
             color: this.engine.currentColor,
             width:this.engine.currentWidth,
-            fill: null
+            fill: e.shiftKey ? this.engine.currentColor : null
         })
     }
 
     onMouseMove(worldPos, e) {
         if (this.currentCircle) {
-
             this.currentCircle.data.x2 = worldPos.x
             this.currentCircle.data.y2 = worldPos.y
+            this.engine.render()
         }
 
-        this.engine.render()
 
     }
 
@@ -38,6 +37,13 @@ export class CircleTool extends Tool {
                 Math.pow(this.currentCircle.data.x2 - this.currentCircle.data.x1, 2) +
                 Math.pow(this.currentCircle.data.y2 - this.currentCircle.data.y1, 2)
             )
+
+            if (radius > 1) {
+                this.engine.objectManager.addObject(this.currentCircle)
+                if (this.engine.toolbar) {
+                    this.engine.toolbar.updateUndoRedoButtons()
+                }
+            }
 
             this.currentCircle = null
             this.startPoint = null

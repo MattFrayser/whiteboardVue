@@ -21,11 +21,11 @@ export class Circle extends DrawingObject {
     containsPoint(point) {
         const radius = Math.sqrt(
             Math.pow(this.data.x2 - this.data.x1, 2) +
-            Math.pow(this.data.y2 - this.data.y1, 2) 
+            Math.pow(this.data.y2 - this.data.y1, 2)
         )
         const distance = Math.sqrt(
-            Math.pow(point.x2 - this.data.x1, 2) +
-            Math.pow(point.y2 - this.data.y1, 2) 
+            Math.pow(point.x - this.data.x1, 2) +
+            Math.pow(point.y - this.data.y1, 2)
         )
 
         return distance <= radius
@@ -50,9 +50,15 @@ export class Circle extends DrawingObject {
         ctx.fillStyle = this.data.fill || 'transparent'
 
         ctx.beginPath()
-        ctx.arc(this.data.x1, this.data.y2, radius, 0, Math.PI * 2)
+        ctx.arc(this.data.x1, this.data.y1, radius, 0, Math.PI * 2)
 
+        if (this.data.fill) {
+            ctx.fill()
+        }
         ctx.stroke()
 
+        if (this.selected) {
+            this.renderSelection(ctx)
+        }
     }
 }

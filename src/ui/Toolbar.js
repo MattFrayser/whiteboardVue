@@ -224,8 +224,11 @@ export class Toolbar {
         })
 
         const canvas = this.engine.canvas
-        if (this.getCurrentToolName() === 'rectangle') {
+        const currentToolName = this.getCurrentToolName()
+        if ( currentToolName === 'rectangle' || currentToolName === 'circle' || currentToolName === 'line') {
             canvas.style.cursor = 'crosshair'
+        } else if (currentToolName === 'text') {
+            canvas.style.cursor = 'text'
         } else {
             canvas.style.cursor = 'default'
         }

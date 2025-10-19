@@ -3,6 +3,10 @@ import { Coordinates } from './Coordinates'
 import { DrawTool } from '../tools/DrawTool'
 import { RectangleTool } from '../tools/RectangleTool'
 import { CircleTool } from '../tools/CircleTool'
+import { SelectTool } from '../tools/SelectTool'
+import { EraserTool } from '../tools/EraserTool'
+import { LineTool } from '../tools/LineTool'
+import { TextTool } from '../tools/TextTool'
 
 export class DrawingEngine {
     constructor(canvas) {
@@ -14,7 +18,11 @@ export class DrawingEngine {
         this.tools = {
             draw: new DrawTool(this),
             rectangle: new RectangleTool(this),
-            circle: new CircleTool(this)
+            circle: new CircleTool(this),
+            select: new SelectTool(this),
+            eraser: new EraserTool(this),
+            line: new LineTool(this),
+            text: new TextTool(this)
         }
 
         this.currentTool = this.tools.draw

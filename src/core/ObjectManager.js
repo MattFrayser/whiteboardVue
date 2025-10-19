@@ -2,6 +2,8 @@
 import { Stroke } from '../objects/Stroke'
 import { Rectangle } from '../objects/Rectangle'
 import { Circle } from '../objects/Circle'
+import { Line } from '../objects/Line'
+import { Text } from '../objects/Text'
 
 export class ObjectManager {
     constructor() {
@@ -130,6 +132,8 @@ export class ObjectManager {
             'stroke': Stroke,
             'rectangle': Rectangle,
             'circle': Circle,
+            'line': Line,
+            'text': Text
         }
 
         const ObjectClass = typeMap[data.type]

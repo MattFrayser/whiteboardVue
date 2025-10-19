@@ -14,7 +14,7 @@ export class Rectangle extends DrawingObject {
         }
     }
     
-    move() {
+    move(dx, dy) {
       this.data.x1 += dx
       this.data.y1 += dy
       this.data.x2 += dx
