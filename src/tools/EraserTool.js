@@ -28,9 +28,6 @@ export class EraserTool extends Tool {
     }
 
     onMouseUp(worldPos, e) {
-        if (this.erasedObjects.size > 0) {
-            this.engine.objectManager.saveState()
-        }
         this.isErasing = false
         this.erasedObjects.clear()
         this.eraserTrail = []
@@ -42,21 +39,18 @@ export class EraserTool extends Tool {
         const eraserSize = 1
 
         objects.forEach(obj => {
-                    if (this.erasedObjects.has(obj)) return
-             const bounds = obj.getBounds()
-                if (point.x + eraserSize > bounds.x &&
-                    point.x - eraserSize < bounds.x + bounds.width &&
-                    point.y + eraserSize > bounds.y &&
-                    point.y - eraserSize < bounds.y + bounds.height) {
-                    
-                    // Remove object
-                    const index = this.engine.objectManager.objects.indexOf(obj)
-                    if (index > -1) {
-                        this.engine.objectManager.objects.splice(index, 1)
-                        this.erasedObjects.add(obj)
-                        this.engine.render()
-                    }
-                }
+            if (this.erasedObjects.has(obj)) return
+            const bounds = obj.getBounds()
+            if (point.x + eraserSize > bounds.x &&
+                point.x - eraserSize < bounds.x + bounds.width &&
+                point.y + eraserSize > bounds.y &&
+                point.y - eraserSize < bounds.y + bounds.height) {
+
+                // Remove using ObjectManager to trigger broadcast
+                this.engine.objectManager.removeObject(obj)
+                this.erasedObjects.add(obj)
+                this.engine.render()
+            }
         })
     }
 

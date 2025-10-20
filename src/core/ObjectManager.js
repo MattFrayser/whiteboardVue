@@ -6,17 +6,24 @@ import { Line } from '../objects/Line'
 import { Text } from '../objects/Text'
 
 export class ObjectManager {
-    constructor() {
+    constructor(engine = null) {
         this.objects = []
         this.selectedObjects = []
-        this.history = ['[]']  
+        this.history = ['[]']
         this.historyIndex = 0
         this.clipboard = []
+        this.engine = engine
     }
     
     addObject(object) {
         this.objects.push(object)
         this.saveState()
+
+        // Broadcast to other clients
+        if (this.engine && this.engine.wsManager) {
+            this.engine.wsManager.broadcastObjectAdded(object)
+        }
+
         return object
     }
     
@@ -25,6 +32,11 @@ export class ObjectManager {
         if (index > -1) {
             this.objects.splice(index, 1)
             this.saveState()
+
+            // Broadcast to other clients
+            if (this.engine && this.engine.wsManager) {
+                this.engine.wsManager.broadcastObjectDeleted(object)
+            }
         }
     }
     
@@ -42,14 +54,13 @@ export class ObjectManager {
     }
     
     deleteSelected() {
-        this.selectedObjects.forEach(obj => {
-            const index = this.objects.indexOf(obj)
-            if (index > -1) {
-                this.objects.splice(index, 1)
-            }
-        })
+        const toDelete = [...this.selectedObjects]
         this.clearSelection()
-        this.saveState()
+
+        // Use removeObject to trigger broadcasts
+        toDelete.forEach(obj => {
+            this.removeObject(obj)
+        })
     }
     
     getObjectAt(point) {

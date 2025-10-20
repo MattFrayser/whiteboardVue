@@ -12,7 +12,7 @@ export class DrawingEngine {
     constructor(canvas) {
         this.canvas = canvas
         this.ctx = canvas.getContext('2d')
-        this.objectManager = new ObjectManager()
+        this.objectManager = new ObjectManager(this)
         this.coordinates = new Coordinates()
 
         this.tools = {
@@ -73,6 +73,19 @@ export class DrawingEngine {
                 {x: e.clientX, y: e.clientY},
                 this.canvas
         )
+
+        // Broadcast cursor position with current tool
+        if (this.wsManager && this.wsManager.userId) {
+            // Get current tool name
+            const toolName = Object.keys(this.tools).find(
+                key => this.tools[key] === this.currentTool
+            )
+            this.wsManager.broadcastCursor({
+                x: worldPos.x,
+                y: worldPos.y,
+                tool: toolName
+            })
+        }
 
         if (e.buttons === 1) {
             this.currentTool.onMouseMove(worldPos, e)
@@ -210,24 +223,42 @@ export class DrawingEngine {
     
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
-        
+
         // Apply transformations
         this.ctx.save()
         const { offsetX, offsetY, scale } = this.coordinates
         this.ctx.translate(offsetX, offsetY)
         this.ctx.scale(scale, scale)
-        
+
         // Render all objects
         this.objectManager.render(this.ctx)
-        
+
         // Render current tool preview
         if (this.currentTool && this.currentTool.renderPreview) {
             this.currentTool.renderPreview(this.ctx)
         }
-        
+
+        // Render remote cursors
+        if (this.wsManager && this.wsManager.remoteCursors) {
+            this.wsManager.remoteCursors.forEach((cursor, userId) => {
+                this.renderRemoteCursor(this.ctx, cursor)
+            })
+        }
+
         this.ctx.restore()
     }
-    
+
+    renderRemoteCursor(ctx, cursor) {
+        ctx.save()
+
+        ctx.fillStyle = cursor.color || '#444444'
+        ctx.beginPath()
+        ctx.arc(cursor.x, cursor.y, 5, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.restore()
+    }
+
     start() {
         this.render()
     }
