@@ -21,20 +21,32 @@ body {
 
 .toolbar {
     position: fixed;
-    top: 20px;
-    left: 20px;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
     background: white;
-    padding: 15px;
+    padding: 6px;
+    border: 1px solid #e0e0e0;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
     display: flex;
-    gap: 15px;
+    gap: 4px;
     align-items: center;
     z-index: 1000;
 }
 
-/* Color Picker */
+.toolbar-section {
+    display: flex;
+    gap: 4px;
+}
 
+.toolbar-divider {
+    width: 1px; 
+    height: 32px;
+    background: #e0e0e0;
+    margin: 0 8px;
+}
+/* Color Picker */
 .color-picker-container {
     position: relative;
     display: inline-block;
@@ -43,12 +55,11 @@ body {
 .color-swatches {
     display: flex;
     gap: 8px;
-    
 }
 
 .swatch {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border: 2px solid #ddd;
     border-radius: 50%;
     cursor: pointer;
@@ -136,9 +147,35 @@ body {
     cursor: pointer;
 }
 
+/* Tools */
+.tool-btn, .icon-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all 0.15s ease;
+    padding: 0;
+}
+
+.tool-btn.active {
+    background: gray;
+    color: white;
+}
+
+.icon-btn:disabled {
+    color: #ccc;
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
 /* Undo & Redo */ 
 .control-group {
-   margin-left: 0.5em; 
    font-size: 2em;
 }
 .control-group button {
@@ -153,4 +190,6 @@ body {
 .control-group button:disabled{
     color: gray;
 }
+
+
 

@@ -50,6 +50,26 @@ export class Text extends DrawingObject {
         }
     }
 
+    applyBounds(newBounds) {
+        const oldBounds = this.getBounds()
+        const scale = newBounds.height / oldBounds.height
+        
+        this.data.fontSize = Math.max(8, Math.round(this.data.fontSize * scale))
+        this.measureBounds()
+        
+        this.data.x = newBounds.x
+        this.data.y = newBounds.y + this.textHeight
+    }
+    getResizeHandles() {
+        const bounds = this.getBounds()
+        // Only corner handles
+        return [
+            { x: bounds.x, y: bounds.y, cursor: 'nw-resize' },
+            { x: bounds.x + bounds.width, y: bounds.y, cursor: 'ne-resize' },
+            { x: bounds.x + bounds.width, y: bounds.y + bounds.height, cursor: 'se-resize' },
+            { x: bounds.x, y: bounds.y + bounds.height, cursor: 'sw-resize' },
+        ]
+    }
     setText(text) {
         this.data.text = text
         this.measureBounds()

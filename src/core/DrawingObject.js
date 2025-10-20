@@ -42,11 +42,19 @@ export class DrawingObject {
         ctx.setLineDash([])
         
         // Render resize handles
-        const handleSize = 8 / ctx.getTransform().a
+        const handleSize = 12 / ctx.getTransform().a
         const handles = this.getResizeHandles()
-        ctx.fillStyle = '#0066ff'
+        ctx.fillStyle = '#ffffff'
+        ctx.strokeStyle = '#0066ff'
+        ctx.lineWidth = 2 / ctx.getTransform().a
         handles.forEach(handle => {
             ctx.fillRect(
+                handle.x - handleSize/2,
+                handle.y - handleSize/2,
+                handleSize,
+                handleSize
+            )
+            ctx.strokeRect(
                 handle.x - handleSize/2,
                 handle.y - handleSize/2,
                 handleSize,
@@ -68,6 +76,67 @@ export class DrawingObject {
             { x: bounds.x, y: bounds.y + bounds.height/2, cursor: 'w-resize' }
         ]
     }
+
+    resize(handleIndex, newX, newY) {
+        const bounds = this.getBounds()
+
+        let newBounds = {...bounds}
+
+        switch (handleIndex) {
+            case 0: // north-west
+                newBounds.x = newX
+                newBounds.y = newY
+                newBounds.width = bounds.x + bounds.width - newX
+                newBounds.height = bounds.y + bounds.height - newY
+                break
+            case 1: // north
+                newBounds.y = newY
+                newBounds.height = bounds.y + bounds.height - newY
+                break
+            case 2: // north-east
+                newBounds.y = newY
+                newBounds.width = newX - bounds.x 
+                newBounds.height = bounds.y + bounds.height - newY
+                break
+            case 3: // east
+                newBounds.width = newX - bounds.x
+                break
+            case 4: // south-east
+                newBounds.width = newX - bounds.x
+                newBounds.height = newY - bounds.y
+                break
+            case 5: // south 
+                newBounds.height = newY - bounds.y
+                break
+            case 6: // south-west
+                newBounds.x = newX
+                newBounds.width = bounds.x + bounds.width - newX
+                newBounds.height = newY - bounds.y
+                break
+            case 7: // west
+                newBounds.x = newX
+                newBounds.width = bounds.x + bounds.width - newX
+                break
+        }
+
+        // Prevent negative dimensions
+        if (newBounds.width < 5) {
+            newBounds.width = 5
+            // Adjust x if needed to prevent flipping
+            if (handleIndex === 0 || handleIndex === 6 || handleIndex === 7) {
+                newBounds.x = bounds.x + bounds.width - 5
+            }
+        }
+        if (newBounds.height < 5) {
+            newBounds.height = 5
+            // Adjust y if needed to prevent flipping
+            if (handleIndex === 0 || handleIndex === 1 || handleIndex === 2) {
+                newBounds.y = bounds.y + bounds.height - 5
+            }
+        }
+        this.applyBounds(newBounds, handleIndex)
+}
+
     
     toJSON() {
         return {

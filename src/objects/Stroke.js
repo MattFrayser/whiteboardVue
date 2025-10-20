@@ -37,6 +37,17 @@ export class Stroke extends DrawingObject {
             point.y += dy
         })
     }
+
+    applyBounds(newBounds) {
+        const oldBounds = this.getBounds()
+        const scaleX = newBounds.width / oldBounds.width
+        const scaleY = newBounds.height / oldBounds.height
+        
+        this.data.points = this.data.points.map(point => ({
+            x: newBounds.x + (point.x - oldBounds.x) * scaleX,
+            y: newBounds.y + (point.y - oldBounds.y) * scaleY
+        }))
+    }
     
     render(ctx) {
         if (this.data.points.length === 0) return

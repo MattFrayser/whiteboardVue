@@ -13,6 +13,13 @@ export class Rectangle extends DrawingObject {
             height: Math.abs(this.data.y2 - this.data.y1)
         }
     }
+
+    applyBounds(newBounds) {
+      this.data.x1 = newBounds.x
+      this.data.y1 = newBounds.y
+      this.data.x2 = newBounds.x + newBounds.width
+      this.data.y2 = newBounds.y + newBounds.height
+    }
     
     move(dx, dy) {
       this.data.x1 += dx

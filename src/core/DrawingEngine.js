@@ -30,6 +30,8 @@ export class DrawingEngine {
         this.currentWidth = 5
         this.toolbar = null
 
+        this.rightMouseDown = false
+
         this.setupEventListeners()
         this.resize()
     }
@@ -38,12 +40,13 @@ export class DrawingEngine {
         this.toolbar = toolbar
     }
 
-    setupEventListeners() {            
+    setupEventListeners() {
         this.canvas.addEventListener('mousedown', e => this.handleMouseDown(e))
         this.canvas.addEventListener('mousemove', e => this.handleMouseMove(e))
         this.canvas.addEventListener('mouseup', e => this.handleMouseUp(e))
         this.canvas.addEventListener('wheel', e => this.handleMouseWheel(e))
-        
+        this.canvas.addEventListener('contextmenu', e => e.preventDefault())
+
         document.addEventListener('keydown', e => this.handleKeyDown(e))
     }
 
@@ -57,6 +60,8 @@ export class DrawingEngine {
             this.currentTool.onMouseDown(worldPos, e)
         } else if (e.button === 2) {
             this.coordinates.startPan({ x: e.clientX, y:e.clientY })
+            this.rightMouseDown = true
+            this.updateCursor()
         }
     } 
 
@@ -80,12 +85,14 @@ export class DrawingEngine {
             { x: e.clientX, y: e.clientY },
             this.canvas
         )
-        
+
         if (e.button === 0) {
             this.currentTool.onMouseUp(worldPos, e)
         } else if (e.button === 2) {
             this.coordinates.endPan()
-        }   
+            this.rightMouseDown = false
+            this.updateCursor(worldPos)
+        }
     }
 
     handleMouseWheel(e) {
@@ -95,37 +102,47 @@ export class DrawingEngine {
         this.render()
     }
 
-    updateCursor() {
-            canvas.style.cursor = rightMouseDown ? 'grabbing' : 'crosshair';
+    updateCursor(worldPos = null) {
+        if (this.rightMouseDown) {
+            this.canvas.style.cursor = 'grabbing'
+        } else {
+            // Restore tool-specific cursor
+            if (this.currentTool === this.tools.select && worldPos) {
+                // SelectTool has dynamic cursor based on hover position
+                this.currentTool.updateCursor(worldPos)
+            } else if (this.toolbar) {
+                this.toolbar.updateToolButtons()
+            }
+        }
     }
 
     handleKeyDown(e) {
         const shortcuts = {
-            'v': 'select',
-            'p': 'draw',
-            'r': 'rectangle',
-            'c': 'circle',
-            'l': 'line',
-            't': 'text',
-            'e': 'eraser'
+            'S': 'select',
+            'D': 'draw',
+            'R': 'rectangle',
+            'C': 'circle',
+            'L': 'line',
+            'T': 'text',
+            'E': 'eraser'
         }
-        
+
         if (shortcuts[e.key]) {
             this.setTool(shortcuts[e.key])
+            this.updateCursor()
         }
-        
-        // Undo/Redo
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+
+        // Undo / redo
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
             e.preventDefault()
-            if (e.shiftKey) {
-                this.objectManager.redo()
-            } else {
-                this.objectManager.undo()
-            }
-            this.render()
-            if (this.toolbar) {
-                this.toolbar.updateUndoRedoButtons()
-            }
+            this.objectManager.redo()
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault()
+            this.objectManager.undo()
+        }
+        this.render()
+        if (this.toolbar) {
+            this.toolbar.updateUndoRedoButtons()
         }
         
         // Delete
@@ -144,7 +161,7 @@ export class DrawingEngine {
     
     resize() {
         this.canvas.width = window.innerWidth
-        this.canvas.height = window.innerHeight - 60
+        this.canvas.height = window.innerHeight
         this.render()
     }
     

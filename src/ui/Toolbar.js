@@ -133,7 +133,7 @@ export class Toolbar {
         if (this.activeSwatch) {
             const circle = this.activeSwatch.querySelector('.swatch-circle')
             if (circle) {
-                const size = Math.min(36, Math.max(8, this.engine.currentWidth * 1.5))
+                const size = Math.min(28, Math.max(8, this.engine.currentWidth * 1.5))
                 circle.style.width = size + 'px'
                 circle.style.height = size + 'px'
             }

@@ -115,7 +115,7 @@ export class ObjectManager {
     }
     
     redo() {
-        if (this.historyIndex < this.history.length) {
+        if (this.historyIndex < this.history.length - 1) {
             this.historyIndex++
             this.loadState(this.history[this.historyIndex])
         }

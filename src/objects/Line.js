@@ -65,6 +65,17 @@ export class Line extends DrawingObject {
         this.data.y2 += dy
     }
 
+    applyBounds(newBounds) {
+    const oldBounds = this.getBounds()
+    const scaleX = newBounds.width / oldBounds.width
+    const scaleY = newBounds.height / oldBounds.height
+    
+    this.data.x1 = newBounds.x + (this.data.x1 - oldBounds.x) * scaleX
+    this.data.y1 = newBounds.y + (this.data.y1 - oldBounds.y) * scaleY
+    this.data.x2 = newBounds.x + (this.data.x2 - oldBounds.x) * scaleX
+    this.data.y2 = newBounds.y + (this.data.y2 - oldBounds.y) * scaleY
+}
+
     render(ctx) {
         ctx.strokeStyle = this.data.color
         ctx.lineWidth = this.data.width
