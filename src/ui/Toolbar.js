@@ -225,12 +225,31 @@ export class Toolbar {
 
         const canvas = this.engine.canvas
         const currentToolName = this.getCurrentToolName()
-        if ( currentToolName === 'rectangle' || currentToolName === 'circle' || currentToolName === 'line') {
-            canvas.style.cursor = 'crosshair'
-        } else if (currentToolName === 'text') {
-            canvas.style.cursor = 'text'
-        } else {
-            canvas.style.cursor = 'default'
+
+        switch (currentToolName) {
+            case 'rectangle':
+                canvas.style.cursor = 'crosshair'
+                break
+            case 'circle':
+                canvas.style.cursor = 'crosshair'
+                break
+            case 'line':
+                canvas.style.cursor = 'crosshair'
+                break
+            case 'draw':
+                canvas.style.cursor = 'url(/draw-cursor.svg) 2 17, crosshair'
+                break
+            case 'eraser':
+                canvas.style.cursor = 'url(/eraser-cursor.svg) 10 9, pointer'
+                break
+            case 'select':
+                canvas.style.cursor = 'url(/select-cursor.svg) 2 2, default'
+                break
+            case 'text':
+                canvas.style.cursor = 'text'
+                break
+            default:
+                canvas.style.cursor = 'default'
         }
     }
 

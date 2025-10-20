@@ -6,18 +6,25 @@ export class EraserTool extends Tool {
         super(engine)
         this.isErasing = false
         this.erasedObjects = new Set()
+        this.currentWorldPos = null
+        this.eraserTrail = []
     }
 
     onMouseDown(worldPos, e) {
         this.isErasing = true
         this.erasedObjects.clear()
+        this.eraserTrail = [worldPos]
+        this.currentWorldPos = worldPos
         this.eraseAt(worldPos)
     }
 
     onMouseMove(worldPos, e) {
+        this.currentWorldPos = worldPos
         if (this.isErasing) {
+            this.eraserTrail.push(worldPos)
             this.eraseAt(worldPos)
         }
+        this.engine.render()
     }
 
     onMouseUp(worldPos, e) {
@@ -26,6 +33,8 @@ export class EraserTool extends Tool {
         }
         this.isErasing = false
         this.erasedObjects.clear()
+        this.eraserTrail = []
+        this.engine.render()
     }
 
     eraseAt(point) {
@@ -52,18 +61,28 @@ export class EraserTool extends Tool {
     }
 
     renderPreview(ctx) {
-         if (this.isErasing) {
-                ctx.save()
-                ctx.globalAlpha = 0.3
-                ctx.fillStyle = '#ff0000'
-                const mousePos = this.engine.lastMousePos // You'd need to track this
-                if (mousePos) {
-                    ctx.beginPath()
-                    ctx.arc(mousePos.x, mousePos.y, this.engine.currentWidth * 2, 0, Math.PI * 2)
-                    ctx.fill()
-                }
-                ctx.restore()
+        ctx.save()
+
+        // Eraser Trail 
+        if (this.isErasing && this.eraserTrail.length > 0) {
+            ctx.strokeStyle = '#888888'
+            ctx.lineWidth = 10
+            ctx.lineCap = 'round'
+            ctx.lineJoin = 'round'
+            ctx.globalAlpha = 0.5
+
+            ctx.beginPath()
+            const firstPoint = this.eraserTrail[0]
+            ctx.moveTo(firstPoint.x, firstPoint.y)
+
+            for (let i = 1; i < this.eraserTrail.length; i++) {
+                const point = this.eraserTrail[i]
+                ctx.lineTo(point.x, point.y)
+            }
+            ctx.stroke()
         }
+
+        ctx.restore()
     }
 }
 

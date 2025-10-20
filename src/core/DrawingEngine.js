@@ -31,6 +31,7 @@ export class DrawingEngine {
         this.toolbar = null
 
         this.rightMouseDown = false
+        this.lastMousePos = { x: 0, y: 0 } // Track mouse position for paste
 
         this.setupEventListeners()
         this.resize()
@@ -66,6 +67,8 @@ export class DrawingEngine {
     } 
 
     handleMouseMove(e) {
+        this.lastMousePos = { x: e.clientX, y: e.clientY } // Track mouse position
+
         const worldPos = this.coordinates.viewportToWorld(
                 {x: e.clientX, y: e.clientY},
                 this.canvas
@@ -132,7 +135,40 @@ export class DrawingEngine {
             this.updateCursor()
         }
 
-        // Undo / redo
+        // Copy (ctrl-c)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            e.preventDefault()
+            this.objectManager.copySelected()
+        }
+
+        // Cut (ctrl-x)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+            e.preventDefault()
+            this.objectManager.cutSelected()
+
+            this.render()
+          if (this.toolbar) {
+                this.toolbar.updateUndoRedoButtons()
+            }
+        }
+
+        // paste (ctrl-v)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+            e.preventDefault()
+            const worldPos = this.coordinates.viewportToWorld(
+                this.lastMousePos,
+                this.canvas
+            )
+            this.objectManager.paste(worldPos.x, worldPos.y)
+
+            this.render()
+            if (this.toolbar) {
+                this.toolbar.updateUndoRedoButtons()
+            }
+        }
+
+
+        // Undo (ctrl-z) / redo (ctrl-shift-z)
         if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
             e.preventDefault()
             this.objectManager.redo()
@@ -155,8 +191,15 @@ export class DrawingEngine {
         if (this.currentTool) {
             this.currentTool.deactivate()
         }
+
+        // Clear selection when switching away from select tool
+        if (this.currentTool === this.tools.select) {
+            this.objectManager.clearSelection()
+        }
+
         this.currentTool = this.tools[toolName]
         this.currentTool.activate()
+        this.render()
     }
     
     resize() {

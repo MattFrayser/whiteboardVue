@@ -11,6 +11,10 @@ export class SelectTool extends Tool {
         this.resizeHandleIndex = null
         this.resizeObject = null
 
+        this.isSelecting = false
+        this.selectionStart = null
+        this.selectionEnd = null
+
         this.setupMouseMoveListener()
     }
 
@@ -35,7 +39,7 @@ export class SelectTool extends Tool {
         // Don't change cursor while dragging or resizing
         if (this.isDragging || this.isResizing) return
 
-        // Check if hovering over a resize handle
+        // Hovering over a resize handle
         if (this.engine.objectManager.selectedObjects.length === 1) {
             const obj = this.engine.objectManager.selectedObjects[0]
             const handleIndex = this.getHandleAt(worldPos, obj)
@@ -47,12 +51,13 @@ export class SelectTool extends Tool {
             }
         }
 
-        // Check if hovering over an object
+        // Hovering over an object
         const object = this.engine.objectManager.getObjectAt(worldPos)
         if (object) {
             this.engine.canvas.style.cursor = 'move'
         } else {
-            this.engine.canvas.style.cursor = 'default'
+            // Use custom select cursor when not hovering over anything
+            this.engine.canvas.style.cursor = 'url(/select-cursor.svg) 2 2, pointer'
         }
     }
 
@@ -71,7 +76,7 @@ export class SelectTool extends Tool {
             }
         }
 
-        // Normal selection 
+        // Normal selection
         const object = this.engine.objectManager.getObjectAt(worldPos)
 
         if (object) {
@@ -81,7 +86,13 @@ export class SelectTool extends Tool {
             this.dragStart = worldPos
             this.isDragging = true
         } else {
-            this.engine.objectManager.clearSelection()
+            // select Drag 
+            if (!e.shiftKey) {
+                this.engine.objectManager.clearSelection()
+            }
+            this.isSelecting = true
+            this.selectionStart = worldPos
+            this.selectionEnd = worldPos
         }
 
         this.engine.render()
@@ -96,6 +107,14 @@ export class SelectTool extends Tool {
             // Keep cursor during resize
             const handles = this.resizeObject.getResizeHandles()
             this.engine.canvas.style.cursor = handles[this.resizeHandleIndex].cursor
+            return
+        }
+
+        // Drag Selection
+        if (this.isSelecting) {
+            this.selectionEnd = worldPos
+            this.engine.canvas.style.cursor = 'crosshair'
+            this.engine.render()
             return
         }
 
@@ -121,6 +140,17 @@ export class SelectTool extends Tool {
                 this.engine.toolbar.updateUndoRedoButtons()
             }
         }
+
+        // Finish drag selection
+        if (this.isSelecting) {
+            const rect = this.getSelectionRect()
+            this.engine.objectManager.selectObjectsInRect(rect, e.shiftKey)
+            this.isSelecting = false
+            this.selectionStart = null
+            this.selectionEnd = null
+            this.engine.render()
+        }
+
         this.isDragging = false
         this.dragStart = null
 
@@ -134,15 +164,15 @@ export class SelectTool extends Tool {
 
     getHandleAt(point, obj) {
         const handles = obj.getResizeHandles()
-        // Visual handle size is 12px, but make clickable area larger for easier interaction
-        const visualHandleSize = 12 / this.engine.coordinates.scale
+
+        //const visualHandleSize = 12 / this.engine.coordinates.scale
         const clickableSize = 20 / this.engine.coordinates.scale  // Larger clickable area
         const halfSize = clickableSize / 2
 
         for (let i = 0; i < handles.length; i++) {
             const handle = handles[i]
 
-            // Use rectangular (square) hit test with larger clickable area
+            // Use rectangle 
             if (point.x >= handle.x - halfSize &&
                 point.x <= handle.x + halfSize &&
                 point.y >= handle.y - halfSize &&
@@ -152,7 +182,33 @@ export class SelectTool extends Tool {
         }
 
         return -1
+    }
 
+    getSelectionRect() {
+        if (!this.selectionStart || !this.selectionEnd) return null
+
+        const x = Math.min(this.selectionStart.x, this.selectionEnd.x)
+        const y = Math.min(this.selectionStart.y, this.selectionEnd.y)
+        const width = Math.abs(this.selectionEnd.x - this.selectionStart.x)
+        const height = Math.abs(this.selectionEnd.y - this.selectionStart.y)
+
+        return { x, y, width, height }
+    }
+
+    renderPreview(ctx) {
+        if (this.isSelecting && this.selectionStart && this.selectionEnd) {
+            const rect = this.getSelectionRect()
+
+            ctx.strokeStyle = '#0066ff'
+            ctx.fillStyle = 'rgba(0, 102, 255, 0.1)'
+            ctx.lineWidth = 1 / ctx.getTransform().a
+            ctx.setLineDash([5, 5])
+
+            ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
+            ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
+
+            ctx.setLineDash([])
+        }
     }
 
 }

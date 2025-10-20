@@ -61,6 +61,29 @@ export class ObjectManager {
         }
         return null
     }
+
+    selectObjectsInRect(rect, multi = false) {
+        if (!multi) {
+            this.clearSelection()
+        }
+
+        // Check each object intersection with select rectangle 
+        this.objects.forEach(obj => {
+            const bounds = obj.getBounds()
+
+            const intersects = !(
+                bounds.x + bounds.width < rect.x ||
+                bounds.x > rect.x + rect.width ||
+                bounds.y + bounds.height < rect.y ||
+                bounds.y > rect.y + rect.height
+            )
+
+            if (intersects && !obj.selected) {
+                obj.selected = true
+                this.selectedObjects.push(obj)
+            }
+        })
+    }
     
     moveSelected(dx, dy) {
         this.selectedObjects.forEach(obj => obj.move(dx, dy))
@@ -105,6 +128,59 @@ export class ObjectManager {
             this.history.shift()
             this.historyIndex--
         }
+    }
+    
+    copySelected() {
+        if (this.selectedObjects.length === 0) return
+
+        this.clipboard = this.selectedObjects.map(obj => obj.toJSON())
+    }
+
+    cutSelected() {
+        if (this.selectedObjects.length === 0) return 
+        
+        this.copySelected()
+        this.deleteSelected()
+
+    }
+    paste(x, y) {
+        if (this.clipboard.length === 0) return
+
+        this.clearSelection()
+
+        const newObjects = this.clipboard.map(data => {
+           // Deep clone
+           const clonedData = JSON.parse(JSON.stringify(data))
+           const newObject = this.createObjectFromData(clonedData)
+           this.objects.push(newObject)
+           return newObject
+        })
+
+        // Bounding box of all objects 
+        let minX = Infinity, minY = Infinity
+        let maxX = -Infinity, maxY = -Infinity
+
+        newObjects.forEach(obj => {
+            const bounds = obj.getBounds()
+            minX = Math.min(minX, bounds.x)
+            minY = Math.min(minY, bounds.y)
+            maxX = Math.max(maxX, bounds.x + bounds.width)
+            maxY = Math.max(maxY, bounds.y + bounds.height)
+        })
+
+        // Group center offset to cursor
+        const groupCenterX = (minX + maxX) / 2
+        const groupCenterY = (minY + maxY) / 2
+
+        const dx = x - groupCenterX
+        const dy = y - groupCenterY
+
+        newObjects.forEach(obj => {
+            obj.move(dx, dy)
+            this.selectObject(obj, true)
+        })
+
+        this.saveState()
     }
     
     undo() {
