@@ -162,6 +162,7 @@ export class ObjectManager {
         const newObjects = this.clipboard.map(data => {
            // Deep clone
            const clonedData = JSON.parse(JSON.stringify(data))
+           clonedData.id = null // will trigger new ID
            const newObject = this.createObjectFromData(clonedData)
            this.objects.push(newObject)
            return newObject

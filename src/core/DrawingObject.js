@@ -28,7 +28,11 @@ export class DrawingObject {
     move(dx, dy) {
         // Override in subclasses
     }
-    
+
+    applyBounds(newBounds, handleIndex) {
+        // Override in subclasses
+    }
+
     render(ctx) {
         // Override in subclasses
     }

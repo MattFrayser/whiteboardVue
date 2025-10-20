@@ -30,8 +30,7 @@ export class Toolbar {
         // Color Picker
         const colorPicker = document.getElementById('colorPicker')
         colorPicker.addEventListener('change', (e) => {
-            this.engine.currentColor = e.target.value
-            this.updateColorSwatches()
+            this.selectColor(e.target.value)
         })
 
         // Color swatches -- double click
@@ -62,10 +61,10 @@ export class Toolbar {
             e.stopPropagation();
         });
 
-        
+
         colorGrid.addEventListener('click', (e) => {
             if (e.target.classList.contains('color-option')) {
-                this.engine.currentColor = e.target.dataset.color
+                this.selectColor(e.target.dataset.color)
                 this.closeMenu();
             }
         });
@@ -163,9 +162,8 @@ export class Toolbar {
         } else if (this.activeSwatchForMenu) {
             const circle = this.activeSwatchForMenu.querySelector('.swatch-circle')
             if (circle) {
-                circle.style.background = color
+                circle.style.backgroundColor = color
             }
-            this.activeSwatchForMenu.style.backgroundColor = color
             this.activeSwatchForMenu.dataset.color = color
             this.activeSwatch = this.activeSwatchForMenu
         }
