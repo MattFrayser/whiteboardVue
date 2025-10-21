@@ -4,15 +4,36 @@ export class WebSocketManager {
         this.socket = null
         this.roomCode = null
         this.remoteCursors = new Map()
+
+        this.connectionStatus = 'disconnected' //  'connected', 'disconnected', 'error'
+        this.statusCallback = null
+        this.reconnectAttempts = 0
+        this.maxReconnectAttempts = 5
+        this.reconnectDelay = 1000
+        this.reconnectTimeout = null
+    }
+
+    setStatusCallback(callback) {
+        this.statusCallback = callback
+    }
+
+    updateStatus(status) {
+        this.connectionStatus = status
+        if (this.statusCallback) {
+            this.statusCallback(status)
+        }
     }
 
     connect(roomCode) {
         this.roomCode = roomCode
 
         try {
-            this.socket = new WebSocket(`ws://localhost:8080/ws?room=${roomCode}`) 
+            this.socket = new WebSocket(`ws://localhost:8080/ws?room=${roomCode}`)
 
             this.socket.onopen = () => {
+                this.updateStatus('connected')
+                this.reconnectAttempts = 0
+                this.reconnectDelay = 1000
                 this.send({ type: 'getUserId' })
             }
 
@@ -21,14 +42,38 @@ export class WebSocketManager {
             }
 
             this.socket.onerror = (error) => {
+                console.error("Connection Error", error)
+                this.updateStatus('error')
             }
 
             this.socket.onclose = () => {
+                this.handleDisconnect()
             }
 
         } catch (error) {
+            console.error('Failed to connect:', error)
+            this.handleDisconnect()
         }
+    }
 
+    handleDisconnect() {
+        this.remoteCursors.clear()
+        this.socket = null
+        this.updateStatus('disconnected')
+        this.engine.render()
+
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++
+
+            this.reconnectTimeout = setTimeout(() => {
+                this.connect(this.roomCode)
+            }, this.reconnectDelay)
+
+            // Exponential backoff
+            this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 10000)
+        } else {
+            this.updateStatus('error')
+        }
     }
 
     send(msg) {
