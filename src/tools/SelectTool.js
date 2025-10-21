@@ -135,6 +135,14 @@ export class SelectTool extends Tool {
 
     onMouseUp(worldPos, e) {
         if (this.isResizing || this.isDragging) {
+            // Broadcast final position/size to other clients
+            if (this.isDragging) {
+                this.engine.objectManager.broadcast('update', this.engine.objectManager.selectedObjects)
+            }
+            if (this.isResizing && this.resizeObject) {
+                this.engine.objectManager.broadcast('update', this.resizeObject)
+            }
+
             this.engine.objectManager.saveState()
             if (this.engine.toolbar) {
                 this.engine.toolbar.updateUndoRedoButtons()

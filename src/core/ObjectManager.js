@@ -1,4 +1,3 @@
-// src/core/ObjectManager.js
 import { Stroke } from '../objects/Stroke'
 import { Rectangle } from '../objects/Rectangle'
 import { Circle } from '../objects/Circle'
@@ -16,13 +15,16 @@ export class ObjectManager {
     }
     
     addObject(object) {
+        // Update userId to current user when adding
+        if (this.engine && this.engine.wsManager) {
+            object.userId = this.engine.wsManager.userId
+        }
+
         this.objects.push(object)
         this.saveState()
 
         // Broadcast to other clients
-        if (this.engine && this.engine.wsManager) {
-            this.engine.wsManager.broadcastObjectAdded(object)
-        }
+        this.broadcast('add', object)
 
         return object
     }
@@ -34,9 +36,26 @@ export class ObjectManager {
             this.saveState()
 
             // Broadcast to other clients
-            if (this.engine && this.engine.wsManager) {
-                this.engine.wsManager.broadcastObjectDeleted(object)
-            }
+            this.broadcast('delete', object)
+        }
+    }
+
+    broadcast(action, data) {
+        if (!this.engine || !this.engine.wsManager) return
+
+        // Normalize to array for uniform handling
+        const objects = Array.isArray(data) ? data : [data]
+
+        switch(action) {
+            case 'add':
+                objects.forEach(obj => this.engine.wsManager.broadcastObjectAdded(obj))
+                break
+            case 'update':
+                objects.forEach(obj => this.engine.wsManager.broadcastObjectUpdated(obj))
+                break
+            case 'delete':
+                objects.forEach(obj => this.engine.wsManager.broadcastObjectDeleted(obj))
+                break
         }
     }
     
@@ -106,12 +125,14 @@ export class ObjectManager {
         if (this.historyIndex < this.history.length - 1) {
             this.history = this.history.slice(0, this.historyIndex + 1)
         }
-        
-        // Save current state
-        const state = this.objects.map(obj => obj.toJSON())
+
+        // Save only THIS user's objects (personal undo/redo)
+        const userId = this.engine?.wsManager?.userId
+        const myObjects = this.objects.filter(obj => obj.userId === userId)
+        const state = myObjects.map(obj => obj.toJSON())
         this.history.push(JSON.stringify(state))
         this.historyIndex++
-        
+
         // Limit history size
         if (this.history.length > 50) {
             this.history.shift()
@@ -142,7 +163,7 @@ export class ObjectManager {
            const clonedData = JSON.parse(JSON.stringify(data))
            clonedData.id = null // will trigger new ID
            const newObject = this.createObjectFromData(clonedData)
-           this.objects.push(newObject)
+           this.addObject(newObject)
            return newObject
         })
 
@@ -170,27 +191,75 @@ export class ObjectManager {
             this.selectObject(obj, true)
         })
 
+        // Broadcast the moved positions to other clients
+        this.broadcast('update', newObjects)
+
         this.saveState()
     }
     
     undo() {
         if (this.historyIndex > 0) {
+            const userId = this.engine?.wsManager?.userId
+
+            const before = this.objects.filter(o => o.userId === userId)
+
+            // Apply undo
             this.historyIndex--
             this.loadState(this.history[this.historyIndex])
+
+            const after = this.objects.filter(o => o.userId === userId)
+
+            this.broadcastDiff(before, after)
         }
     }
-    
+
     redo() {
         if (this.historyIndex < this.history.length - 1) {
+            const userId = this.engine?.wsManager?.userId
+
+            const before = this.objects.filter(o => o.userId === userId)
+
+            // Apply redo
             this.historyIndex++
             this.loadState(this.history[this.historyIndex])
+
+            const after = this.objects.filter(o => o.userId === userId)
+
+            this.broadcastDiff(before, after)
         }
     }
-    
+
     loadState(stateStr) {
         const state = JSON.parse(stateStr)
-        this.objects = state.map(data => this.createObjectFromData(data))
+        const userId = this.engine?.wsManager?.userId
+
+        // Remove only THIS user's objects
+        this.objects = this.objects.filter(obj => obj.userId !== userId)
+
+        // Restore THIS user's objects from history
+        const myRestoredObjects = state.map(data => this.createObjectFromData(data))
+        this.objects.push(...myRestoredObjects)
+
         this.clearSelection()
+    }
+
+    broadcastDiff(before, after) {
+        // deleted (in before but not in after)
+        const deleted = before.filter(b => !after.find(a => a.id === b.id))
+
+        // added (in after but not in before)
+        const added = after.filter(a => !before.find(b => b.id === a.id))
+
+        // modified (same ID, different data)
+        const modified = after.filter(a => {
+            const beforeObj = before.find(b => b.id === a.id)
+            if (!beforeObj) return false
+            return JSON.stringify(beforeObj.data) !== JSON.stringify(a.data)
+        })
+
+        if (deleted.length > 0) this.broadcast('delete', deleted)
+        if (added.length > 0) this.broadcast('add', added)
+        if (modified.length > 0) this.broadcast('update', modified)
     }
     
     createObjectFromData(data) {
@@ -204,7 +273,11 @@ export class ObjectManager {
 
         const ObjectClass = typeMap[data.type]
         if (ObjectClass) {
-            return new ObjectClass(data.id, data.data)
+            const obj = new ObjectClass(data.id, data.data)
+            // Preserve userId and zIndex from saved data
+            obj.userId = data.userId
+            obj.zIndex = data.zIndex || 0
+            return obj
         }
     }
     

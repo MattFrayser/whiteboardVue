@@ -137,19 +137,32 @@ export class WebSocketManager {
     }
 
     createObjectFromData(data) {
+        let obj = null
         switch (data.type) {
             case 'stroke':
-                return new Stroke(data.id, data.data)
+                obj = new Stroke(data.id, data.data)
+                break
             case 'rectangle':
-                return new Rectangle(data.id, data.data)
+                obj = new Rectangle(data.id, data.data)
+                break
             case 'circle':
-                return new Circle(data.id, data.data)
+                obj = new Circle(data.id, data.data)
+                break
             case 'line':
-                return new Line(data.id, data.data)
+                obj = new Line(data.id, data.data)
+                break
             case 'text':
-                return new Text(data.id, data.data)
-
+                obj = new Text(data.id, data.data)
+                break
         }
+
+        // Preserve userId and zIndex from remote data
+        if (obj) {
+            obj.userId = data.userId
+            obj.zIndex = data.zIndex || 0
+        }
+
+        return obj
     }
 
     broadcastObjectAdded(object) {

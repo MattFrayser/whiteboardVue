@@ -39,9 +39,6 @@ export class LineTool extends Tool {
             )
             if (length > 1) {
                 this.engine.objectManager.addObject(this.currentLine)
-                if (this.engine.wsManager) {
-                    this.engine.wsManager.broadcastObjectAdded(this.currentLine)
-                }
           }
             this.currentLine = null
             this.startPoint = null

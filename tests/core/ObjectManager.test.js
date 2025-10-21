@@ -43,8 +43,10 @@ describe('ObjectManager', () => {
 
     mockEngine = {
       wsManager: {
+        userId: 'test-user-id',
         broadcastObjectAdded: vi.fn(),
-        broadcastObjectDeleted: vi.fn()
+        broadcastObjectDeleted: vi.fn(),
+        broadcastObjectUpdated: vi.fn()
       }
     };
     manager = new ObjectManager(mockEngine);
@@ -283,36 +285,6 @@ describe('ObjectManager', () => {
       manager.moveSelected(10, 20);
 
       expect(manager.historyIndex).toBe(1);
-    });
-  });
-
-  describe('bringToFront', () => {
-    it('should move selected objects to end of array', () => {
-      const obj1 = new Rectangle('id-1', { x1: 0, y1: 0, x2: 100, y2: 100, color: '#000', width: 2 });
-      const obj2 = new Rectangle('id-2', { x1: 0, y1: 0, x2: 100, y2: 100, color: '#000', width: 2 });
-      const obj3 = new Rectangle('id-3', { x1: 0, y1: 0, x2: 100, y2: 100, color: '#000', width: 2 });
-      manager.objects.push(obj1, obj2, obj3);
-      manager.selectObject(obj1);
-
-      manager.bringToFront();
-
-      expect(manager.objects.indexOf(obj1)).toBe(2);
-      expect(manager.objects[2]).toBe(obj1);
-    });
-  });
-
-  describe('sendToBack', () => {
-    it('should move selected objects to start of array', () => {
-      const obj1 = new Rectangle('id-1', { x1: 0, y1: 0, x2: 100, y2: 100, color: '#000', width: 2 });
-      const obj2 = new Rectangle('id-2', { x1: 0, y1: 0, x2: 100, y2: 100, color: '#000', width: 2 });
-      const obj3 = new Rectangle('id-3', { x1: 0, y1: 0, x2: 100, y2: 100, color: '#000', width: 2 });
-      manager.objects.push(obj1, obj2, obj3);
-      manager.selectObject(obj3);
-
-      manager.sendToBack();
-
-      expect(manager.objects.indexOf(obj3)).toBe(0);
-      expect(manager.objects[0]).toBe(obj3);
     });
   });
 

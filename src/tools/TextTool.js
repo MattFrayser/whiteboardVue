@@ -92,9 +92,6 @@ export class TextTool extends Tool {
             })
             
             this.engine.objectManager.addObject(textObj)
-            if (this.engine.wsManager) {
-                this.engine.wsManager.broadcastObjectAdded(textObj)
-            }
             this.engine.render()
         }
         
