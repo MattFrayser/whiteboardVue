@@ -4,8 +4,6 @@ import { Line } from '../objects/Line'
 export class LineTool extends Tool {
     constructor(engine) {
         super(engine)
-        this.isEditing = false
-        this.currentText = null
     }
 
     onMouseDown(worldPos, e) {
@@ -17,8 +15,6 @@ export class LineTool extends Tool {
             y2: worldPos.y,
             color: this.engine.currentColor,
             width: this.engine.currentWidth,
-            dashed: e.altKey,
-            arrow: e.ctrlKey
         })
     }
 

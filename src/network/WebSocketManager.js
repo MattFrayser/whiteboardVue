@@ -1,9 +1,3 @@
-import { Stroke } from '../objects/Stroke'
-import { Rectangle } from '../objects/Rectangle'
-import { Circle } from '../objects/Circle'
-import { Line } from '../objects/Line'
-import { Text } from '../objects/Text'
-
 export class WebSocketManager {
     constructor(engine) {
         this.engine = engine
@@ -19,7 +13,6 @@ export class WebSocketManager {
             this.socket = new WebSocket(`ws://localhost:8080/ws?room=${roomCode}`) 
 
             this.socket.onopen = () => {
-                console.log("connected to room: ", roomCode)
                 this.send({ type: 'getUserId' })
             }
 
@@ -28,15 +21,12 @@ export class WebSocketManager {
             }
 
             this.socket.onerror = (error) => {
-                console.log("Websocket error: ", error)
             }
 
             this.socket.onclose = () => {
-                console.log("Websocket disconnect")
             }
 
         } catch (error) {
-            console.log("failed to connect to room: ", roomCode)
         }
 
     }
@@ -77,7 +67,7 @@ export class WebSocketManager {
     handleSync(msg) {
         this.engine.objectManager.objects = []
         msg.objects.forEach( objData => {
-            const obj = this.createObjectFromData(objData)
+            const obj = this.engine.objectManager.createObjectFromData(objData)
             if (obj) {
                 this.engine.objectManager.objects.push(obj)
             }
@@ -90,7 +80,7 @@ export class WebSocketManager {
         // skip if users obj
         if (objectData.userId == this.userId) return
 
-        const obj = this.createObjectFromData(objectData.object)
+        const obj = this.engine.objectManager.createObjectFromData(objectData.object)
         if (obj) {
             this.engine.objectManager.objects.push(obj)
             this.engine.render()
@@ -136,34 +126,6 @@ export class WebSocketManager {
         this.engine.render()
     }
 
-    createObjectFromData(data) {
-        let obj = null
-        switch (data.type) {
-            case 'stroke':
-                obj = new Stroke(data.id, data.data)
-                break
-            case 'rectangle':
-                obj = new Rectangle(data.id, data.data)
-                break
-            case 'circle':
-                obj = new Circle(data.id, data.data)
-                break
-            case 'line':
-                obj = new Line(data.id, data.data)
-                break
-            case 'text':
-                obj = new Text(data.id, data.data)
-                break
-        }
-
-        // Preserve userId and zIndex from remote data
-        if (obj) {
-            obj.userId = data.userId
-            obj.zIndex = data.zIndex || 0
-        }
-
-        return obj
-    }
 
     broadcastObjectAdded(object) {
         this.send({

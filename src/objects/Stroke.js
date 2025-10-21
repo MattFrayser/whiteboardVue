@@ -1,10 +1,8 @@
 import { DrawingObject } from '../core/DrawingObject'
-import { Coordinates } from '../core/Coordinates'
 
 export class Stroke extends DrawingObject {
     constructor(id, data) {
         super(id, 'stroke', data)
-        this.coordinates = new Coordinates()
     }
     
     getBounds() {

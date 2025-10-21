@@ -18,7 +18,6 @@ export class Toolbar {
 
     setupEventListeners() {
 
-        // TODO: keyboard shortcuts
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tool = btn.dataset.tool
@@ -116,9 +115,7 @@ export class Toolbar {
         this.engine.currentWidth = size
         
         const brushSize = document.getElementById('brushSize')
-        const sizeValue = document.getElementById('sizeValue')
         if (brushSize) brushSize.value = size
-        if (sizeValue) sizeValue.textContent = size
         
         // Store size on active swatch
         if (this.activeSwatch) {

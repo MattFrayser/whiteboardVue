@@ -263,22 +263,32 @@ export class ObjectManager {
     }
     
     createObjectFromData(data) {
-        const typeMap = {
-            'stroke': Stroke,
-            'rectangle': Rectangle,
-            'circle': Circle,
-            'line': Line,
-            'text': Text
+        let obj = null
+        switch (data.type) {
+            case 'stroke':
+                obj = new Stroke(data.id, data.data)
+                break
+            case 'rectangle':
+                obj = new Rectangle(data.id, data.data)
+                break
+            case 'circle':
+                obj = new Circle(data.id, data.data)
+                break
+            case 'line':
+                obj = new Line(data.id, data.data)
+                break
+            case 'text':
+                obj = new Text(data.id, data.data)
+                break
         }
 
-        const ObjectClass = typeMap[data.type]
-        if (ObjectClass) {
-            const obj = new ObjectClass(data.id, data.data)
-            // Preserve userId and zIndex from saved data
+        // Preserve userId and zIndex from remote data
+        if (obj) {
             obj.userId = data.userId
             obj.zIndex = data.zIndex || 0
-            return obj
         }
+
+        return obj
     }
     
     render(ctx) {

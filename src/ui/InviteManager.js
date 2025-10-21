@@ -13,7 +13,6 @@ export class InviteManager {
     }
 
     handleClick() {
-        console.log(this.roomCode)
         const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${this.roomCode}`
         this.copyToClipboard(inviteUrl)
     }
@@ -21,7 +20,6 @@ export class InviteManager {
     async copyToClipboard(link) {
         try {
             await navigator.clipboard.writeText(link)
-            console.log(link)
             this.showNotification('Copied to clipboard')
         }
         catch (error) {

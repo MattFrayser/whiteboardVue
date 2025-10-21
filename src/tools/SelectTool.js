@@ -173,8 +173,7 @@ export class SelectTool extends Tool {
     getHandleAt(point, obj) {
         const handles = obj.getResizeHandles()
 
-        //const visualHandleSize = 12 / this.engine.coordinates.scale
-        const clickableSize = 20 / this.engine.coordinates.scale  // Larger clickable area
+        const clickableSize = 20 / this.engine.coordinates.scale   // Larger clickable area
         const halfSize = clickableSize / 2
 
         for (let i = 0; i < handles.length; i++) {

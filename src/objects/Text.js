@@ -115,8 +115,4 @@ export class Text extends DrawingObject {
             { x: bounds.x, y: bounds.y + bounds.height, cursor: 'sw-resize' },
         ]
     }
-    setText(text) {
-        this.data.text = text
-        this.measureBounds()
-    }
 }

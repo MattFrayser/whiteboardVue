@@ -5,7 +5,6 @@ export class TextTool extends Tool {
     constructor(engine) {
         super(engine)
         this.isEditing = false
-        this.currentText = null
         this.inputElement = null
     }
     
@@ -70,7 +69,7 @@ export class TextTool extends Tool {
         }, 10)
         
         this.isEditing = true
-        this.currentTextPosition = worldPos
+        this.Position = worldPos
     }
     
     finishEditing() {
@@ -81,8 +80,8 @@ export class TextTool extends Tool {
             // Create text object
             const textObj = new Text(null, {
                 text: text,
-                x: this.currentTextPosition.x,
-                y: this.currentTextPosition.y,
+                x: this.Position.x,
+                y: this.Position.y,
                 color: this.engine.currentColor,
                 fontSize: this.engine.currentWidth * 3,
                 fontFamily: 'Arial, sans-serif',
@@ -108,8 +107,7 @@ export class TextTool extends Tool {
             this.inputElement = null
         }
         this.isEditing = false
-        this.currentText = null
-        this.currentTextPosition = null
+        this.Position = null
     }
     
     deactivate() {
