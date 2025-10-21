@@ -101,28 +101,6 @@ export class ObjectManager {
         this.saveState()
     }
     
-    bringToFront() {
-        this.selectedObjects.forEach(obj => {
-            const index = this.objects.indexOf(obj)
-            if (index > -1) {
-                this.objects.splice(index, 1)
-                this.objects.push(obj)
-            }
-        })
-        this.saveState()
-    }
-    
-    sendToBack() {
-        this.selectedObjects.forEach(obj => {
-            const index = this.objects.indexOf(obj)
-            if (index > -1) {
-                this.objects.splice(index, 1)
-                this.objects.unshift(obj)
-            }
-        })
-        this.saveState()
-    }
-    
     saveState() {
         // Remove future history if we're not at the end
         if (this.historyIndex < this.history.length - 1) {

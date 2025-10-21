@@ -19,6 +19,7 @@ body {
     display: block;
 }
 
+/* Toobar */
 .toolbar {
     position: fixed;
     top: 12px;
@@ -191,5 +192,61 @@ body {
     color: gray;
 }
 
+/* invite link */
+.invite-link {
+    position: fixed;
+    top: 12px;
+    right: 1%;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    z-index: 1000;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
 
+.invite-link button {
+    background: none;
+    color: inherit;
+    padding: 12px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    transition: inherit;
+}
+
+.invite-link:hover {
+    background: gray;
+    color: white;
+}
+
+  .invite-notification {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      background: #4caf50;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 1001;
+      opacity: 0;
+      transform: translate(-50%, -10px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+  }
+
+  .invite-notification.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+  }
+
+  .invite-notification.error {
+      background: #f44336;
+  }
 
