@@ -11,6 +11,8 @@ export class WebSocketManager {
         this.maxReconnectAttempts = 5
         this.reconnectDelay = 1000
         this.reconnectTimeout = null
+        this.authTimeout = null
+        this.userColor = null
     }
 
     setStatusCallback(callback) {
@@ -31,10 +33,23 @@ export class WebSocketManager {
             this.socket = new WebSocket(`ws://localhost:8080/ws?room=${roomCode}`)
 
             this.socket.onopen = () => {
-                this.updateStatus('connected')
-                this.reconnectAttempts = 0
-                this.reconnectDelay = 1000
-                this.send({ type: 'getUserId' })
+
+                // Send authenticate message with stored token (if exists)
+                const token = this.getStoredToken()
+                const authMsg = {
+                    type: 'authenticate',
+                    token: token || ''
+                }
+                this.send(authMsg)
+
+                // Set authentication timeout (6 seconds - slightly longer than backend's 5s)
+                this.authTimeout = setTimeout(() => {
+                    console.error('[WebSocket] Authentication timeout - no response from server')
+                    this.updateStatus('error')
+                    if (this.socket) {
+                        this.socket.close()
+                    }
+                }, 6000)
             }
 
             this.socket.onmessage = (event) => {
@@ -42,11 +57,12 @@ export class WebSocketManager {
             }
 
             this.socket.onerror = (error) => {
-                console.error("Connection Error", error)
+                console.error("[WebSocket] Connection Error:", error)
                 this.updateStatus('error')
             }
 
-            this.socket.onclose = () => {
+            this.socket.onclose = (event) => {
+                console.log('[WebSocket] Connection closed. Code:', event.code, 'Reason:', event.reason, 'Clean:', event.wasClean)
                 this.handleDisconnect()
             }
 
@@ -57,6 +73,12 @@ export class WebSocketManager {
     }
 
     handleDisconnect() {
+        // Clear auth timeout if active
+        if (this.authTimeout) {
+            clearTimeout(this.authTimeout)
+            this.authTimeout = null
+        }
+
         this.remoteCursors.clear()
         this.socket = null
         this.updateStatus('disconnected')
@@ -76,16 +98,39 @@ export class WebSocketManager {
         }
     }
 
+    getStoredToken() {
+        try {
+            return localStorage.getItem('whiteboard_session_token')
+        } catch (e) {
+            console.warn('Could not access localStorage:', e)
+            return null
+        }
+    }
+
+    storeToken(token) {
+        try {
+            localStorage.setItem('whiteboard_session_token', token)
+        } catch (e) {
+            console.warn('Could not save token to localStorage:', e)
+        }
+    }
+
     send(msg) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify(msg))
+        } else {
+            console.warn('[WebSocket] Cannot send message - socket not open. ReadyState:', this.socket?.readyState, 'Message:', msg)
         }
     }
 
     handleMessage(msg) {
+
         switch (msg.type) {
-            case 'userId':
-                this.userId = msg.userId
+            case 'authenticated':
+                this.handleAuthenticated(msg)
+                break
+            case 'room_joined':
+                this.handleRoomJoined(msg)
                 break
             case 'sync':
                 this.handleSync(msg)
@@ -105,8 +150,36 @@ export class WebSocketManager {
             case 'userDisconnected':
                 this.handleUserDisconnect(msg)
                 break
+            default:
+                console.warn('[WebSocket] Unknown message type:', msg.type, msg)
         }
 
+    }
+
+    handleAuthenticated(msg) {
+        // Clear auth timeout - authentication succeeded
+        if (this.authTimeout) {
+            clearTimeout(this.authTimeout)
+            this.authTimeout = null
+        }
+
+        // Store user ID and session token
+        this.userId = msg.userId
+        if (msg.token) {
+            this.storeToken(msg.token)
+        }
+
+        console.log('Authenticated as user:', this.userId)
+    }
+
+    handleRoomJoined(msg) {
+        // Store user color and update status
+        this.userColor = msg.color
+        this.updateStatus('connected')
+        this.reconnectAttempts = 0
+        this.reconnectDelay = 1000
+
+        console.log('Joined room:', msg.room, 'with color:', this.userColor)
     }
     
     handleSync(msg) {
@@ -114,7 +187,10 @@ export class WebSocketManager {
         msg.objects.forEach( objData => {
             const obj = this.engine.objectManager.createObjectFromData(objData)
             if (obj) {
+                console.log('[WebSocket] Object created successfully:', obj)
                 this.engine.objectManager.objects.push(obj)
+            } else {
+                console.warn('[WebSocket] Failed to create object from data:', objData)
             }
         })
 
@@ -123,12 +199,16 @@ export class WebSocketManager {
 
     handleObjectAdded(objectData) {
         // skip if users obj
-        if (objectData.userId == this.userId) return
+        if (objectData.userId == this.userId) {
+            return
+        }
 
         const obj = this.engine.objectManager.createObjectFromData(objectData.object)
         if (obj) {
             this.engine.objectManager.objects.push(obj)
             this.engine.render()
+        } else {
+            console.warn('[WebSocket] Failed to create object from objectAdded:', objectData.object)
         }
     }
     handleObjectUpdated(objectData) {

@@ -32,6 +32,7 @@ export class DrawingEngine {
 
         this.rightMouseDown = false
         this.lastMousePos = { x: 0, y: 0 } // Track mouse position for paste
+        this.lastCursorBroadcast = 0 // Timestamp of last cursor broadcast for throttling
 
         this.setupEventListeners()
         this.resize()
@@ -48,6 +49,7 @@ export class DrawingEngine {
         this.canvas.addEventListener('wheel', e => this.handleMouseWheel(e))
         this.canvas.addEventListener('contextmenu', e => e.preventDefault())
 
+        window.addEventListener('resize', () => this.resize())
         document.addEventListener('keydown', e => this.handleKeyDown(e))
     }
 
@@ -74,17 +76,21 @@ export class DrawingEngine {
                 this.canvas
         )
 
-        // Broadcast cursor position with current tool
+        // Broadcast cursor position with throttling (max 20/sec = every 50ms)
         if (this.wsManager && this.wsManager.userId) {
-            // Get current tool name
-            const toolName = Object.keys(this.tools).find(
-                key => this.tools[key] === this.currentTool
-            )
-            this.wsManager.broadcastCursor({
-                x: worldPos.x,
-                y: worldPos.y,
-                tool: toolName
-            })
+            const now = Date.now()
+            if (now - this.lastCursorBroadcast >= 50) {
+                this.lastCursorBroadcast = now
+                // Get current tool name
+                const toolName = Object.keys(this.tools).find(
+                    key => this.tools[key] === this.currentTool
+                )
+                this.wsManager.broadcastCursor({
+                    x: worldPos.x,
+                    y: worldPos.y,
+                    tool: toolName
+                })
+            }
         }
 
         if (e.buttons === 1) {
