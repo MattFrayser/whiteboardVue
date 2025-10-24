@@ -79,6 +79,12 @@ export class WebSocketManager {
             this.authTimeout = null
         }
 
+        // Clear reconnect timeout if active
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout)
+            this.reconnectTimeout = null
+        }
+
         this.remoteCursors.clear()
         this.socket = null
         this.updateStatus('disconnected')
@@ -206,6 +212,13 @@ export class WebSocketManager {
         const obj = this.engine.objectManager.createObjectFromData(objectData.object)
         if (obj) {
             this.engine.objectManager.objects.push(obj)
+
+            // Add to quadtree
+            const bounds = obj.getBounds()
+            this.engine.objectManager.quadtree.insert(obj, bounds)
+
+            // Mark as dirty for rendering
+            this.engine.markDirty(bounds)
             this.engine.render()
         } else {
             console.warn('[WebSocket] Failed to create object from objectAdded:', objectData.object)
@@ -216,7 +229,23 @@ export class WebSocketManager {
 
         const obj = this.engine.objectManager.objects.find(o => o.id === objectData.object.id)
         if (obj) {
+            // Mark old bounds as dirty
+            const oldBounds = obj.getBounds()
+            this.engine.markDirty(oldBounds)
+
+            // Update quadtree
+            this.engine.objectManager.quadtree.remove(obj, oldBounds)
+
+            // Update object data
             obj.data = objectData.object.data
+
+            // Mark new bounds as dirty
+            const newBounds = obj.getBounds()
+            this.engine.markDirty(newBounds)
+
+            // Update quadtree
+            this.engine.objectManager.quadtree.insert(obj, newBounds)
+
             this.engine.render()
         }
     }
@@ -225,6 +254,13 @@ export class WebSocketManager {
 
         const obj = this.engine.objectManager.objects.find(o => o.id === objectData.objectId)
         if (obj) {
+            // Mark bounds as dirty before deletion
+            const bounds = obj.getBounds()
+            this.engine.markDirty(bounds)
+
+            // Remove from quadtree
+            this.engine.objectManager.quadtree.remove(obj, bounds)
+
             const index = this.engine.objectManager.objects.indexOf(obj)
             if (index > -1) {
                 this.engine.objectManager.objects.splice(index, 1)
@@ -236,12 +272,34 @@ export class WebSocketManager {
     handleCursor(cursor) {
         if (cursor.userId == this.userId) return
 
+        // Mark old cursor position as dirty (if exists)
+        const oldCursor = this.remoteCursors.get(cursor.userId)
+        if (oldCursor) {
+            const cursorRadius = 10 // Cursor visual size
+            this.engine.markDirty({
+                x: oldCursor.x - cursorRadius,
+                y: oldCursor.y - cursorRadius,
+                width: cursorRadius * 2,
+                height: cursorRadius * 2
+            }, 5)
+        }
+
+        // Update cursor position
         this.remoteCursors.set(cursor.userId, {
             x: cursor.x,
             y: cursor.y,
             color: cursor.color,
             tool: cursor.tool
         })
+
+        // Mark new cursor position as dirty
+        const cursorRadius = 10
+        this.engine.markDirty({
+            x: cursor.x - cursorRadius,
+            y: cursor.y - cursorRadius,
+            width: cursorRadius * 2,
+            height: cursorRadius * 2
+        }, 5)
 
         this.engine.render()
     }
@@ -281,5 +339,28 @@ export class WebSocketManager {
             tool: cursor.tool,
             color: cursor.color
         })
+    }
+
+    disconnect() {
+        // Clear all timers
+        if (this.authTimeout) {
+            clearTimeout(this.authTimeout)
+            this.authTimeout = null
+        }
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout)
+            this.reconnectTimeout = null
+        }
+
+        // Close socket connection
+        if (this.socket) {
+            this.socket.close()
+            this.socket = null
+        }
+
+        // Clear data
+        this.remoteCursors.clear()
+        this.reconnectAttempts = this.maxReconnectAttempts // Prevent reconnect
+        this.updateStatus('disconnected')
     }
 }

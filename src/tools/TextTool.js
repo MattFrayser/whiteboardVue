@@ -42,22 +42,27 @@ export class TextTool extends Tool {
 
         document.body.appendChild(this.inputElement)
 
-        // Handle input events
-        this.inputElement.addEventListener('keydown', (e) => {
+        // Store bound event handlers for cleanup
+        this.keydownHandler = (e) => {
             if (e.key === 'Enter') {
                 this.finishEditing()
             } else if (e.key === 'Escape') {
                 this.cancelEditing()
             }
             e.stopPropagation()
-        })
+        }
+
+        this.blurHandler = () => {
+            this.finishEditing()
+        }
+
+        // Handle input events
+        this.inputElement.addEventListener('keydown', this.keydownHandler)
 
         // Delay blur handler to prevent immediate firing from mousedown event
         setTimeout(() => {
             if (this.inputElement) {
-                this.inputElement.addEventListener('blur', () => {
-                    this.finishEditing()
-                })
+                this.inputElement.addEventListener('blur', this.blurHandler)
             }
         }, 200)
 
@@ -67,7 +72,7 @@ export class TextTool extends Tool {
                 this.inputElement.focus()
             }
         }, 10)
-        
+
         this.isEditing = true
         this.Position = worldPos
     }
@@ -103,9 +108,21 @@ export class TextTool extends Tool {
     
     cleanup() {
         if (this.inputElement) {
+            // Remove event listeners before removing element
+            if (this.keydownHandler) {
+                this.inputElement.removeEventListener('keydown', this.keydownHandler)
+            }
+            if (this.blurHandler) {
+                this.inputElement.removeEventListener('blur', this.blurHandler)
+            }
+
             this.inputElement.remove()
             this.inputElement = null
         }
+
+        // Clear handler references
+        this.keydownHandler = null
+        this.blurHandler = null
         this.isEditing = false
         this.Position = null
     }

@@ -31,8 +31,13 @@ export class DrawingEngine {
         this.toolbar = null
 
         this.rightMouseDown = false
-        this.lastMousePos = { x: 0, y: 0 } // Track mouse position for paste
-        this.lastCursorBroadcast = 0 // Timestamp of last cursor broadcast for throttling
+        this.lastMousePos = { x: 0, y: 0 } // mouse position for paste
+        this.lastCursorBroadcast = 0
+
+        // Dirty rectangle optimization
+        this.dirtyRegions = []
+        this.dirtyThreshold = 0.3 // 30% of canvas area
+        this.forceFullRedraw = false
 
         this.setupEventListeners()
         this.resize()
@@ -43,14 +48,23 @@ export class DrawingEngine {
     }
 
     setupEventListeners() {
-        this.canvas.addEventListener('mousedown', e => this.handleMouseDown(e))
-        this.canvas.addEventListener('mousemove', e => this.handleMouseMove(e))
-        this.canvas.addEventListener('mouseup', e => this.handleMouseUp(e))
-        this.canvas.addEventListener('wheel', e => this.handleMouseWheel(e))
-        this.canvas.addEventListener('contextmenu', e => e.preventDefault())
+        // Store bound methods for cleanup
+        this.boundHandleMouseDown = e => this.handleMouseDown(e)
+        this.boundHandleMouseMove = e => this.handleMouseMove(e)
+        this.boundHandleMouseUp = e => this.handleMouseUp(e)
+        this.boundHandleMouseWheel = e => this.handleMouseWheel(e)
+        this.boundPreventContext = e => e.preventDefault()
+        this.boundResize = () => this.resize()
+        this.boundHandleKeyDown = e => this.handleKeyDown(e)
 
-        window.addEventListener('resize', () => this.resize())
-        document.addEventListener('keydown', e => this.handleKeyDown(e))
+        this.canvas.addEventListener('mousedown', this.boundHandleMouseDown)
+        this.canvas.addEventListener('mousemove', this.boundHandleMouseMove)
+        this.canvas.addEventListener('mouseup', this.boundHandleMouseUp)
+        this.canvas.addEventListener('wheel', this.boundHandleMouseWheel)
+        this.canvas.addEventListener('contextmenu', this.boundPreventContext)
+
+        window.addEventListener('resize', this.boundResize)
+        document.addEventListener('keydown', this.boundHandleKeyDown)
     }
 
     handleMouseDown(e) {
@@ -98,6 +112,7 @@ export class DrawingEngine {
         } else if (e.buttons === 2) {
             e.preventDefault()
             this.coordinates.pan({ x: e.clientX, y: e.clientY })
+            this.forceFullRedraw = true // Panning affects entire viewport
             this.render()
         }
     }
@@ -121,6 +136,7 @@ export class DrawingEngine {
         e.preventDefault()
         const zoomPoint = { x: e.clientX, y: e.clientY }
         this.coordinates.zoom(e.deltaY, zoomPoint, this.canvas)
+        this.forceFullRedraw = true // Zoom affects entire viewport
         this.render()
     }
 
@@ -224,10 +240,114 @@ export class DrawingEngine {
     resize() {
         this.canvas.width = window.innerWidth
         this.canvas.height = window.innerHeight
+        this.forceFullRedraw = true
         this.render()
+    }
+
+    /**
+     * Mark a region as dirty (needs redrawing)
+     * Bounds should be in world coordinates
+     */
+    markDirty(bounds, padding = 10) {
+        if (!bounds || bounds.width === 0 || bounds.height === 0) {
+            return
+        }
+
+        // Expand bounds for stroke width/anti-aliasing
+        const expanded = {
+            x: bounds.x - padding,
+            y: bounds.y - padding,
+            width: bounds.width + padding * 2,
+            height: bounds.height + padding * 2
+        }
+
+        this.dirtyRegions.push(expanded)
+    }
+
+    /**
+     * Clear all dirty regions
+     */
+    clearDirtyRegions() {
+        this.dirtyRegions = []
+        this.forceFullRedraw = false
+    }
+
+    /**
+     * Merge overlapping dirty regions into a single bounding box
+     */
+    mergeDirtyRegions() {
+        if (this.dirtyRegions.length === 0) return []
+        if (this.dirtyRegions.length === 1) return this.dirtyRegions
+
+        // Simple approach: compute single bounding box
+        let minX = Infinity, minY = Infinity
+        let maxX = -Infinity, maxY = -Infinity
+
+        for (const region of this.dirtyRegions) {
+            minX = Math.min(minX, region.x)
+            minY = Math.min(minY, region.y)
+            maxX = Math.max(maxX, region.x + region.width)
+            maxY = Math.max(maxY, region.y + region.height)
+        }
+
+        return [{
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        }]
+    }
+
+    /**
+     * Check if we should use full redraw instead of dirty rect optimization
+     */
+    shouldUseFullRedraw() {
+        if (this.forceFullRedraw) return true
+        if (this.dirtyRegions.length === 0) return false
+
+        const merged = this.mergeDirtyRegions()
+        if (merged.length === 0) return false
+
+        // Calculate dirty area in viewport coordinates
+        const { scale, offsetX, offsetY } = this.coordinates
+        const dirtyViewportArea = merged.reduce((total, region) => {
+            const vw = region.width * scale
+            const vh = region.height * scale
+            return total + (vw * vh)
+        }, 0)
+
+        const canvasArea = this.canvas.width * this.canvas.height
+        return (dirtyViewportArea / canvasArea) > this.dirtyThreshold
+    }
+
+    /**
+     * Get the viewport bounds in world coordinates
+     */
+    getViewportBounds() {
+        const { scale, offsetX, offsetY } = this.coordinates
+        return {
+            x: -offsetX / scale,
+            y: -offsetY / scale,
+            width: this.canvas.width / scale,
+            height: this.canvas.height / scale
+        }
     }
     
     render() {
+        // Check if we should use dirty rectangle optimization
+        if (this.dirtyRegions.length > 0 && !this.shouldUseFullRedraw()) {
+            this.renderDirty()
+        } else {
+            this.renderFull()
+        }
+
+        this.clearDirtyRegions()
+    }
+
+    /**
+     * Full canvas redraw with viewport culling
+     */
+    renderFull() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
         // Apply transformations
@@ -236,8 +356,11 @@ export class DrawingEngine {
         this.ctx.translate(offsetX, offsetY)
         this.ctx.scale(scale, scale)
 
-        // Render all objects
-        this.objectManager.render(this.ctx)
+        // Get viewport bounds for culling
+        const viewport = this.getViewportBounds()
+
+        // Render objects (with viewport culling via quadtree)
+        this.objectManager.render(this.ctx, viewport)
 
         // Render current tool preview
         if (this.currentTool && this.currentTool.renderPreview) {
@@ -254,6 +377,58 @@ export class DrawingEngine {
         this.ctx.restore()
     }
 
+    /**
+     * Render only dirty regions
+     */
+    renderDirty() {
+        const mergedRegions = this.mergeDirtyRegions()
+        const { offsetX, offsetY, scale } = this.coordinates
+
+        for (const region of mergedRegions) {
+            this.ctx.save()
+
+            // Transform to viewport coordinates
+            const viewportX = region.x * scale + offsetX
+            const viewportY = region.y * scale + offsetY
+            const viewportWidth = region.width * scale
+            const viewportHeight = region.height * scale
+
+            // Set clipping region in viewport coordinates
+            this.ctx.beginPath()
+            this.ctx.rect(viewportX, viewportY, viewportWidth, viewportHeight)
+            this.ctx.clip()
+
+            // Clear the dirty region
+            this.ctx.clearRect(viewportX, viewportY, viewportWidth, viewportHeight)
+
+            // Apply world transformations
+            this.ctx.translate(offsetX, offsetY)
+            this.ctx.scale(scale, scale)
+
+            // Query objects in dirty region using quadtree
+            const objectsToRender = this.objectManager.quadtree.query(region)
+            objectsToRender.forEach(obj => obj.render(this.ctx))
+
+            // Render current tool preview if it intersects dirty region
+            if (this.currentTool && this.currentTool.renderPreview) {
+                this.currentTool.renderPreview(this.ctx)
+            }
+
+            // Render remote cursors in dirty region
+            if (this.wsManager && this.wsManager.remoteCursors) {
+                this.wsManager.remoteCursors.forEach((cursor, userId) => {
+                    // Check if cursor is in dirty region
+                    if (cursor.x >= region.x && cursor.x <= region.x + region.width &&
+                        cursor.y >= region.y && cursor.y <= region.y + region.height) {
+                        this.renderRemoteCursor(this.ctx, cursor)
+                    }
+                })
+            }
+
+            this.ctx.restore()
+        }
+    }
+
     renderRemoteCursor(ctx, cursor) {
         ctx.save()
 
@@ -267,5 +442,40 @@ export class DrawingEngine {
 
     start() {
         this.render()
+    }
+
+    destroy() {
+        // Remove all event listeners
+        if (this.boundHandleMouseDown) {
+            this.canvas.removeEventListener('mousedown', this.boundHandleMouseDown)
+            this.canvas.removeEventListener('mousemove', this.boundHandleMouseMove)
+            this.canvas.removeEventListener('mouseup', this.boundHandleMouseUp)
+            this.canvas.removeEventListener('wheel', this.boundHandleMouseWheel)
+            this.canvas.removeEventListener('contextmenu', this.boundPreventContext)
+
+            window.removeEventListener('resize', this.boundResize)
+            document.removeEventListener('keydown', this.boundHandleKeyDown)
+        }
+
+        // Cleanup WebSocket
+        if (this.wsManager) {
+            this.wsManager.disconnect()
+        }
+
+        // Cleanup tools
+        if (this.tools) {
+            Object.values(this.tools).forEach(tool => {
+                if (tool.deactivate) {
+                    tool.deactivate()
+                }
+            })
+        }
+
+        // Clear references
+        this.objectManager = null
+        this.coordinates = null
+        this.tools = null
+        this.currentTool = null
+        this.toolbar = null
     }
 }

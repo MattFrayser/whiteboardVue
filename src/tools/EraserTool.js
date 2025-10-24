@@ -46,6 +46,9 @@ export class EraserTool extends Tool {
                 point.y + eraserSize > bounds.y &&
                 point.y - eraserSize < bounds.y + bounds.height) {
 
+                // Mark erased object bounds as dirty
+                this.engine.markDirty(bounds)
+
                 // Remove using ObjectManager to trigger broadcast
                 this.engine.objectManager.removeObject(obj)
                 this.erasedObjects.add(obj)

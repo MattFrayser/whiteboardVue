@@ -6,6 +6,7 @@ export class CircleTool extends Tool {
         super(engine)
         this.startPoint = null
         this.currentCircle = null
+        this.lastBounds = null
     }
 
     onMouseDown(worldPos, e) {
@@ -19,16 +20,26 @@ export class CircleTool extends Tool {
             width:this.engine.currentWidth,
             fill: e.shiftKey ? this.engine.currentColor : null
         })
+        this.lastBounds = null
     }
 
     onMouseMove(worldPos, e) {
         if (this.currentCircle) {
+            // Mark old bounds as dirty
+            if (this.lastBounds) {
+                this.engine.markDirty(this.lastBounds)
+            }
+
             this.currentCircle.data.x2 = worldPos.x
             this.currentCircle.data.y2 = worldPos.y
+
+            // Mark new bounds as dirty
+            const newBounds = this.currentCircle.getBounds()
+            this.engine.markDirty(newBounds)
+            this.lastBounds = newBounds
+
             this.engine.render()
         }
-
-
     }
 
     onMouseUp(worldPos, e) {
@@ -39,6 +50,9 @@ export class CircleTool extends Tool {
             )
 
             if (radius > 1) {
+                // Mark final bounds as dirty
+                const bounds = this.currentCircle.getBounds()
+                this.engine.markDirty(bounds)
                 this.engine.objectManager.addObject(this.currentCircle)
                 if (this.engine.toolbar) {
                     this.engine.toolbar.updateUndoRedoButtons()
@@ -47,6 +61,7 @@ export class CircleTool extends Tool {
 
             this.currentCircle = null
             this.startPoint = null
+            this.lastBounds = null
             this.engine.render()
         }
     }

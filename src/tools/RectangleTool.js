@@ -4,8 +4,9 @@ import { Rectangle } from '../objects/Rectangle'
 export class RectangleTool extends Tool {
     constructor(engine) {
         super(engine)
-        this.startPoint = null 
+        this.startPoint = null
         this.currentRect = null
+        this.lastBounds = null
     }
 
     onMouseDown(worldPos, e) {
@@ -19,12 +20,24 @@ export class RectangleTool extends Tool {
             width: this.engine.currentWidth,
             fill: e.shiftKey ? this.engine.currentColor : null
         })
+        this.lastBounds = null
     }
-    
+
     onMouseMove(worldPos, e) {
         if (this.currentRect) {
+            // Mark old bounds as dirty
+            if (this.lastBounds) {
+                this.engine.markDirty(this.lastBounds)
+            }
+
             this.currentRect.data.x2 = worldPos.x
             this.currentRect.data.y2 = worldPos.y
+
+            // Mark new bounds as dirty
+            const newBounds = this.currentRect.getBounds()
+            this.engine.markDirty(newBounds)
+            this.lastBounds = newBounds
+
             this.engine.render()
         }
     }
@@ -33,6 +46,8 @@ export class RectangleTool extends Tool {
         if (this.currentRect) {
             const bounds = this.currentRect.getBounds()
             if (bounds.width > 1 && bounds.height > 1) {
+                // Mark final bounds as dirty
+                this.engine.markDirty(bounds)
                 this.engine.objectManager.addObject(this.currentRect)
                 if (this.engine.toolbar) {
                     this.engine.toolbar.updateUndoRedoButtons()
@@ -40,6 +55,7 @@ export class RectangleTool extends Tool {
             }
             this.currentRect = null
             this.startPoint = null
+            this.lastBounds = null
             this.engine.render()
         }
     }

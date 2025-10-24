@@ -3,6 +3,7 @@ import { Rectangle } from '../objects/Rectangle'
 import { Circle } from '../objects/Circle'
 import { Line } from '../objects/Line'
 import { Text } from '../objects/Text'
+import { Quadtree } from './Quadtree'
 
 export class ObjectManager {
     constructor(engine = null) {
@@ -12,6 +13,13 @@ export class ObjectManager {
         this.historyIndex = 0
         this.clipboard = []
         this.engine = engine
+
+        // Initialize quadtree with large bounds (will expand as needed)
+        this.quadtree = new Quadtree(
+            { x: -10000, y: -10000, width: 20000, height: 20000 },
+            10, // max objects per node
+            8   // max levels
+        )
     }
     
     addObject(object) {
@@ -21,6 +29,11 @@ export class ObjectManager {
         }
 
         this.objects.push(object)
+
+        // Add to quadtree
+        const bounds = object.getBounds()
+        this.quadtree.insert(object, bounds)
+
         this.saveState()
 
         // Broadcast to other clients
@@ -32,6 +45,10 @@ export class ObjectManager {
     removeObject(object) {
         const index = this.objects.indexOf(object)
         if (index > -1) {
+            // Remove from quadtree
+            const bounds = object.getBounds()
+            this.quadtree.remove(object, bounds)
+
             this.objects.splice(index, 1)
             this.saveState()
 
@@ -83,10 +100,13 @@ export class ObjectManager {
     }
     
     getObjectAt(point) {
-        // Search from top to bottom
-        for (let i = this.objects.length - 1; i >= 0; i--) {
-            if (this.objects[i].containsPoint(point)) {
-                return this.objects[i]
+        // Use quadtree for efficient spatial query
+        const candidates = this.quadtree.queryPoint(point)
+
+        // Search from top to bottom (reverse order for z-index)
+        for (let i = candidates.length - 1; i >= 0; i--) {
+            if (candidates[i].containsPoint(point)) {
+                return candidates[i]
             }
         }
         return null
@@ -97,8 +117,11 @@ export class ObjectManager {
             this.clearSelection()
         }
 
-        // Check each object intersection with select rectangle 
-        this.objects.forEach(obj => {
+        // Use quadtree for efficient spatial query
+        const candidates = this.quadtree.query(rect)
+
+        // Check each candidate for intersection with select rectangle
+        candidates.forEach(obj => {
             const bounds = obj.getBounds()
 
             const intersects = !(
@@ -116,8 +139,27 @@ export class ObjectManager {
     }
     
     moveSelected(dx, dy) {
-        this.selectedObjects.forEach(obj => obj.move(dx, dy))
+        // Update quadtree for moved objects
+        this.selectedObjects.forEach(obj => {
+            const oldBounds = obj.getBounds()
+            this.quadtree.remove(obj, oldBounds)
+
+            obj.move(dx, dy)
+
+            const newBounds = obj.getBounds()
+            this.quadtree.insert(obj, newBounds)
+        })
         this.saveState()
+    }
+
+    /**
+     * Update quadtree entry when an object's bounds change
+     * Call this after resizing or transforming objects
+     */
+    updateObjectInQuadtree(object, oldBounds) {
+        this.quadtree.remove(object, oldBounds)
+        const newBounds = object.getBounds()
+        this.quadtree.insert(object, newBounds)
     }
     
     saveState() {
@@ -241,6 +283,9 @@ export class ObjectManager {
         this.objects.push(...myRestoredObjects)
 
         this.clearSelection()
+
+        // Rebuild quadtree after state change
+        this.quadtree.rebuild(this.objects)
     }
 
     broadcastDiff(before, after) {
@@ -291,8 +336,15 @@ export class ObjectManager {
         return obj
     }
     
-    render(ctx) {
-        this.objects.forEach(obj => obj.render(ctx))
+    render(ctx, viewport = null) {
+        // If viewport is provided, use quadtree for culling
+        if (viewport) {
+            const visibleObjects = this.quadtree.query(viewport)
+            visibleObjects.forEach(obj => obj.render(ctx))
+        } else {
+            // Full render (fallback)
+            this.objects.forEach(obj => obj.render(ctx))
+        }
     }
 }
 

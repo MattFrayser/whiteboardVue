@@ -101,7 +101,16 @@ export class SelectTool extends Tool {
     onMouseMove(worldPos, e) {
         // Resize
         if (this.isResizing) {
+            // Mark old bounds as dirty
+            const oldBounds = this.resizeObject.getBounds()
+            this.engine.markDirty(oldBounds)
+
             this.resizeObject.resize(this.resizeHandleIndex, worldPos.x, worldPos.y)
+
+            // Mark new bounds as dirty
+            const newBounds = this.resizeObject.getBounds()
+            this.engine.markDirty(newBounds)
+
             this.engine.render()
 
             // Keep cursor during resize
@@ -112,7 +121,18 @@ export class SelectTool extends Tool {
 
         // Drag Selection
         if (this.isSelecting) {
+            // Mark old selection rectangle as dirty
+            if (this.selectionEnd) {
+                const oldRect = this.getSelectionRect()
+                this.engine.markDirty(oldRect)
+            }
+
             this.selectionEnd = worldPos
+
+            // Mark new selection rectangle as dirty
+            const newRect = this.getSelectionRect()
+            this.engine.markDirty(newRect)
+
             this.engine.canvas.style.cursor = 'crosshair'
             this.engine.render()
             return
@@ -120,11 +140,23 @@ export class SelectTool extends Tool {
 
         // Moving
         if (this.isDragging && this.dragStart) {
+            // Mark old positions as dirty
+            this.engine.objectManager.selectedObjects.forEach(obj => {
+                const bounds = obj.getBounds()
+                this.engine.markDirty(bounds)
+            })
+
             const dx = worldPos.x - this.dragStart.x
             const dy = worldPos.y - this.dragStart.y
 
             this.engine.objectManager.selectedObjects.forEach(obj => {
                 obj.move(dx, dy)
+            })
+
+            // Mark new positions as dirty
+            this.engine.objectManager.selectedObjects.forEach(obj => {
+                const bounds = obj.getBounds()
+                this.engine.markDirty(bounds)
             })
 
             this.dragStart = worldPos
@@ -135,13 +167,30 @@ export class SelectTool extends Tool {
 
     onMouseUp(worldPos, e) {
         if (this.isResizing || this.isDragging) {
-            // Broadcast final position/size to other clients
+            // Update quadtree for moved/resized objects
             if (this.isDragging) {
+                // Note: Objects already moved, just need to update quadtree
+                // ObjectManager.moveSelected() handles this, but in SelectTool we move directly
+                // So we need to rebuild the quadtree for these objects
+                this.engine.objectManager.selectedObjects.forEach(obj => {
+                    // The object has already moved, we just need to update the quadtree
+                    // Use a dummy old bounds - quadtree will handle it
+                    this.engine.objectManager.quadtree.remove(obj, obj.getBounds())
+                    this.engine.objectManager.quadtree.insert(obj, obj.getBounds())
+                })
                 this.engine.objectManager.broadcast('update', this.engine.objectManager.selectedObjects)
             }
             if (this.isResizing && this.resizeObject) {
+                // Update quadtree for resized object
+                this.engine.objectManager.quadtree.remove(this.resizeObject, this.resizeObject.getBounds())
+                this.engine.objectManager.quadtree.insert(this.resizeObject, this.resizeObject.getBounds())
                 this.engine.objectManager.broadcast('update', this.resizeObject)
             }
+
+            // Mark final positions as dirty
+            this.engine.objectManager.selectedObjects.forEach(obj => {
+                this.engine.markDirty(obj.getBounds())
+            })
 
             this.engine.objectManager.saveState()
             if (this.engine.toolbar) {
@@ -151,7 +200,10 @@ export class SelectTool extends Tool {
 
         // Finish drag selection
         if (this.isSelecting) {
+            // Mark final selection rect as dirty
             const rect = this.getSelectionRect()
+            this.engine.markDirty(rect)
+
             this.engine.objectManager.selectObjectsInRect(rect, e.shiftKey)
             this.isSelecting = false
             this.selectionStart = null

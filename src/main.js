@@ -44,3 +44,8 @@ engine.wsManager.connect(roomCode)
 
 engine.start()
 
+// Clean up on exit
+window.addEventListener('beforeunload', () => {
+    engine.destroy()
+})
+
