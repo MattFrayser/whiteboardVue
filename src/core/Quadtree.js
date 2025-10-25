@@ -1,22 +1,23 @@
 /**
  * Quadtree spatial indexing data structure for efficient spatial queries
  * Used for viewport culling and fast collision/selection detection
+ *
+ * Recursivly divide 2d space, creating a tree structure.
  */
 
 class QuadtreeNode {
     constructor(bounds, level, maxObjects, maxLevels) {
-        this.bounds = bounds // { x, y, width, height }
-        this.level = level
-        this.maxObjects = maxObjects
-        this.maxLevels = maxLevels
+        this.bounds = bounds // rect region node covers { x, y, width, height }
+        this.level = level // Current depth (0 = root)
+        this.maxObjects = maxObjects // Capacity before splitting
+        this.maxLevels = maxLevels // Maximum tree depth (prevents infinite subdivision)
 
-        this.objects = [] // Array of { object, bounds }
-        this.nodes = [] // Child nodes (4 quadrants: NW, NE, SW, SE)
+        this.objects = [] // { object, bounds }
+        this.nodes = [] // 4 child nodes (0=NW, 1=NE, 2=SW, 3=SE)
     }
 
-    /**
-     * Split this node into 4 quadrants
-     */
+    // Called when node has too many objects, 
+    // Node is split into 4 quadrants creating child nodes
     split() {
         const subWidth = this.bounds.width / 2
         const subHeight = this.bounds.height / 2
@@ -24,7 +25,7 @@ class QuadtreeNode {
         const y = this.bounds.y
         const nextLevel = this.level + 1
 
-        // Create 4 child nodes: NW, NE, SW, SE
+        //  0: NW, 1: NE, 2: SW, 3: SE
         this.nodes[0] = new QuadtreeNode(
             { x: x, y: y, width: subWidth, height: subHeight },
             nextLevel, this.maxObjects, this.maxLevels
@@ -45,13 +46,15 @@ class QuadtreeNode {
 
     /**
      * Get indices of quadrants that the bounds intersects
-     * Returns array of indices: 0=NW, 1=NE, 2=SW, 3=SE
+     * Uses midpoint testing: an object can span multiple quadrants if it
+     * crosses the vertical or horizontal midpoint of this node
      */
     getQuadrants(bounds) {
         const indices = []
         const verticalMidpoint = this.bounds.x + this.bounds.width / 2
         const horizontalMidpoint = this.bounds.y + this.bounds.height / 2
 
+        // Test which sides of the midpoints the bounds occupies
         const startIsNorth = bounds.y < horizontalMidpoint
         const startIsWest = bounds.x < verticalMidpoint
         const endIsEast = bounds.x + bounds.width > verticalMidpoint
@@ -63,14 +66,12 @@ class QuadtreeNode {
         if (endIsSouth && startIsWest) indices.push(2)   // SW
         if (endIsSouth && endIsEast) indices.push(3)     // SE
 
-        return indices
+        return indices //0=NW, 1=NE, 2=SW, 3=SE
     }
 
-    /**
-     * Insert an object with its bounding box
-     */
     insert(object, bounds) {
-        // If we have child nodes, insert into them
+
+        // Insert any child nodes
         if (this.nodes.length > 0) {
             const indices = this.getQuadrants(bounds)
             for (const index of indices) {
@@ -79,28 +80,30 @@ class QuadtreeNode {
             return
         }
 
-        // Add to this node
+        // Add object to node
         this.objects.push({ object, bounds })
 
-        // Check if we need to split
+        // when max objects are exceeded split node,
+        // this condition is kept in check by having a max level
         if (this.objects.length > this.maxObjects && this.level < this.maxLevels) {
-            // Split the node
             if (this.nodes.length === 0) {
                 this.split()
             }
 
-            // Move objects to child nodes
+            // Redistribute objects: push down to children when possible,
+            // but keep objects at this level if they span multiple quadrants
+            // (prevents duplicate storage and allows single-quadrant objects
+            // to benefit from deeper spatial partitioning)
             const objectsToDistribute = [...this.objects]
             this.objects = []
 
             for (const item of objectsToDistribute) {
                 const indices = this.getQuadrants(item.bounds)
 
-                // If object spans multiple quadrants, keep it at this level
+                // Multi-quadrant objects stay at parent level to avoid duplication
                 if (indices.length > 1) {
                     this.objects.push(item)
                 } else {
-                    // Insert into appropriate child node
                     for (const index of indices) {
                         this.nodes[index].insert(item.object, item.bounds)
                     }
@@ -109,9 +112,6 @@ class QuadtreeNode {
         }
     }
 
-    /**
-     * Remove an object with its bounding box
-     */
     remove(object, bounds) {
         // Remove from child nodes
         if (this.nodes.length > 0) {
@@ -125,9 +125,7 @@ class QuadtreeNode {
         this.objects = this.objects.filter(item => item.object !== object)
     }
 
-    /**
-     * Query all objects that intersect with the given rectangle
-     */
+    // querys are done by recusivly traversing nodes that intersect with rect
     query(rect, results = []) {
         // Check if this node intersects with query rect
         if (!this.intersects(this.bounds, rect)) {
@@ -137,7 +135,8 @@ class QuadtreeNode {
         // Check objects at this level
         for (const item of this.objects) {
             if (this.intersects(item.bounds, rect)) {
-                // Avoid duplicates
+                // Avoid duplicates: objects spanning multiple quadrants exist at parent
+                // level but we may visit the same parent from multiple child branches
                 if (!results.includes(item.object)) {
                     results.push(item.object)
                 }
@@ -154,9 +153,8 @@ class QuadtreeNode {
         return results
     }
 
-    /**
-     * Query all objects that contain a specific point
-     */
+    // Similar to query but only for single point
+    // Used for click detection
     queryPoint(point, results = []) {
         // Check if point is in this node's bounds
         if (!this.containsPoint(this.bounds, point)) {
@@ -183,21 +181,17 @@ class QuadtreeNode {
         return results
     }
 
-    /**
-     * Check if two rectangles intersect
-     */
+    
+    // Uses negation: easier to check if they DON'T overlap 
     intersects(rect1, rect2) {
         return !(
-            rect1.x + rect1.width < rect2.x ||
-            rect1.x > rect2.x + rect2.width ||
-            rect1.y + rect1.height < rect2.y ||
-            rect1.y > rect2.y + rect2.height
+            rect1.x + rect1.width < rect2.x ||   // rect1 is completely left of rect2
+            rect1.x > rect2.x + rect2.width ||   // rect1 is completely right of rect2
+            rect1.y + rect1.height < rect2.y ||  // rect1 is completely above rect2
+            rect1.y > rect2.y + rect2.height     // rect1 is completely below rect2
         )
     }
 
-    /**
-     * Check if a rectangle contains a point
-     */
     containsPoint(rect, point) {
         return (
             point.x >= rect.x &&
@@ -207,9 +201,6 @@ class QuadtreeNode {
         )
     }
 
-    /**
-     * Clear all objects from this node and children
-     */
     clear() {
         this.objects = []
         for (const node of this.nodes) {
@@ -218,9 +209,7 @@ class QuadtreeNode {
         this.nodes = []
     }
 
-    /**
-     * Get total number of objects in tree (for debugging)
-     */
+    // used for debugging
     count() {
         let total = this.objects.length
         for (const node of this.nodes) {
@@ -232,26 +221,25 @@ class QuadtreeNode {
 
 export class Quadtree {
     constructor(bounds, maxObjects = 10, maxLevels = 8) {
+        // maxObjects: higher = fewer nodes but slower queries per node
+        // maxLevels: higher = deeper tree, more precise culling but more overhead
+        // defaults tuned for typical whiteboard object density
         this.bounds = bounds
         this.maxObjects = maxObjects
         this.maxLevels = maxLevels
         this.root = new QuadtreeNode(bounds, 0, maxObjects, maxLevels)
     }
 
-    /**
-     * Insert an object with its bounding box
-     */
     insert(object, bounds) {
         if (!bounds || bounds.width === 0 || bounds.height === 0) {
+            // Zero-size bounds break getQuadrants() logic and provide no
+            // useful spatial information for queries
             console.warn('[Quadtree] Invalid bounds for insert:', bounds)
             return
         }
         this.root.insert(object, bounds)
     }
 
-    /**
-     * Remove an object with its bounding box
-     */
     remove(object, bounds) {
         if (!bounds) {
             console.warn('[Quadtree] Invalid bounds for remove:', bounds)
@@ -260,23 +248,17 @@ export class Quadtree {
         this.root.remove(object, bounds)
     }
 
-    /**
-     * Query all objects that intersect with the given rectangle
-     */
+
     query(rect) {
         return this.root.query(rect, [])
     }
 
-    /**
-     * Query all objects that contain a specific point
-     */
+
     queryPoint(point) {
         return this.root.queryPoint(point, [])
     }
 
-    /**
-     * Clear all objects from the quadtree
-     */
+
     clear() {
         this.root.clear()
         this.root = new QuadtreeNode(
@@ -287,9 +269,7 @@ export class Quadtree {
         )
     }
 
-    /**
-     * Rebuild the entire quadtree from an array of objects
-     */
+
     rebuild(objects) {
         this.clear()
         for (const obj of objects) {
@@ -299,11 +279,12 @@ export class Quadtree {
     }
 
     /**
-     * Update bounds for the quadtree (e.g., when canvas resizes)
+     * Update bounds for the quadtree (ex: canvas resizes)
+     * WARNING: This triggers a full rebuild (O(n log n)) - use sparingly
      */
     updateBounds(bounds) {
+        // Must rebuild since all spatial partitions are now invalid
         this.bounds = bounds
-        // Rebuild with new bounds
         const allObjects = this.getAllObjects()
         this.clear()
         this.root = new QuadtreeNode(
@@ -317,9 +298,7 @@ export class Quadtree {
         }
     }
 
-    /**
-     * Get all objects in the quadtree (for rebuilding)
-     */
+    // used when rebuilding
     getAllObjects() {
         const results = []
         this.collectObjects(this.root, results)
@@ -337,9 +316,7 @@ export class Quadtree {
         }
     }
 
-    /**
-     * Get total number of objects (for debugging)
-     */
+    // debugging
     count() {
         return this.root.count()
     }
