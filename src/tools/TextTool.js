@@ -1,5 +1,5 @@
-import { Tool } from './Tool'
 import { Text } from '../objects/Text'
+import { Tool } from './Tool'
 
 export class TextTool extends Tool {
     constructor(engine) {
@@ -7,17 +7,17 @@ export class TextTool extends Tool {
         this.isEditing = false
         this.inputElement = null
     }
-    
+
     onMouseDown(worldPos, e) {
         // If already editing, finish current text
         if (this.isEditing) {
             this.finishEditing()
         }
-        
+
         // Create text input at click position
         this.createTextInput(worldPos)
     }
-    
+
     createTextInput(worldPos) {
         // Create input element
         this.inputElement = document.createElement('input')
@@ -28,9 +28,9 @@ export class TextTool extends Tool {
         // Position input at click location
         const viewportPos = this.engine.coordinates.worldToViewport(worldPos)
         const canvasRect = this.engine.canvas.getBoundingClientRect()
-        this.inputElement.style.left = (canvasRect.left + viewportPos.x) + 'px'
-        this.inputElement.style.top = (canvasRect.top + viewportPos.y) + 'px'
-        this.inputElement.style.fontSize = this.engine.currentWidth * 3 + 'px'
+        this.inputElement.style.left = `${canvasRect.left + viewportPos.x}px`
+        this.inputElement.style.top = `${canvasRect.top + viewportPos.y}px`
+        this.inputElement.style.fontSize = `${this.engine.currentWidth * 3}px`
         this.inputElement.style.color = this.engine.currentColor
         this.inputElement.style.background = 'rgba(255, 255, 255, 0.9)'
         this.inputElement.style.border = '2px solid #0066ff'
@@ -43,7 +43,7 @@ export class TextTool extends Tool {
         document.body.appendChild(this.inputElement)
 
         // Store bound event handlers for cleanup
-        this.keydownHandler = (e) => {
+        this.keydownHandler = e => {
             if (e.key === 'Enter') {
                 this.finishEditing()
             } else if (e.key === 'Escape') {
@@ -76,15 +76,17 @@ export class TextTool extends Tool {
         this.isEditing = true
         this.Position = worldPos
     }
-    
+
     finishEditing() {
-        if (!this.inputElement) return
-        
+        if (!this.inputElement) {
+            return
+        }
+
         const text = this.inputElement.value.trim()
         if (text) {
             // Create text object
             const textObj = new Text(null, {
-                text: text,
+                text,
                 x: this.Position.x,
                 y: this.Position.y,
                 color: this.engine.currentColor,
@@ -92,20 +94,20 @@ export class TextTool extends Tool {
                 fontFamily: 'Arial, sans-serif',
                 bold: false,
                 italic: false,
-                background: null
+                background: null,
             })
-            
+
             this.engine.objectManager.addObject(textObj)
             this.engine.render()
         }
-        
+
         this.cleanup()
     }
-    
+
     cancelEditing() {
         this.cleanup()
     }
-    
+
     cleanup() {
         if (this.inputElement) {
             // Remove event listeners before removing element
@@ -126,7 +128,7 @@ export class TextTool extends Tool {
         this.isEditing = false
         this.Position = null
     }
-    
+
     deactivate() {
         super.deactivate()
         if (this.isEditing) {

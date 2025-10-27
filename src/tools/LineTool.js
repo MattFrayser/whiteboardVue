@@ -1,5 +1,5 @@
-import { Tool } from './Tool'
 import { Line } from '../objects/Line'
+import { Tool } from './Tool'
 
 export class LineTool extends Tool {
     constructor(engine) {
@@ -42,7 +42,7 @@ export class LineTool extends Tool {
         if (this.currentLine) {
             const length = Math.sqrt(
                 Math.pow(this.currentLine.data.x2 - this.currentLine.data.x1, 2) +
-                Math.pow(this.currentLine.data.y2 - this.currentLine.data.y1, 2)
+                    Math.pow(this.currentLine.data.y2 - this.currentLine.data.y1, 2)
             )
             if (length > 1) {
                 // Mark final bounds as dirty
@@ -56,7 +56,7 @@ export class LineTool extends Tool {
             this.engine.render()
         }
     }
-    
+
     renderPreview(ctx) {
         if (this.currentLine) {
             this.currentLine.render(ctx)

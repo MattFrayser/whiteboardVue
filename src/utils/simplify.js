@@ -43,7 +43,6 @@ export function douglasPeucker(points, epsilon, minPoints = 3) {
     }
 }
 
-
 // Uses cross product formula: |area of parallelogram| / base length
 function perpendicularDistance(point, lineStart, lineEnd) {
     const dx = lineEnd.x - lineStart.x
@@ -52,10 +51,7 @@ function perpendicularDistance(point, lineStart, lineEnd) {
     // Handle case where line segment is actually a point
     if (dx === 0 && dy === 0) {
         // Fall back to simple Euclidean distance
-        return Math.sqrt(
-            Math.pow(point.x - lineStart.x, 2) +
-            Math.pow(point.y - lineStart.y, 2)
-        )
+        return Math.sqrt(Math.pow(point.x - lineStart.x, 2) + Math.pow(point.y - lineStart.y, 2))
     }
 
     // Cross product gives twice the area of triangle formed by the three points
@@ -68,8 +64,8 @@ function perpendicularDistance(point, lineStart, lineEnd) {
     return numerator / denominator
 }
 
- // Fallback when simplification would reduce points below minimum
- // Uses uniform sampling to maintain stroke shape distribution
+// Fallback when simplification would reduce points below minimum
+// Uses uniform sampling to maintain stroke shape distribution
 function preserveMinimumPoints(points, minPoints) {
     if (points.length <= minPoints) {
         return points

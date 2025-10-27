@@ -63,12 +63,11 @@ export class WebSocketManager {
             this.socket = new WebSocket(`ws://localhost:8080/ws?room=${roomCode}`)
 
             this.socket.onopen = () => {
-
                 // Send authenticate message with stored token (if exists)
                 const token = this.getStoredToken()
                 const authMsg = {
                     type: 'authenticate',
-                    token: token || ''
+                    token: token || '',
                 }
                 this.send(authMsg)
 
@@ -82,20 +81,19 @@ export class WebSocketManager {
                 }, 6000)
             }
 
-            this.socket.onmessage = (event) => {
+            this.socket.onmessage = event => {
                 this.handleMessage(JSON.parse(event.data))
             }
 
-            this.socket.onerror = (error) => {
-                console.error("[WebSocket] Connection Error:", error)
+            this.socket.onerror = error => {
+                console.error('[WebSocket] Connection Error:', error)
                 this.updateStatus('error')
             }
 
-            this.socket.onclose = (event) => {
-                console.log('[WebSocket] Connection closed. Code:', event.code, 'Reason:', event.reason, 'Clean:', event.wasClean)
+            this.socket.onclose = event => {
+                // Connection closed - handled by handleDisconnect
                 this.handleDisconnect()
             }
-
         } catch (error) {
             console.error('Failed to connect:', error)
             this.handleDisconnect()
@@ -156,12 +154,16 @@ export class WebSocketManager {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify(msg))
         } else {
-            console.warn('[WebSocket] Cannot send message - socket not open. ReadyState:', this.socket?.readyState, 'Message:', msg)
+            console.warn(
+                '[WebSocket] Cannot send message - socket not open. ReadyState:',
+                this.socket?.readyState,
+                'Message:',
+                msg
+            )
         }
     }
 
     handleMessage(msg) {
-
         switch (msg.type) {
             case 'authenticated':
                 this.handleAuthenticated(msg)
@@ -190,7 +192,6 @@ export class WebSocketManager {
             default:
                 console.warn('[WebSocket] Unknown message type:', msg.type, msg)
         }
-
     }
 
     handleAuthenticated(msg) {
@@ -206,8 +207,6 @@ export class WebSocketManager {
             this.storeToken(msg.token)
         }
 
-        console.log('Authenticated as user:', this.userId)
-
         this.eventBus.publish('network:authenticated', { userId: this.userId })
     }
 
@@ -217,10 +216,8 @@ export class WebSocketManager {
         this.updateStatus('connected')
         this.reconnectAttempts = 0
         this.reconnectDelay = 1000
-
-        console.log('Joined room:', msg.room, 'with color:', this.userColor)
     }
-    
+
     handleSync(msg) {
         this.eventBus.publish('network:sync', { objects: msg.objects })
     }
@@ -233,66 +230,71 @@ export class WebSocketManager {
 
         this.eventBus.publish('network:objectAdded', {
             object: objectData.object,
-            userId: objectData.userId
+            userId: objectData.userId,
         })
     }
 
     handleObjectUpdated(objectData) {
-        if (objectData.userId == this.userId) return
+        if (objectData.userId == this.userId) {
+            return
+        }
 
         this.eventBus.publish('network:objectUpdated', {
             object: objectData.object,
-            userId: objectData.userId
+            userId: objectData.userId,
         })
     }
 
     handleObjectDeleted(objectData) {
-        if (objectData.userId == this.userId) return
+        if (objectData.userId == this.userId) {
+            return
+        }
 
         this.eventBus.publish('network:objectDeleted', {
             objectId: objectData.objectId,
-            userId: objectData.userId
+            userId: objectData.userId,
         })
     }
 
     handleCursor(cursor) {
-        if (cursor.userId == this.userId) return
+        if (cursor.userId == this.userId) {
+            return
+        }
 
         this.eventBus.publish('network:remoteCursorMove', {
             userId: cursor.userId,
             x: cursor.x,
             y: cursor.y,
             color: cursor.color,
-            tool: cursor.tool
+            tool: cursor.tool,
         })
     }
 
     handleUserDisconnect(user) {
         this.eventBus.publish('network:userDisconnected', {
-            userId: user.userId
+            userId: user.userId,
         })
     }
-
 
     broadcastObjectAdded(object) {
         this.send({
             type: 'objectAdded',
-            object: object.toJSON(), 
-            userId: this.userId
+            object: object.toJSON(),
+            userId: this.userId,
         })
     }
     broadcastObjectUpdated(object) {
         this.send({
             type: 'objectUpdated',
-            object: object.toJSON(), 
-            userId: this.userId
+            object: object.toJSON(),
+            userId: this.userId,
         })
     }
     broadcastObjectDeleted(object) {
         this.send({
             type: 'objectDeleted',
             objectId: object.id,
-            userId: this.userId
+            userId: this.userId,
         })
     }
     broadcastCursor(cursor) {
@@ -301,7 +303,7 @@ export class WebSocketManager {
             x: cursor.x,
             y: cursor.y,
             tool: cursor.tool,
-            color: cursor.color
+            color: cursor.color,
         })
     }
 

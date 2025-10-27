@@ -1,4 +1,4 @@
-import { DrawingObject } from '../core/DrawingObject'
+import { DrawingObject } from './DrawingObject'
 
 export class Line extends DrawingObject {
     constructor(id, data) {
@@ -11,13 +11,13 @@ export class Line extends DrawingObject {
             x: Math.min(this.data.x1, this.data.x2) - padding,
             y: Math.min(this.data.y1, this.data.y2) - padding,
             width: Math.abs(this.data.x2 - this.data.x1) + padding * 2,
-            height: Math.abs(this.data.y2 - this.data.y1) + padding * 2
+            height: Math.abs(this.data.y2 - this.data.y1) + padding * 2,
         }
     }
 
     containsPoint(point) {
         const distance = this.pointToLineDistance(
-            point, 
+            point,
             { x: this.data.x1, y: this.data.y1 },
             { x: this.data.x2, y: this.data.y2 }
         )
@@ -30,17 +30,17 @@ export class Line extends DrawingObject {
         const B = point.y - lineStart.y
         const C = lineEnd.x - lineStart.x
         const D = lineEnd.y - lineStart.y
-        
+
         const dot = A * C + B * D
         const lenSq = C * C + D * D
         let param = -1
-        
+
         if (lenSq !== 0) {
             param = dot / lenSq
         }
-        
+
         let xx, yy
-        
+
         if (param < 0) {
             xx = lineStart.x
             yy = lineStart.y
@@ -51,10 +51,10 @@ export class Line extends DrawingObject {
             xx = lineStart.x + param * C
             yy = lineStart.y + param * D
         }
-        
+
         const dx = point.x - xx
         const dy = point.y - yy
-        
+
         return Math.sqrt(dx * dx + dy * dy)
     }
 
@@ -69,7 +69,7 @@ export class Line extends DrawingObject {
         // Override resize to handle padding correctly
         const padding = this.data.width / 2
         const bounds = this.getBounds()
-        let newBounds = {...bounds}
+        const newBounds = { ...bounds }
 
         // Calculate new visual bounds based on handle dragging
         switch (handleIndex) {
@@ -130,7 +130,7 @@ export class Line extends DrawingObject {
             x: newBounds.x + padding,
             y: newBounds.y + padding,
             width: newBounds.width - padding * 2,
-            height: newBounds.height - padding * 2
+            height: newBounds.height - padding * 2,
         }
 
         this.applyBounds(contentBounds)
@@ -162,18 +162,18 @@ export class Line extends DrawingObject {
         ctx.strokeStyle = this.data.color
         ctx.lineWidth = this.data.width
         ctx.lineCap = 'round'
-        
+
         if (this.data.dashed) {
             ctx.setLineDash([this.data.width * 2, this.data.width])
         }
-        
+
         ctx.beginPath()
         ctx.moveTo(this.data.x1, this.data.y1)
         ctx.lineTo(this.data.x2, this.data.y2)
         ctx.stroke()
-        
+
         ctx.setLineDash([])
-              
+
         if (this.selected) {
             this.renderSelection(ctx)
         }

@@ -5,10 +5,30 @@ export class Toolbar {
         this.activeSwatch = null
         this.activeSwatchForMenu = null
         this.colors = [
-        '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00',
-        '#FF00FF', '#00FFFF', '#800000', '#008000', '#000080', '#808000',
-        '#800080', '#008080', '#C0C0C0', '#808080', '#FFA500', '#A52A2A',
-        '#FFC0CB', '#FFD700', '#4B0082', '#9370DB', '#90EE90', '#FF6347'
+            '#000000',
+            '#FFFFFF',
+            '#FF0000',
+            '#00FF00',
+            '#0000FF',
+            '#FFFF00',
+            '#FF00FF',
+            '#00FFFF',
+            '#800000',
+            '#008000',
+            '#000080',
+            '#808000',
+            '#800080',
+            '#008080',
+            '#C0C0C0',
+            '#808080',
+            '#FFA500',
+            '#A52A2A',
+            '#FFC0CB',
+            '#FFD700',
+            '#4B0082',
+            '#9370DB',
+            '#90EE90',
+            '#FF6347',
         ]
 
         // Track state locally
@@ -44,7 +64,6 @@ export class Toolbar {
     }
 
     setupEventListeners() {
-
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tool = btn.dataset.tool
@@ -54,7 +73,7 @@ export class Toolbar {
 
         // Color Picker
         const colorPicker = document.getElementById('colorPicker')
-        colorPicker.addEventListener('change', (e) => {
+        colorPicker.addEventListener('change', e => {
             this.selectColor(e.target.value)
         })
 
@@ -63,38 +82,37 @@ export class Toolbar {
             swatch.addEventListener('click', () => {
                 const swatchColor = swatch.dataset.color
                 const swatchSize = parseInt(swatch.dataset.size) || this.engine.currentWidth
-            
+
                 if (this.clickTimers.has(swatch)) {
                     // Double click
                     clearTimeout(this.clickTimers.get(swatch))
                     this.clickTimers.delete(swatch)
-                    this.openMenu(swatch);
-                } else{
+                    this.openMenu(swatch)
+                } else {
                     // single click
                     const timer = setTimeout(() => {
                         this.selectColor(swatchColor)
                         this.selectBrushSize(swatchSize)
-                        this.clickTimers.delete(swatch);
-                    }, 250);
-                        this.clickTimers.set(swatch, timer);
+                        this.clickTimers.delete(swatch)
+                    }, 250)
+                    this.clickTimers.set(swatch, timer)
                 }
             })
         })
-            
+
         // Color menu
-        colorMenu.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
+        colorMenu.addEventListener('click', e => {
+            e.stopPropagation()
+        })
 
-
-        colorGrid.addEventListener('click', (e) => {
+        colorGrid.addEventListener('click', e => {
             if (e.target.classList.contains('color-option')) {
                 this.selectColor(e.target.dataset.color)
-                this.closeMenu();
+                this.closeMenu()
             }
-        });
+        })
         // Close menu when clicking outside
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', e => {
             if (!e.target.closest('.color-picker-container')) {
                 this.closeMenu()
             }
@@ -102,7 +120,7 @@ export class Toolbar {
 
         // Brush Size
         const brushSize = document.getElementById('brushSize')
-        brushSize.addEventListener('input', (e) => {
+        brushSize.addEventListener('input', e => {
             this.selectBrushSize(parseInt(e.target.value))
         })
 
@@ -127,19 +145,21 @@ export class Toolbar {
 
     initColorGrid() {
         this.colors.forEach(color => {
-            const colorOption = document.createElement('div');
-            colorOption.classList.add('color-option');
-            colorOption.dataset.color = color;
-            colorOption.style.background = color;
-            colorGrid.appendChild(colorOption);
-        });
+            const colorOption = document.createElement('div')
+            colorOption.classList.add('color-option')
+            colorOption.dataset.color = color
+            colorOption.style.background = color
+            colorGrid.appendChild(colorOption)
+        })
     }
 
     selectBrushSize(size) {
         this.currentWidth = size
 
         const brushSize = document.getElementById('brushSize')
-        if (brushSize) brushSize.value = size
+        if (brushSize) {
+            brushSize.value = size
+        }
 
         // Store size on active swatch
         if (this.activeSwatch) {
@@ -157,19 +177,19 @@ export class Toolbar {
             const circle = this.activeSwatch.querySelector('.swatch-circle')
             if (circle) {
                 const size = Math.min(28, Math.max(8, this.currentWidth * 1.5))
-                circle.style.width = size + 'px'
-                circle.style.height = size + 'px'
+                circle.style.width = `${size}px`
+                circle.style.height = `${size}px`
             }
         }
     }
     selectColor(color) {
         this.currentColor = color
-        
+
         // Remove active from current swatch
         if (this.activeSwatch) {
             this.activeSwatch.classList.remove('active')
         }
-        
+
         // Find matching swatch
         let matchingSwatch = null
         const swatches = document.querySelectorAll('.swatch')
@@ -179,7 +199,7 @@ export class Toolbar {
                 break
             }
         }
-        
+
         // Update swatch or use menu swatch
         if (matchingSwatch) {
             this.activeSwatch = matchingSwatch
@@ -191,7 +211,7 @@ export class Toolbar {
             this.activeSwatchForMenu.dataset.color = color
             this.activeSwatch = this.activeSwatchForMenu
         }
-        
+
         if (this.activeSwatch) {
             this.activeSwatch.classList.add('active')
             this.updateBrushPreview()
@@ -199,13 +219,15 @@ export class Toolbar {
 
         // Update color picker
         const colorPicker = document.getElementById('colorPicker')
-        if (colorPicker) colorPicker.value = color
+        if (colorPicker) {
+            colorPicker.value = color
+        }
 
         // Emit event
         this.eventBus.publish('toolbar:colorChanged', { color })
     }
     openMenu(swatch) {
-        this.activeSwatchForMenu = swatch;
+        this.activeSwatchForMenu = swatch
 
         // Make this swatch active
         if (this.activeSwatch) {
@@ -219,16 +241,18 @@ export class Toolbar {
         const swatchSize = parseInt(swatch.dataset.size) || this.currentWidth
         this.currentColor = swatchColor
 
-        colorMenu.classList.remove('hidden');
+        colorMenu.classList.remove('hidden')
         const colorPicker = document.getElementById('colorPicker')
-        if (colorPicker) colorPicker.value = swatchColor
+        if (colorPicker) {
+            colorPicker.value = swatchColor
+        }
 
         this.selectBrushSize(swatchSize)
     }
 
     closeMenu() {
-        colorMenu.classList.add('hidden');
-        this.activeSwatchForMenu = null;
+        colorMenu.classList.add('hidden')
+        this.activeSwatchForMenu = null
     }
 
     updateToolButtons() {

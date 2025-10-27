@@ -1,5 +1,5 @@
-import { Tool } from './Tool'
 import { Rectangle } from '../objects/Rectangle'
+import { Tool } from './Tool'
 
 export class RectangleTool extends Tool {
     constructor(engine) {
@@ -18,7 +18,7 @@ export class RectangleTool extends Tool {
             y2: worldPos.y,
             color: this.engine.currentColor,
             width: this.engine.currentWidth,
-            fill: e.shiftKey ? this.engine.currentColor : null
+            fill: e.shiftKey ? this.engine.currentColor : null,
         })
         this.lastBounds = null
     }

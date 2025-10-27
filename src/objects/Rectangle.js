@@ -1,4 +1,4 @@
-import { DrawingObject } from "../core/DrawingObject";
+import { DrawingObject } from './DrawingObject'
 
 export class Rectangle extends DrawingObject {
     constructor(id, data) {
@@ -10,22 +10,22 @@ export class Rectangle extends DrawingObject {
             x: Math.min(this.data.x1, this.data.x2),
             y: Math.min(this.data.y1, this.data.y2),
             width: Math.abs(this.data.x2 - this.data.x1),
-            height: Math.abs(this.data.y2 - this.data.y1)
+            height: Math.abs(this.data.y2 - this.data.y1),
         }
     }
 
     applyBounds(newBounds) {
-      this.data.x1 = newBounds.x
-      this.data.y1 = newBounds.y
-      this.data.x2 = newBounds.x + newBounds.width
-      this.data.y2 = newBounds.y + newBounds.height
+        this.data.x1 = newBounds.x
+        this.data.y1 = newBounds.y
+        this.data.x2 = newBounds.x + newBounds.width
+        this.data.y2 = newBounds.y + newBounds.height
     }
-    
+
     move(dx, dy) {
-      this.data.x1 += dx
-      this.data.y1 += dy
-      this.data.x2 += dx
-      this.data.y2 += dy
+        this.data.x1 += dx
+        this.data.y1 += dy
+        this.data.x2 += dx
+        this.data.y2 += dy
     }
 
     render(ctx) {

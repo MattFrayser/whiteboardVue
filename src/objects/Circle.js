@@ -1,4 +1,4 @@
-import { DrawingObject } from '../core/DrawingObject'
+import { DrawingObject } from './DrawingObject'
 
 export class Circle extends DrawingObject {
     constructor(id, data) {
@@ -7,25 +7,22 @@ export class Circle extends DrawingObject {
 
     getBounds() {
         const radius = Math.sqrt(
-            Math.pow(this.data.x2 - this.data.x1, 2) +
-            Math.pow(this.data.y2 - this.data.y1, 2) 
+            Math.pow(this.data.x2 - this.data.x1, 2) + Math.pow(this.data.y2 - this.data.y1, 2)
         )
         return {
             x: this.data.x1 - radius,
             y: this.data.y1 - radius,
             width: radius * 2,
-            height: radius * 2
+            height: radius * 2,
         }
     }
 
     containsPoint(point) {
         const radius = Math.sqrt(
-            Math.pow(this.data.x2 - this.data.x1, 2) +
-            Math.pow(this.data.y2 - this.data.y1, 2)
+            Math.pow(this.data.x2 - this.data.x1, 2) + Math.pow(this.data.y2 - this.data.y1, 2)
         )
         const distance = Math.sqrt(
-            Math.pow(point.x - this.data.x1, 2) +
-            Math.pow(point.y - this.data.y1, 2)
+            Math.pow(point.x - this.data.x1, 2) + Math.pow(point.y - this.data.y1, 2)
         )
 
         return distance <= radius
@@ -36,9 +33,8 @@ export class Circle extends DrawingObject {
         this.data.y1 += dy
         this.data.x2 += dx
         this.data.y2 += dy
-
     }
-    
+
     applyBounds(newBounds, handleIndex) {
         // For side handles, use the dimension being changed (not the fixed one)
         let size
@@ -64,7 +60,7 @@ export class Circle extends DrawingObject {
 
         if (handleIndex !== undefined) {
             // Lock the opposite corner/edge based on which handle is being dragged
-            switch(handleIndex) {
+            switch (handleIndex) {
                 case 0: // nw - lock se corner
                     centerX = newBounds.x + newBounds.width - radius
                     centerY = newBounds.y + newBounds.height - radius
@@ -117,8 +113,7 @@ export class Circle extends DrawingObject {
     }
     render(ctx) {
         const radius = Math.sqrt(
-            Math.pow(this.data.x2 - this.data.x1, 2) +
-            Math.pow(this.data.y2 - this.data.y1, 2) 
+            Math.pow(this.data.x2 - this.data.x1, 2) + Math.pow(this.data.y2 - this.data.y1, 2)
         )
 
         ctx.strokeStyle = this.data.color

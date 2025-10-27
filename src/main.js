@@ -1,6 +1,6 @@
 import './style.css'
-import { EventBus } from './core/EventBus'
-import { DrawingEngine } from './core/DrawingEngine'
+import { EventBus } from './utils/EventBus'
+import { DrawingEngine } from './engine/DrawingEngine'
 import { Toolbar } from './ui/Toolbar'
 import { WebSocketManager } from './network/WebSocketManager'
 import { InviteManager } from './ui/InviteManager'
@@ -34,10 +34,10 @@ eventBus.subscribe('network:statusChanged', ({ status }) => {
     statusIndicator.className = `connection-status status-${status}`
 
     const statusLabels = {
-        'connected': 'Connected',
-        'connecting': 'Connecting...',
-        'disconnected': 'Connecting...',
-        'error': 'Failed'
+        connected: 'Connected',
+        connecting: 'Connecting...',
+        disconnected: 'Connecting...',
+        error: 'Failed',
     }
     statusText.textContent = statusLabels[status] || status
 })
@@ -53,4 +53,3 @@ window.addEventListener('beforeunload', () => {
     engine.destroy()
     eventBus.clear() // Clean up all listeners
 })
-

@@ -3,17 +3,17 @@ export class Tool {
         this.engine = engine
         this.active = false
     }
-    
+
     activate() {
         this.active = true
     }
-    
+
     deactivate() {
         this.active = false
     }
-    
-    onMouseDown(worldPos, e) {}
-    onMouseMove(worldPos, e) {}
-    onMouseUp(worldPos, e) {}
-    renderPreview(ctx) {}
+
+    onMouseDown(_worldPos, _e) {}
+    onMouseMove(_worldPos, _e) {}
+    onMouseUp(_worldPos, _e) {}
+    renderPreview(_ctx) {}
 }

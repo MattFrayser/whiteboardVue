@@ -16,7 +16,7 @@ class QuadtreeNode {
         this.nodes = [] // 4 child nodes (0=NW, 1=NE, 2=SW, 3=SE)
     }
 
-    // Called when node has too many objects, 
+    // Called when node has too many objects,
     // Node is split into 4 quadrants creating child nodes
     split() {
         const subWidth = this.bounds.width / 2
@@ -27,20 +27,28 @@ class QuadtreeNode {
 
         //  0: NW, 1: NE, 2: SW, 3: SE
         this.nodes[0] = new QuadtreeNode(
-            { x: x, y: y, width: subWidth, height: subHeight },
-            nextLevel, this.maxObjects, this.maxLevels
+            { x, y, width: subWidth, height: subHeight },
+            nextLevel,
+            this.maxObjects,
+            this.maxLevels
         )
         this.nodes[1] = new QuadtreeNode(
-            { x: x + subWidth, y: y, width: subWidth, height: subHeight },
-            nextLevel, this.maxObjects, this.maxLevels
+            { x: x + subWidth, y, width: subWidth, height: subHeight },
+            nextLevel,
+            this.maxObjects,
+            this.maxLevels
         )
         this.nodes[2] = new QuadtreeNode(
-            { x: x, y: y + subHeight, width: subWidth, height: subHeight },
-            nextLevel, this.maxObjects, this.maxLevels
+            { x, y: y + subHeight, width: subWidth, height: subHeight },
+            nextLevel,
+            this.maxObjects,
+            this.maxLevels
         )
         this.nodes[3] = new QuadtreeNode(
             { x: x + subWidth, y: y + subHeight, width: subWidth, height: subHeight },
-            nextLevel, this.maxObjects, this.maxLevels
+            nextLevel,
+            this.maxObjects,
+            this.maxLevels
         )
     }
 
@@ -61,16 +69,23 @@ class QuadtreeNode {
         const endIsSouth = bounds.y + bounds.height > horizontalMidpoint
 
         // Check each quadrant
-        if (startIsNorth && startIsWest) indices.push(0) // NW
-        if (startIsNorth && endIsEast) indices.push(1)   // NE
-        if (endIsSouth && startIsWest) indices.push(2)   // SW
-        if (endIsSouth && endIsEast) indices.push(3)     // SE
+        if (startIsNorth && startIsWest) {
+            indices.push(0)
+        } // NW
+        if (startIsNorth && endIsEast) {
+            indices.push(1)
+        } // NE
+        if (endIsSouth && startIsWest) {
+            indices.push(2)
+        } // SW
+        if (endIsSouth && endIsEast) {
+            indices.push(3)
+        } // SE
 
         return indices //0=NW, 1=NE, 2=SW, 3=SE
     }
 
     insert(object, bounds) {
-
         // Insert any child nodes
         if (this.nodes.length > 0) {
             const indices = this.getQuadrants(bounds)
@@ -181,14 +196,13 @@ class QuadtreeNode {
         return results
     }
 
-    
-    // Uses negation: easier to check if they DON'T overlap 
+    // Uses negation: easier to check if they DON'T overlap
     intersects(rect1, rect2) {
         return !(
-            rect1.x + rect1.width < rect2.x ||   // rect1 is completely left of rect2
-            rect1.x > rect2.x + rect2.width ||   // rect1 is completely right of rect2
-            rect1.y + rect1.height < rect2.y ||  // rect1 is completely above rect2
-            rect1.y > rect2.y + rect2.height     // rect1 is completely below rect2
+            rect1.x + rect1.width < rect2.x || // rect1 is completely left of rect2
+            rect1.x > rect2.x + rect2.width || // rect1 is completely right of rect2
+            rect1.y + rect1.height < rect2.y || // rect1 is completely above rect2
+            rect1.y > rect2.y + rect2.height // rect1 is completely below rect2
         )
     }
 
@@ -248,27 +262,18 @@ export class Quadtree {
         this.root.remove(object, bounds)
     }
 
-
     query(rect) {
         return this.root.query(rect, [])
     }
-
 
     queryPoint(point) {
         return this.root.queryPoint(point, [])
     }
 
-
     clear() {
         this.root.clear()
-        this.root = new QuadtreeNode(
-            this.bounds,
-            0,
-            this.maxObjects,
-            this.maxLevels
-        )
+        this.root = new QuadtreeNode(this.bounds, 0, this.maxObjects, this.maxLevels)
     }
-
 
     rebuild(objects) {
         this.clear()
@@ -287,12 +292,7 @@ export class Quadtree {
         this.bounds = bounds
         const allObjects = this.getAllObjects()
         this.clear()
-        this.root = new QuadtreeNode(
-            bounds,
-            0,
-            this.maxObjects,
-            this.maxLevels
-        )
+        this.root = new QuadtreeNode(bounds, 0, this.maxObjects, this.maxLevels)
         for (const obj of allObjects) {
             this.insert(obj, obj.getBounds())
         }

@@ -1,4 +1,4 @@
-/** 
+/**
  * Event bus for decoupling components
  * Implements pub-sub pattern
  */
@@ -70,4 +70,3 @@ export class EventBus {
         }
     }
 }
-

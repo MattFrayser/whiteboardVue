@@ -1,11 +1,10 @@
 export class InviteManager {
     constructor(roomCode) {
         this.roomCode = roomCode
-        this.button = document.querySelector(".invite-link button")
-        this.notification = document.querySelector(".invite-notification")
+        this.button = document.querySelector('.invite-link button')
+        this.notification = document.querySelector('.invite-notification')
 
         this.setUpListeners()
-        
     }
 
     setUpListeners() {
@@ -21,13 +20,12 @@ export class InviteManager {
         try {
             await navigator.clipboard.writeText(link)
             this.showNotification('Copied to clipboard')
-        }
-        catch (error) {
+        } catch (error) {
             this.showNotification('Error encountered while copying to clipboard', 'failed')
         }
     }
 
-    showNotification(message, type='success') {
+    showNotification(message, type = 'success') {
         this.notification.textContent = message
         this.notification.className = `invite-notification ${type}`
         this.notification.classList.add('show')
@@ -37,5 +35,4 @@ export class InviteManager {
             this.notification.classList.remove('show')
         }, 3000)
     }
-
 }

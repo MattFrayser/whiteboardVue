@@ -1,17 +1,12 @@
-import { Stroke } from '../objects/Stroke'
-import { Rectangle } from '../objects/Rectangle'
-import { Circle } from '../objects/Circle'
-import { Line } from '../objects/Line'
-import { Text } from '../objects/Text'
-import { Quadtree } from './Quadtree'
+import { ClipboardManager } from './ClipboardManager'
+import { HistoryManager } from './HistoryManager'
+import { ObjectSerializer } from './ObjectSerializer'
+import { Quadtree } from '../utils/Quadtree'
 
 export class ObjectManager {
     constructor(engine, eventBus) {
         this.objects = []
         this.selectedObjects = []
-        this.history = ['[]']
-        this.historyIndex = 0
-        this.clipboard = []
         this.engine = engine
         this.eventBus = eventBus
         this.userId = null // Will be set via event
@@ -20,8 +15,12 @@ export class ObjectManager {
         this.quadtree = new Quadtree(
             { x: -10000, y: -10000, width: 20000, height: 20000 },
             10, // max objects per node
-            8   // max levels
+            8 // max levels
         )
+
+        // Initialize managers
+        this.historyManager = new HistoryManager(eventBus, () => this.userId)
+        this.clipboardManager = new ClipboardManager()
 
         this.subscribeToEvents()
     }
@@ -32,7 +31,7 @@ export class ObjectManager {
             this.userId = userId
         })
     }
-    
+
     addObject(object) {
         // Update userId to current user when adding
         if (this.userId) {
@@ -45,13 +44,13 @@ export class ObjectManager {
         const bounds = object.getBounds()
         this.quadtree.insert(object, bounds)
 
-        this.saveState()
+        this.historyManager.saveState(this.objects)
 
         this.eventBus.publish('objectManager:objectAdded', { object })
 
         return object
     }
-    
+
     removeObject(object) {
         const index = this.objects.indexOf(object)
         if (index > -1) {
@@ -60,7 +59,7 @@ export class ObjectManager {
             this.quadtree.remove(object, bounds)
 
             this.objects.splice(index, 1)
-            this.saveState()
+            this.historyManager.saveState(this.objects)
 
             // Emit event for broadcasting
             this.eventBus.publish('objectManager:objectDeleted', { object })
@@ -71,19 +70,25 @@ export class ObjectManager {
         // Normalize to array for uniform handling
         const objects = Array.isArray(data) ? data : [data]
 
-        switch(action) {
+        switch (action) {
             case 'add':
-                objects.forEach(obj => this.eventBus.publish('objectManager:objectAdded', { object: obj }))
+                objects.forEach(obj =>
+                    this.eventBus.publish('objectManager:objectAdded', { object: obj })
+                )
                 break
             case 'update':
-                objects.forEach(obj => this.eventBus.publish('objectManager:objectUpdated', { object: obj }))
+                objects.forEach(obj =>
+                    this.eventBus.publish('objectManager:objectUpdated', { object: obj })
+                )
                 break
             case 'delete':
-                objects.forEach(obj => this.eventBus.publish('objectManager:objectDeleted', { object: obj }))
+                objects.forEach(obj =>
+                    this.eventBus.publish('objectManager:objectDeleted', { object: obj })
+                )
                 break
         }
     }
-    
+
     selectObject(object, multi = false) {
         if (!multi) {
             this.clearSelection()
@@ -91,12 +96,12 @@ export class ObjectManager {
         object.selected = true
         this.selectedObjects.push(object)
     }
-    
+
     clearSelection() {
-        this.selectedObjects.forEach(obj => obj.selected = false)
+        this.selectedObjects.forEach(obj => (obj.selected = false))
         this.selectedObjects = []
     }
-    
+
     deleteSelected() {
         const toDelete = [...this.selectedObjects]
         this.clearSelection()
@@ -106,7 +111,7 @@ export class ObjectManager {
             this.removeObject(obj)
         })
     }
-    
+
     getObjectAt(point) {
         const candidates = this.quadtree.queryPoint(point)
 
@@ -143,7 +148,7 @@ export class ObjectManager {
             }
         })
     }
-    
+
     moveSelected(dx, dy) {
         this.selectedObjects.forEach(obj => {
             const oldBounds = obj.getBounds()
@@ -154,7 +159,7 @@ export class ObjectManager {
             const newBounds = obj.getBounds()
             this.quadtree.insert(obj, newBounds)
         })
-        this.saveState()
+        this.historyManager.saveState(this.objects)
     }
 
     /**
@@ -166,61 +171,42 @@ export class ObjectManager {
         const newBounds = object.getBounds()
         this.quadtree.insert(object, newBounds)
     }
-    
-    saveState() {
-        // Remove future history if we're not at the end
-        if (this.historyIndex < this.history.length - 1) {
-            this.history = this.history.slice(0, this.historyIndex + 1)
-        }
 
-        // Save only THIS user's objects (personal undo/redo)
-        const myObjects = this.objects.filter(obj => obj.userId === this.userId)
-        const state = myObjects.map(obj => obj.toJSON())
-        this.history.push(JSON.stringify(state))
-        this.historyIndex++
-
-        // Limit history size
-        if (this.history.length > 50) {
-            this.history.shift()
-            this.historyIndex--
-        }
-
-        this.eventBus.publish('objectManager:historyChanged', {
-            canUndo: this.historyIndex > 0,
-            canRedo: this.historyIndex < this.history.length - 1
-        })
-    }
-    
     copySelected() {
-        if (this.selectedObjects.length === 0) return
-
-        this.clipboard = this.selectedObjects.map(obj => obj.toJSON())
+        this.clipboardManager.copy(this.selectedObjects)
     }
 
     cutSelected() {
-        if (this.selectedObjects.length === 0) return 
-        
+        if (this.selectedObjects.length === 0) {
+            return
+        }
+
         this.copySelected()
         this.deleteSelected()
-
     }
+
     paste(x, y) {
-        if (this.clipboard.length === 0) return
+        if (!this.clipboardManager.hasContent()) {
+            return
+        }
 
         this.clearSelection()
 
-        const newObjects = this.clipboard.map(data => {
-           // Deep clone
-           const clonedData = JSON.parse(JSON.stringify(data))
-           clonedData.id = null // will trigger new ID
-           const newObject = this.createObjectFromData(clonedData)
-           this.addObject(newObject)
-           return newObject
+        const clipboard = this.clipboardManager.getClipboard()
+        const newObjects = clipboard.map(data => {
+            // Deep clone
+            const clonedData = JSON.parse(JSON.stringify(data))
+            clonedData.id = null // will trigger new ID
+            const newObject = this.createObjectFromData(clonedData)
+            this.addObject(newObject)
+            return newObject
         })
 
-        // Bounding box of all objects 
-        let minX = Infinity, minY = Infinity
-        let maxX = -Infinity, maxY = -Infinity
+        // Bounding box of all objects
+        let minX = Infinity,
+            minY = Infinity
+        let maxX = -Infinity,
+            maxY = -Infinity
 
         newObjects.forEach(obj => {
             const bounds = obj.getBounds()
@@ -244,44 +230,34 @@ export class ObjectManager {
 
         this.broadcast('update', newObjects)
 
-        this.saveState()
+        this.historyManager.saveState(this.objects)
     }
-    
+
     undo() {
-        if (this.historyIndex > 0) {
+        if (this.historyManager.canUndo()) {
             const before = this.objects.filter(o => o.userId === this.userId)
 
             // Apply undo
-            this.historyIndex--
-            this.loadState(this.history[this.historyIndex])
+            const stateStr = this.historyManager.undo()
+            this.loadState(stateStr)
 
             const after = this.objects.filter(o => o.userId === this.userId)
 
             this.broadcastDiff(before, after)
-
-            this.eventBus.publish('objectManager:historyChanged', {
-                canUndo: this.historyIndex > 0,
-                canRedo: this.historyIndex < this.history.length - 1
-            })
         }
     }
 
     redo() {
-        if (this.historyIndex < this.history.length - 1) {
+        if (this.historyManager.canRedo()) {
             const before = this.objects.filter(o => o.userId === this.userId)
 
             // Apply redo
-            this.historyIndex++
-            this.loadState(this.history[this.historyIndex])
+            const stateStr = this.historyManager.redo()
+            this.loadState(stateStr)
 
             const after = this.objects.filter(o => o.userId === this.userId)
 
             this.broadcastDiff(before, after)
-
-            this.eventBus.publish('objectManager:historyChanged', {
-                canUndo: this.historyIndex > 0,
-                canRedo: this.historyIndex < this.history.length - 1
-            })
         }
     }
 
@@ -311,44 +287,27 @@ export class ObjectManager {
         // modified (same ID, different data)
         const modified = after.filter(a => {
             const beforeObj = before.find(b => b.id === a.id)
-            if (!beforeObj) return false
+            if (!beforeObj) {
+                return false
+            }
             return JSON.stringify(beforeObj.data) !== JSON.stringify(a.data)
         })
 
-        if (deleted.length > 0) this.broadcast('delete', deleted)
-        if (added.length > 0) this.broadcast('add', added)
-        if (modified.length > 0) this.broadcast('update', modified)
+        if (deleted.length > 0) {
+            this.broadcast('delete', deleted)
+        }
+        if (added.length > 0) {
+            this.broadcast('add', added)
+        }
+        if (modified.length > 0) {
+            this.broadcast('update', modified)
+        }
     }
-    
+
     createObjectFromData(data) {
-        let obj = null
-        switch (data.type) {
-            case 'stroke':
-                obj = new Stroke(data.id, data.data)
-                break
-            case 'rectangle':
-                obj = new Rectangle(data.id, data.data)
-                break
-            case 'circle':
-                obj = new Circle(data.id, data.data)
-                break
-            case 'line':
-                obj = new Line(data.id, data.data)
-                break
-            case 'text':
-                obj = new Text(data.id, data.data)
-                break
-        }
-
-        // Preserve userId and zIndex from remote data
-        if (obj) {
-            obj.userId = data.userId
-            obj.zIndex = data.zIndex || 0
-        }
-
-        return obj
+        return ObjectSerializer.createObjectFromData(data)
     }
-    
+
     render(ctx, viewport = null) {
         // If viewport is provided, use quadtree for culling
         if (viewport) {
@@ -360,5 +319,3 @@ export class ObjectManager {
         }
     }
 }
-
-

@@ -1,5 +1,5 @@
-import { Tool } from './Tool'
 import { Circle } from '../objects/Circle'
+import { Tool } from './Tool'
 
 export class CircleTool extends Tool {
     constructor(engine) {
@@ -17,8 +17,8 @@ export class CircleTool extends Tool {
             x2: worldPos.x,
             y2: worldPos.y,
             color: this.engine.currentColor,
-            width:this.engine.currentWidth,
-            fill: e.shiftKey ? this.engine.currentColor : null
+            width: this.engine.currentWidth,
+            fill: e.shiftKey ? this.engine.currentColor : null,
         })
         this.lastBounds = null
     }
@@ -46,7 +46,7 @@ export class CircleTool extends Tool {
         if (this.currentCircle) {
             const radius = Math.sqrt(
                 Math.pow(this.currentCircle.data.x2 - this.currentCircle.data.x1, 2) +
-                Math.pow(this.currentCircle.data.y2 - this.currentCircle.data.y1, 2)
+                    Math.pow(this.currentCircle.data.y2 - this.currentCircle.data.y1, 2)
             )
 
             if (radius > 1) {

@@ -1,7 +1,6 @@
 import { Tool } from './Tool'
 
 export class EraserTool extends Tool {
-
     constructor(engine) {
         super(engine)
         this.isErasing = false
@@ -39,13 +38,16 @@ export class EraserTool extends Tool {
         const eraserSize = 1
 
         objects.forEach(obj => {
-            if (this.erasedObjects.has(obj)) return
+            if (this.erasedObjects.has(obj)) {
+                return
+            }
             const bounds = obj.getBounds()
-            if (point.x + eraserSize > bounds.x &&
+            if (
+                point.x + eraserSize > bounds.x &&
                 point.x - eraserSize < bounds.x + bounds.width &&
                 point.y + eraserSize > bounds.y &&
-                point.y - eraserSize < bounds.y + bounds.height) {
-
+                point.y - eraserSize < bounds.y + bounds.height
+            ) {
                 // Mark erased object bounds as dirty
                 this.engine.markDirty(bounds)
 
@@ -60,7 +62,7 @@ export class EraserTool extends Tool {
     renderPreview(ctx) {
         ctx.save()
 
-        // Eraser Trail 
+        // Eraser Trail
         if (this.isErasing && this.eraserTrail.length > 0) {
             ctx.strokeStyle = '#888888'
             ctx.lineWidth = 10
@@ -82,4 +84,3 @@ export class EraserTool extends Tool {
         ctx.restore()
     }
 }
-

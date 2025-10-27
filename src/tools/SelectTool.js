@@ -1,4 +1,4 @@
-import { Tool } from "./Tool";
+import { Tool } from './Tool'
 
 export class SelectTool extends Tool {
     constructor(engine) {
@@ -19,8 +19,10 @@ export class SelectTool extends Tool {
     }
 
     setupMouseMoveListener() {
-        this.engine.canvas.addEventListener('mousemove', (e) => {
-            if (!this.isActive()) return
+        this.engine.canvas.addEventListener('mousemove', e => {
+            if (!this.isActive()) {
+                return
+            }
 
             const worldPos = this.engine.coordinates.viewportToWorld(
                 { x: e.clientX, y: e.clientY },
@@ -37,7 +39,9 @@ export class SelectTool extends Tool {
 
     updateCursor(worldPos) {
         // Don't change cursor while dragging or resizing
-        if (this.isDragging || this.isResizing) return
+        if (this.isDragging || this.isResizing) {
+            return
+        }
 
         // Hovering over a resize handle
         if (this.engine.objectManager.selectedObjects.length === 1) {
@@ -86,7 +90,7 @@ export class SelectTool extends Tool {
             this.dragStart = worldPos
             this.isDragging = true
         } else {
-            // select Drag 
+            // select Drag
             if (!e.shiftKey) {
                 this.engine.objectManager.clearSelection()
             }
@@ -96,7 +100,7 @@ export class SelectTool extends Tool {
         }
 
         this.engine.render()
-}
+    }
 
     onMouseMove(worldPos, e) {
         // Resize
@@ -178,12 +182,21 @@ export class SelectTool extends Tool {
                     this.engine.objectManager.quadtree.remove(obj, obj.getBounds())
                     this.engine.objectManager.quadtree.insert(obj, obj.getBounds())
                 })
-                this.engine.objectManager.broadcast('update', this.engine.objectManager.selectedObjects)
+                this.engine.objectManager.broadcast(
+                    'update',
+                    this.engine.objectManager.selectedObjects
+                )
             }
             if (this.isResizing && this.resizeObject) {
                 // Update quadtree for resized object
-                this.engine.objectManager.quadtree.remove(this.resizeObject, this.resizeObject.getBounds())
-                this.engine.objectManager.quadtree.insert(this.resizeObject, this.resizeObject.getBounds())
+                this.engine.objectManager.quadtree.remove(
+                    this.resizeObject,
+                    this.resizeObject.getBounds()
+                )
+                this.engine.objectManager.quadtree.insert(
+                    this.resizeObject,
+                    this.resizeObject.getBounds()
+                )
                 this.engine.objectManager.broadcast('update', this.resizeObject)
             }
 
@@ -225,17 +238,19 @@ export class SelectTool extends Tool {
     getHandleAt(point, obj) {
         const handles = obj.getResizeHandles()
 
-        const clickableSize = 20 / this.engine.coordinates.scale   // Larger clickable area
+        const clickableSize = 20 / this.engine.coordinates.scale // Larger clickable area
         const halfSize = clickableSize / 2
 
         for (let i = 0; i < handles.length; i++) {
             const handle = handles[i]
 
-            // Use rectangle 
-            if (point.x >= handle.x - halfSize &&
+            // Use rectangle
+            if (
+                point.x >= handle.x - halfSize &&
                 point.x <= handle.x + halfSize &&
                 point.y >= handle.y - halfSize &&
-                point.y <= handle.y + halfSize) {
+                point.y <= handle.y + halfSize
+            ) {
                 return i
             }
         }
@@ -244,7 +259,9 @@ export class SelectTool extends Tool {
     }
 
     getSelectionRect() {
-        if (!this.selectionStart || !this.selectionEnd) return null
+        if (!this.selectionStart || !this.selectionEnd) {
+            return null
+        }
 
         const x = Math.min(this.selectionStart.x, this.selectionEnd.x)
         const y = Math.min(this.selectionStart.y, this.selectionEnd.y)
@@ -269,5 +286,4 @@ export class SelectTool extends Tool {
             ctx.setLineDash([])
         }
     }
-
 }
