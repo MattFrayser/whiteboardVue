@@ -6,13 +6,15 @@ import { Text } from '../objects/Text'
 import { Quadtree } from './Quadtree'
 
 export class ObjectManager {
-    constructor(engine = null) {
+    constructor(engine, eventBus) {
         this.objects = []
         this.selectedObjects = []
         this.history = ['[]']
         this.historyIndex = 0
         this.clipboard = []
         this.engine = engine
+        this.eventBus = eventBus
+        this.userId = null // Will be set via event
 
         // Initialize quadtree with large bounds (will expand as needed)
         this.quadtree = new Quadtree(
@@ -20,12 +22,21 @@ export class ObjectManager {
             10, // max objects per node
             8   // max levels
         )
+
+        this.subscribeToEvents()
+    }
+
+    subscribeToEvents() {
+        // Listen for authenticated user ID from network
+        this.eventBus.subscribe('network:authenticated', ({ userId }) => {
+            this.userId = userId
+        })
     }
     
     addObject(object) {
         // Update userId to current user when adding
-        if (this.engine && this.engine.wsManager) {
-            object.userId = this.engine.wsManager.userId
+        if (this.userId) {
+            object.userId = this.userId
         }
 
         this.objects.push(object)
@@ -36,8 +47,7 @@ export class ObjectManager {
 
         this.saveState()
 
-        // Broadcast to other clients
-        this.broadcast('add', object)
+        this.eventBus.publish('objectManager:objectAdded', { object })
 
         return object
     }
@@ -52,26 +62,24 @@ export class ObjectManager {
             this.objects.splice(index, 1)
             this.saveState()
 
-            // Broadcast to other clients
-            this.broadcast('delete', object)
+            // Emit event for broadcasting
+            this.eventBus.publish('objectManager:objectDeleted', { object })
         }
     }
 
     broadcast(action, data) {
-        if (!this.engine || !this.engine.wsManager) return
-
         // Normalize to array for uniform handling
         const objects = Array.isArray(data) ? data : [data]
 
         switch(action) {
             case 'add':
-                objects.forEach(obj => this.engine.wsManager.broadcastObjectAdded(obj))
+                objects.forEach(obj => this.eventBus.publish('objectManager:objectAdded', { object: obj }))
                 break
             case 'update':
-                objects.forEach(obj => this.engine.wsManager.broadcastObjectUpdated(obj))
+                objects.forEach(obj => this.eventBus.publish('objectManager:objectUpdated', { object: obj }))
                 break
             case 'delete':
-                objects.forEach(obj => this.engine.wsManager.broadcastObjectDeleted(obj))
+                objects.forEach(obj => this.eventBus.publish('objectManager:objectDeleted', { object: obj }))
                 break
         }
     }
@@ -100,7 +108,6 @@ export class ObjectManager {
     }
     
     getObjectAt(point) {
-        // Use quadtree for efficient spatial query
         const candidates = this.quadtree.queryPoint(point)
 
         // Search from top to bottom (reverse order for z-index)
@@ -117,7 +124,6 @@ export class ObjectManager {
             this.clearSelection()
         }
 
-        // Use quadtree for efficient spatial query
         const candidates = this.quadtree.query(rect)
 
         // Check each candidate for intersection with select rectangle
@@ -139,7 +145,6 @@ export class ObjectManager {
     }
     
     moveSelected(dx, dy) {
-        // Update quadtree for moved objects
         this.selectedObjects.forEach(obj => {
             const oldBounds = obj.getBounds()
             this.quadtree.remove(obj, oldBounds)
@@ -169,8 +174,7 @@ export class ObjectManager {
         }
 
         // Save only THIS user's objects (personal undo/redo)
-        const userId = this.engine?.wsManager?.userId
-        const myObjects = this.objects.filter(obj => obj.userId === userId)
+        const myObjects = this.objects.filter(obj => obj.userId === this.userId)
         const state = myObjects.map(obj => obj.toJSON())
         this.history.push(JSON.stringify(state))
         this.historyIndex++
@@ -180,6 +184,11 @@ export class ObjectManager {
             this.history.shift()
             this.historyIndex--
         }
+
+        this.eventBus.publish('objectManager:historyChanged', {
+            canUndo: this.historyIndex > 0,
+            canRedo: this.historyIndex < this.history.length - 1
+        })
     }
     
     copySelected() {
@@ -233,7 +242,6 @@ export class ObjectManager {
             this.selectObject(obj, true)
         })
 
-        // Broadcast the moved positions to other clients
         this.broadcast('update', newObjects)
 
         this.saveState()
@@ -241,42 +249,47 @@ export class ObjectManager {
     
     undo() {
         if (this.historyIndex > 0) {
-            const userId = this.engine?.wsManager?.userId
-
-            const before = this.objects.filter(o => o.userId === userId)
+            const before = this.objects.filter(o => o.userId === this.userId)
 
             // Apply undo
             this.historyIndex--
             this.loadState(this.history[this.historyIndex])
 
-            const after = this.objects.filter(o => o.userId === userId)
+            const after = this.objects.filter(o => o.userId === this.userId)
 
             this.broadcastDiff(before, after)
+
+            this.eventBus.publish('objectManager:historyChanged', {
+                canUndo: this.historyIndex > 0,
+                canRedo: this.historyIndex < this.history.length - 1
+            })
         }
     }
 
     redo() {
         if (this.historyIndex < this.history.length - 1) {
-            const userId = this.engine?.wsManager?.userId
-
-            const before = this.objects.filter(o => o.userId === userId)
+            const before = this.objects.filter(o => o.userId === this.userId)
 
             // Apply redo
             this.historyIndex++
             this.loadState(this.history[this.historyIndex])
 
-            const after = this.objects.filter(o => o.userId === userId)
+            const after = this.objects.filter(o => o.userId === this.userId)
 
             this.broadcastDiff(before, after)
+
+            this.eventBus.publish('objectManager:historyChanged', {
+                canUndo: this.historyIndex > 0,
+                canRedo: this.historyIndex < this.history.length - 1
+            })
         }
     }
 
     loadState(stateStr) {
         const state = JSON.parse(stateStr)
-        const userId = this.engine?.wsManager?.userId
 
         // Remove only THIS user's objects
-        this.objects = this.objects.filter(obj => obj.userId !== userId)
+        this.objects = this.objects.filter(obj => obj.userId !== this.userId)
 
         // Restore THIS user's objects from history
         const myRestoredObjects = state.map(data => this.createObjectFromData(data))

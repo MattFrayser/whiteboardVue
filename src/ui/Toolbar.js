@@ -1,19 +1,46 @@
 export class Toolbar {
-    constructor(engine) {
-        this.engine = engine
+    constructor(eventBus) {
+        this.eventBus = eventBus
         this.clickTimers = new Map()
-        this.activeSwatch = null 
+        this.activeSwatch = null
         this.activeSwatchForMenu = null
-        this.colors = [        
+        this.colors = [
         '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00',
         '#FF00FF', '#00FFFF', '#800000', '#008000', '#000080', '#808000',
         '#800080', '#008080', '#C0C0C0', '#808080', '#FFA500', '#A52A2A',
         '#FFC0CB', '#FFD700', '#4B0082', '#9370DB', '#90EE90', '#FF6347'
         ]
 
+        // Track state locally
+        this.currentColor = '#000000'
+        this.currentWidth = 5
+        this.currentTool = 'draw'
+
         this.setupEventListeners()
+        this.subscribeToEvents()
         this.initColorGrid()
         this.initSwatches()
+    }
+
+    subscribeToEvents() {
+        // Listen for tool changes from engine
+        this.eventBus.subscribe('engine:toolChanged', ({ toolName }) => {
+            this.currentTool = toolName
+            this.updateToolButtons()
+        })
+
+        // Listen for cursor changes
+        this.eventBus.subscribe('engine:cursorChanged', () => {
+            this.updateToolButtons()
+        })
+
+        // Listen for history changes from ObjectManager
+        this.eventBus.subscribe('objectManager:historyChanged', ({ canUndo, canRedo }) => {
+            const undoBtn = document.getElementById('undoBtn')
+            const redoBtn = document.getElementById('redoBtn')
+            undoBtn.disabled = !canUndo
+            redoBtn.disabled = !canRedo
+        })
     }
 
     setupEventListeners() {
@@ -21,8 +48,7 @@ export class Toolbar {
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tool = btn.dataset.tool
-                this.engine.setTool(tool)
-                this.updateToolButtons()
+                this.eventBus.publish('toolbar:toolChanged', { toolName: tool })
             })
         })
 
@@ -82,14 +108,12 @@ export class Toolbar {
 
         // Undo/Redo
         document.getElementById('undoBtn').addEventListener('click', () => {
-            this.engine.objectManager.undo()
-            this.engine.render()
-            this.updateUndoRedoButtons()
+            // Emit event instead of calling engine directly
+            this.eventBus.publish('toolbar:undoRequested', {})
         })
         document.getElementById('redoBtn').addEventListener('click', () => {
-            this.engine.objectManager.redo()
-            this.engine.render()
-            this.updateUndoRedoButtons()
+            // Emit event instead of calling engine directly
+            this.eventBus.publish('toolbar:redoRequested', {})
         })
     }
 
@@ -112,16 +136,19 @@ export class Toolbar {
     }
 
     selectBrushSize(size) {
-        this.engine.currentWidth = size
-        
+        this.currentWidth = size
+
         const brushSize = document.getElementById('brushSize')
         if (brushSize) brushSize.value = size
-        
+
         // Store size on active swatch
         if (this.activeSwatch) {
             this.activeSwatch.dataset.size = size
         }
-        
+
+        // Emit event
+        this.eventBus.publish('toolbar:brushSizeChanged', { size })
+
         this.updateBrushPreview()
     }
 
@@ -129,14 +156,14 @@ export class Toolbar {
         if (this.activeSwatch) {
             const circle = this.activeSwatch.querySelector('.swatch-circle')
             if (circle) {
-                const size = Math.min(28, Math.max(8, this.engine.currentWidth * 1.5))
+                const size = Math.min(28, Math.max(8, this.currentWidth * 1.5))
                 circle.style.width = size + 'px'
                 circle.style.height = size + 'px'
             }
         }
     }
     selectColor(color) {
-        this.engine.currentColor = color
+        this.currentColor = color
         
         // Remove active from current swatch
         if (this.activeSwatch) {
@@ -173,6 +200,9 @@ export class Toolbar {
         // Update color picker
         const colorPicker = document.getElementById('colorPicker')
         if (colorPicker) colorPicker.value = color
+
+        // Emit event
+        this.eventBus.publish('toolbar:colorChanged', { color })
     }
     openMenu(swatch) {
         this.activeSwatchForMenu = swatch;
@@ -184,10 +214,10 @@ export class Toolbar {
         this.activeSwatch = swatch
         this.activeSwatch.classList.add('active')
 
-        // Update engine with this swatch's settings
+        // Update toolbar state with this swatch's settings
         const swatchColor = swatch.dataset.color
-        const swatchSize = parseInt(swatch.dataset.size) || this.engine.currentWidth
-        this.engine.currentColor = swatchColor
+        const swatchSize = parseInt(swatch.dataset.size) || this.currentWidth
+        this.currentColor = swatchColor
 
         colorMenu.classList.remove('hidden');
         const colorPicker = document.getElementById('colorPicker')
@@ -201,25 +231,17 @@ export class Toolbar {
         this.activeSwatchForMenu = null;
     }
 
-    updateUndoRedoButtons() {
-        const undoBtn = document.getElementById('undoBtn')
-        const redoBtn = document.getElementById('redoBtn')
-        const objectManager = this.engine.objectManager
-
-        undoBtn.disabled = objectManager.historyIndex <= 0
-        redoBtn.disabled = objectManager.historyIndex >= objectManager.history.length - 1
-    }
-
     updateToolButtons() {
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.classList.remove('active')
-            if (btn.dataset.tool === this.getCurrentToolName()) {
+            if (btn.dataset.tool === this.currentTool) {
                 btn.classList.add('active')
             }
         })
 
-        const canvas = this.engine.canvas
-        const currentToolName = this.getCurrentToolName()
+        // Get canvas directly from DOM
+        const canvas = document.getElementById('canvas')
+        const currentToolName = this.currentTool
 
         switch (currentToolName) {
             case 'rectangle':
@@ -246,14 +268,5 @@ export class Toolbar {
             default:
                 canvas.style.cursor = 'default'
         }
-    }
-
-    getCurrentToolName() {
-        for (const [name, tool] of Object.entries(this.engine.tools)) {
-            if (tool === this.engine.currentTool) {
-                return name
-            }
-        }
-        return null
     }
 }

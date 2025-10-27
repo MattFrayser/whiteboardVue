@@ -1,13 +1,18 @@
 import './style.css'
+import { EventBus } from './core/EventBus'
 import { DrawingEngine } from './core/DrawingEngine'
 import { Toolbar } from './ui/Toolbar'
 import { WebSocketManager } from './network/WebSocketManager'
 import { InviteManager } from './ui/InviteManager'
-// init
+
+// Create shared event bus
+const eventBus = new EventBus()
+
+// Initialize components with event bus
 const canvas = document.getElementById('canvas')
-const engine = new DrawingEngine(canvas)
-const toolbar = new Toolbar(engine)
-engine.wsManager = new WebSocketManager(engine)
+const engine = new DrawingEngine(canvas, eventBus)
+const toolbar = new Toolbar(eventBus)
+const wsManager = new WebSocketManager(eventBus)
 
 // get or create roomCode
 const urlParams = new URLSearchParams(window.location.search)
@@ -17,10 +22,6 @@ if (!roomCode) {
     window.history.replaceState({}, '', `?room=${roomCode}`)
 }
 
-// Toolbar
-engine.setToolbar(toolbar)
-toolbar.updateUndoRedoButtons()
-
 // Invite button
 new InviteManager(roomCode)
 
@@ -28,7 +29,8 @@ new InviteManager(roomCode)
 const statusIndicator = document.getElementById('connection-status')
 const statusText = statusIndicator.querySelector('.status-text')
 
-engine.wsManager.setStatusCallback((status) => {
+// Listen to network status events
+eventBus.subscribe('network:statusChanged', ({ status }) => {
     statusIndicator.className = `connection-status status-${status}`
 
     const statusLabels = {
@@ -40,12 +42,15 @@ engine.wsManager.setStatusCallback((status) => {
     statusText.textContent = statusLabels[status] || status
 })
 
-engine.wsManager.connect(roomCode)
+// Connect to WebSocket
+wsManager.connect(roomCode)
 
+// Start engine
 engine.start()
 
 // Clean up on exit
 window.addEventListener('beforeunload', () => {
     engine.destroy()
+    eventBus.clear() // Clean up all listeners
 })
 

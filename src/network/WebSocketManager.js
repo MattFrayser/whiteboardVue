@@ -1,9 +1,8 @@
 export class WebSocketManager {
-    constructor(engine) {
-        this.engine = engine
+    constructor(eventBus) {
+        this.eventBus = eventBus
         this.socket = null
         this.roomCode = null
-        this.remoteCursors = new Map()
 
         this.connectionStatus = 'disconnected' //  'connected', 'disconnected', 'error'
         this.statusCallback = null
@@ -13,6 +12,35 @@ export class WebSocketManager {
         this.reconnectTimeout = null
         this.authTimeout = null
         this.userColor = null
+
+        this.subscribeToEvents()
+    }
+
+    subscribeToEvents() {
+        // Listen for cursor movements from engine
+        this.eventBus.subscribe('engine:cursorMove', ({ x, y, tool }) => {
+            if (this.userId) {
+                this.broadcastCursor({ x, y, tool })
+            }
+        })
+
+        // Listen for object changes from ObjectManager
+        this.eventBus.subscribe('objectManager:objectAdded', ({ object }) => {
+            this.broadcastObjectAdded(object)
+        })
+
+        this.eventBus.subscribe('objectManager:objectUpdated', ({ object }) => {
+            this.broadcastObjectUpdated(object)
+        })
+
+        this.eventBus.subscribe('objectManager:objectDeleted', ({ object }) => {
+            this.broadcastObjectDeleted(object)
+        })
+
+        // Listen for engine destroy
+        this.eventBus.subscribe('engine:destroy', () => {
+            this.disconnect()
+        })
     }
 
     setStatusCallback(callback) {
@@ -24,6 +52,8 @@ export class WebSocketManager {
         if (this.statusCallback) {
             this.statusCallback(status)
         }
+
+        this.eventBus.publish('network:statusChanged', { status })
     }
 
     connect(roomCode) {
@@ -85,10 +115,11 @@ export class WebSocketManager {
             this.reconnectTimeout = null
         }
 
-        this.remoteCursors.clear()
         this.socket = null
         this.updateStatus('disconnected')
-        this.engine.render()
+
+        // Emit event
+        this.eventBus.publish('network:disconnected', {})
 
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++
@@ -176,6 +207,8 @@ export class WebSocketManager {
         }
 
         console.log('Authenticated as user:', this.userId)
+
+        this.eventBus.publish('network:authenticated', { userId: this.userId })
     }
 
     handleRoomJoined(msg) {
@@ -189,18 +222,7 @@ export class WebSocketManager {
     }
     
     handleSync(msg) {
-        this.engine.objectManager.objects = []
-        msg.objects.forEach( objData => {
-            const obj = this.engine.objectManager.createObjectFromData(objData)
-            if (obj) {
-                console.log('[WebSocket] Object created successfully:', obj)
-                this.engine.objectManager.objects.push(obj)
-            } else {
-                console.warn('[WebSocket] Failed to create object from data:', objData)
-            }
-        })
-
-        this.engine.render()
+        this.eventBus.publish('network:sync', { objects: msg.objects })
     }
 
     handleObjectAdded(objectData) {
@@ -209,104 +231,46 @@ export class WebSocketManager {
             return
         }
 
-        const obj = this.engine.objectManager.createObjectFromData(objectData.object)
-        if (obj) {
-            this.engine.objectManager.objects.push(obj)
-
-            // Add to quadtree
-            const bounds = obj.getBounds()
-            this.engine.objectManager.quadtree.insert(obj, bounds)
-
-            // Mark as dirty for rendering
-            this.engine.markDirty(bounds)
-            this.engine.render()
-        } else {
-            console.warn('[WebSocket] Failed to create object from objectAdded:', objectData.object)
-        }
+        this.eventBus.publish('network:objectAdded', {
+            object: objectData.object,
+            userId: objectData.userId
+        })
     }
+
     handleObjectUpdated(objectData) {
         if (objectData.userId == this.userId) return
 
-        const obj = this.engine.objectManager.objects.find(o => o.id === objectData.object.id)
-        if (obj) {
-            // Mark old bounds as dirty
-            const oldBounds = obj.getBounds()
-            this.engine.markDirty(oldBounds)
-
-            // Update quadtree
-            this.engine.objectManager.quadtree.remove(obj, oldBounds)
-
-            // Update object data
-            obj.data = objectData.object.data
-
-            // Mark new bounds as dirty
-            const newBounds = obj.getBounds()
-            this.engine.markDirty(newBounds)
-
-            // Update quadtree
-            this.engine.objectManager.quadtree.insert(obj, newBounds)
-
-            this.engine.render()
-        }
+        this.eventBus.publish('network:objectUpdated', {
+            object: objectData.object,
+            userId: objectData.userId
+        })
     }
+
     handleObjectDeleted(objectData) {
         if (objectData.userId == this.userId) return
 
-        const obj = this.engine.objectManager.objects.find(o => o.id === objectData.objectId)
-        if (obj) {
-            // Mark bounds as dirty before deletion
-            const bounds = obj.getBounds()
-            this.engine.markDirty(bounds)
-
-            // Remove from quadtree
-            this.engine.objectManager.quadtree.remove(obj, bounds)
-
-            const index = this.engine.objectManager.objects.indexOf(obj)
-            if (index > -1) {
-                this.engine.objectManager.objects.splice(index, 1)
-                this.engine.render()
-            }
-        }
+        this.eventBus.publish('network:objectDeleted', {
+            objectId: objectData.objectId,
+            userId: objectData.userId
+        })
     }
 
     handleCursor(cursor) {
         if (cursor.userId == this.userId) return
 
-        // Mark old cursor position as dirty (if exists)
-        const oldCursor = this.remoteCursors.get(cursor.userId)
-        if (oldCursor) {
-            const cursorRadius = 10 // Cursor visual size
-            this.engine.markDirty({
-                x: oldCursor.x - cursorRadius,
-                y: oldCursor.y - cursorRadius,
-                width: cursorRadius * 2,
-                height: cursorRadius * 2
-            }, 5)
-        }
-
-        // Update cursor position
-        this.remoteCursors.set(cursor.userId, {
+        this.eventBus.publish('network:remoteCursorMove', {
+            userId: cursor.userId,
             x: cursor.x,
             y: cursor.y,
             color: cursor.color,
             tool: cursor.tool
         })
-
-        // Mark new cursor position as dirty
-        const cursorRadius = 10
-        this.engine.markDirty({
-            x: cursor.x - cursorRadius,
-            y: cursor.y - cursorRadius,
-            width: cursorRadius * 2,
-            height: cursorRadius * 2
-        }, 5)
-
-        this.engine.render()
     }
 
     handleUserDisconnect(user) {
-        this.remoteCursors.delete(user.userId)
-        this.engine.render()
+        this.eventBus.publish('network:userDisconnected', {
+            userId: user.userId
+        })
     }
 
 
@@ -359,7 +323,6 @@ export class WebSocketManager {
         }
 
         // Clear data
-        this.remoteCursors.clear()
         this.reconnectAttempts = this.maxReconnectAttempts // Prevent reconnect
         this.updateStatus('disconnected')
     }
