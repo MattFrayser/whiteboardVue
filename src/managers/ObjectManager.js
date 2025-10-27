@@ -243,6 +243,9 @@ export class ObjectManager {
     loadState(stateStr) {
         const state = JSON.parse(stateStr)
 
+        // Capture old objects BEFORE filtering (for incremental quadtree update)
+        const oldObjects = this.objects.filter(obj => obj.userId === this.userId)
+
         // Remove only THIS user's objects
         this.objects = this.objects.filter(obj => obj.userId !== this.userId)
 
@@ -252,8 +255,13 @@ export class ObjectManager {
 
         this.clearSelection()
 
-        // Rebuild quadtree after state change
-        this.quadtree.rebuild(this.objects)
+        // only update changed objects, much faster than entire rebuild
+        oldObjects.forEach(obj => {
+            this.quadtree.remove(obj, obj.getBounds())
+        })
+        myRestoredObjects.forEach(obj => {
+            this.quadtree.insert(obj, obj.getBounds())
+        })
     }
 
     publishDiff(before, after) {
