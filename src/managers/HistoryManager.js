@@ -7,11 +7,14 @@ export class HistoryManager {
         this.getUserId = getUserId // Function to get current user ID
         this.history = ['[]']
         this.historyIndex = 0
+
+        // History size management constants
+        this.MAX_HISTORY_SIZE = 50 // Target maximum history size
+        this.TRIM_THRESHOLD = 60 // Trigger batch trim at this size
+        this.TRIM_TO = 40 // Trim back to this size
     }
 
-    /**
-     * Save current state to history
-     */
+
     saveState(objects) {
         // Remove future history if we're not at the end
         if (this.historyIndex < this.history.length - 1) {
@@ -25,10 +28,13 @@ export class HistoryManager {
         this.history.push(JSON.stringify(state))
         this.historyIndex++
 
-        // Limit history size
-        if (this.history.length > 50) {
-            this.history.shift()
-            this.historyIndex--
+        // Batch trim: slice off oldest entries when threshold is exceeded
+        // This amortizes the O(n) cost over multiple saves instead of
+        // doing shift() on every save (which is O(n) every time)
+        if (this.history.length > this.TRIM_THRESHOLD) {
+            const trimAmount = this.history.length - this.TRIM_TO
+            this.history = this.history.slice(trimAmount)
+            this.historyIndex -= trimAmount
         }
 
         // Emit history changed event
@@ -38,16 +44,12 @@ export class HistoryManager {
         })
     }
 
-    /**
-     * Get state at current history index
-     */
+
     getCurrentState() {
         return this.history[this.historyIndex]
     }
 
-    /**
-     * Move back in history
-     */
+
     undo() {
         if (this.historyIndex > 0) {
             this.historyIndex--
@@ -57,9 +59,7 @@ export class HistoryManager {
         return null
     }
 
-    /**
-     * Move forward in history
-     */
+
     redo() {
         if (this.historyIndex < this.history.length - 1) {
             this.historyIndex++
