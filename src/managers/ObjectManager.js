@@ -66,29 +66,6 @@ export class ObjectManager {
         }
     }
 
-    broadcast(action, data) {
-        // Normalize to array for uniform handling
-        const objects = Array.isArray(data) ? data : [data]
-
-        switch (action) {
-            case 'add':
-                objects.forEach(obj =>
-                    this.eventBus.publish('objectManager:objectAdded', { object: obj })
-                )
-                break
-            case 'update':
-                objects.forEach(obj =>
-                    this.eventBus.publish('objectManager:objectUpdated', { object: obj })
-                )
-                break
-            case 'delete':
-                objects.forEach(obj =>
-                    this.eventBus.publish('objectManager:objectDeleted', { object: obj })
-                )
-                break
-        }
-    }
-
     selectObject(object, multi = false) {
         if (!multi) {
             this.clearSelection()
@@ -228,7 +205,9 @@ export class ObjectManager {
             this.selectObject(obj, true)
         })
 
-        this.broadcast('update', newObjects)
+        newObjects.forEach(obj =>
+            this.eventBus.publish('objectManager:objectUpdated', { object: obj })
+        )
 
         this.historyManager.saveState(this.objects)
     }
@@ -243,7 +222,7 @@ export class ObjectManager {
 
             const after = this.objects.filter(o => o.userId === this.userId)
 
-            this.broadcastDiff(before, after)
+            this.publishDiff(before, after)
         }
     }
 
@@ -257,7 +236,7 @@ export class ObjectManager {
 
             const after = this.objects.filter(o => o.userId === this.userId)
 
-            this.broadcastDiff(before, after)
+            this.publishDiff(before, after)
         }
     }
 
@@ -277,7 +256,7 @@ export class ObjectManager {
         this.quadtree.rebuild(this.objects)
     }
 
-    broadcastDiff(before, after) {
+    publishDiff(before, after) {
         // deleted (in before but not in after)
         const deleted = before.filter(b => !after.find(a => a.id === b.id))
 
@@ -294,13 +273,19 @@ export class ObjectManager {
         })
 
         if (deleted.length > 0) {
-            this.broadcast('delete', deleted)
+            deleted.forEach(obj =>
+                this.eventBus.publish('objectManager:objectDeleted', { object: obj })
+            )
         }
         if (added.length > 0) {
-            this.broadcast('add', added)
+            added.forEach(obj =>
+                this.eventBus.publish('objectManager:objectAdded', { object: obj })
+            )
         }
         if (modified.length > 0) {
-            this.broadcast('update', modified)
+            modified.forEach(obj =>
+                this.eventBus.publish('objectManager:objectUpdated', { object: obj })
+            )
         }
     }
 
