@@ -10,10 +10,15 @@ export class SelectTool extends Tool {
         this.isResizing = false
         this.resizeHandleIndex = null
         this.resizeObject = null
+        this.resizeFixedPoint = null
+        this.resizeInitialBounds = null
 
         this.isSelecting = false
         this.selectionStart = null
         this.selectionEnd = null
+
+        // Store old bounds for quadtree updates
+        this.draggedObjectsBounds = new Map()
 
         this.setupMouseMoveListener()
     }
@@ -51,7 +56,7 @@ export class SelectTool extends Tool {
             if (handleIndex !== -1) {
                 const handles = obj.getResizeHandles()
                 this.engine.canvas.style.cursor = handles[handleIndex].cursor
-                return
+                return // Don't check for objects below, we're over a handle
             }
         }
 
@@ -76,6 +81,38 @@ export class SelectTool extends Tool {
                 this.resizeHandleIndex = handleIndex
                 this.resizeObject = obj
                 this.dragStart = worldPos
+
+                // Store the initial bounds and fixed corner/edge position
+                const bounds = obj.getBounds()
+                this.resizeInitialBounds = { ...bounds }
+
+                switch (handleIndex) {
+                    case 0: // NW - fix SE corner
+                        this.resizeFixedPoint = { x: bounds.x + bounds.width, y: bounds.y + bounds.height }
+                        break
+                    case 1: // N - fix bottom edge
+                        this.resizeFixedPoint = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height }
+                        break
+                    case 2: // NE - fix SW corner
+                        this.resizeFixedPoint = { x: bounds.x, y: bounds.y + bounds.height }
+                        break
+                    case 3: // E - fix left edge
+                        this.resizeFixedPoint = { x: bounds.x, y: bounds.y + bounds.height / 2 }
+                        break
+                    case 4: // SE - fix NW corner
+                        this.resizeFixedPoint = { x: bounds.x, y: bounds.y }
+                        break
+                    case 5: // S - fix top edge
+                        this.resizeFixedPoint = { x: bounds.x + bounds.width / 2, y: bounds.y }
+                        break
+                    case 6: // SW - fix NE corner
+                        this.resizeFixedPoint = { x: bounds.x + bounds.width, y: bounds.y }
+                        break
+                    case 7: // W - fix right edge
+                        this.resizeFixedPoint = { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 }
+                        break
+                }
+
                 return
             }
         }
@@ -87,6 +124,13 @@ export class SelectTool extends Tool {
             if (!object.selected) {
                 this.engine.objectManager.selectObject(object, e.shiftKey)
             }
+
+            // Store old bounds for all selected objects before dragging
+            this.draggedObjectsBounds.clear()
+            this.engine.objectManager.selectedObjects.forEach(obj => {
+                this.draggedObjectsBounds.set(obj, obj.getBounds())
+            })
+
             this.dragStart = worldPos
             this.isDragging = true
         } else {
@@ -102,14 +146,24 @@ export class SelectTool extends Tool {
         this.engine.render()
     }
 
+    /**
+     * Get scale-aware padding for selection visuals
+     */
+    getSelectionPadding() {
+        const scale = this.engine.coordinates.scale
+        return Math.max(10, Math.ceil((12 + 4) / scale))
+    }
+
     onMouseMove(worldPos, e) {
         // Resize
         if (this.isResizing) {
+            const selectionPadding = this.getSelectionPadding()
+
             // Mark old bounds as dirty
             const oldBounds = this.resizeObject.getBounds()
             this.engine.markDirty(oldBounds)
 
-            this.resizeObject.resize(this.resizeHandleIndex, worldPos.x, worldPos.y)
+            this.resizeObject.resize(this.resizeHandleIndex, worldPos.x, worldPos.y, this.resizeFixedPoint, this.resizeInitialBounds)
 
             // Mark new bounds as dirty
             const newBounds = this.resizeObject.getBounds()
@@ -144,23 +198,19 @@ export class SelectTool extends Tool {
 
         // Moving
         if (this.isDragging && this.dragStart) {
-            // Mark old positions as dirty
-            this.engine.objectManager.selectedObjects.forEach(obj => {
-                const bounds = obj.getBounds()
-                this.engine.markDirty(bounds)
-            })
-
             const dx = worldPos.x - this.dragStart.x
             const dy = worldPos.y - this.dragStart.y
 
+            // Update each object
             this.engine.objectManager.selectedObjects.forEach(obj => {
-                obj.move(dx, dy)
-            })
+                const oldBounds = obj.getBounds()
+                this.engine.markDirty(oldBounds)
 
-            // Mark new positions as dirty
-            this.engine.objectManager.selectedObjects.forEach(obj => {
-                const bounds = obj.getBounds()
-                this.engine.markDirty(bounds)
+                obj.move(dx, dy)
+
+                const newBounds = obj.getBounds()
+                this.engine.objectManager.updateObjectInQuadtree(obj, oldBounds, newBounds)
+                this.engine.markDirty(newBounds)
             })
 
             this.dragStart = worldPos
@@ -171,32 +221,23 @@ export class SelectTool extends Tool {
 
     onMouseUp(worldPos, e) {
         if (this.isResizing || this.isDragging) {
-            // Update quadtree for moved/resized objects
+            // Finalize quadtree updates
             if (this.isDragging) {
-                // Note: Objects already moved, just need to update quadtree
-                // ObjectManager.moveSelected() handles this, but in SelectTool we move directly
-                // So we need to rebuild the quadtree for these objects
                 this.engine.objectManager.selectedObjects.forEach(obj => {
-                    // The object has already moved, we just need to update the quadtree
-                    // Use a dummy old bounds - quadtree will handle it
-                    this.engine.objectManager.quadtree.remove(obj, obj.getBounds())
-                    this.engine.objectManager.quadtree.insert(obj, obj.getBounds())
+                    const oldBounds = this.draggedObjectsBounds.get(obj)
+                    const newBounds = obj.getBounds()
+                    if (oldBounds) {
+                        this.engine.objectManager.updateObjectInQuadtree(obj, oldBounds, newBounds)
+                    }
                 })
-                this.engine.objectManager.broadcast(
-                    'update',
-                    this.engine.objectManager.selectedObjects
-                )
+
+                this.draggedObjectsBounds.clear()
+                this.engine.objectManager.broadcast('update', this.engine.objectManager.selectedObjects)
             }
+
             if (this.isResizing && this.resizeObject) {
-                // Update quadtree for resized object
-                this.engine.objectManager.quadtree.remove(
-                    this.resizeObject,
-                    this.resizeObject.getBounds()
-                )
-                this.engine.objectManager.quadtree.insert(
-                    this.resizeObject,
-                    this.resizeObject.getBounds()
-                )
+                const bounds = this.resizeObject.getBounds()
+                this.engine.objectManager.updateObjectInQuadtree(this.resizeObject, bounds, bounds)
                 this.engine.objectManager.broadcast('update', this.resizeObject)
             }
 
@@ -209,6 +250,7 @@ export class SelectTool extends Tool {
             if (this.engine.toolbar) {
                 this.engine.toolbar.updateUndoRedoButtons()
             }
+            this.engine.render() // Ensure moved/resized objects are visible
         }
 
         // Finish drag selection
@@ -230,6 +272,8 @@ export class SelectTool extends Tool {
         this.isResizing = false
         this.resizeHandleIndex = null
         this.resizeObject = null
+        this.resizeFixedPoint = null
+        this.resizeInitialBounds = null
 
         // Update cursor after mouse up
         this.updateCursor(worldPos)

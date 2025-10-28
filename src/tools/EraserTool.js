@@ -34,7 +34,7 @@ export class EraserTool extends Tool {
     }
 
     eraseAt(point) {
-        const objects = [...this.engine.objectManager.objects]
+        const objects = [...this.engine.objectManager.getAllObjects()]
         const eraserSize = 1
 
         objects.forEach(obj => {

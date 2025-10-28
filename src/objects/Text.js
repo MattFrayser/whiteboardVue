@@ -50,45 +50,17 @@ export class Text extends DrawingObject {
         }
     }
 
-    resize(handleIndex, newX, newY) {
-        const bounds = this.getBounds()
-        const newBounds = { ...bounds }
+    resize(handleIndex, newX, newY, fixedPoint, initialBounds) {
+        // Text only has corner handles, no side handles
+        const fixedX = fixedPoint.x
+        const fixedY = fixedPoint.y
 
-        switch (handleIndex) {
-            case 0: // NW
-                newBounds.x = newX
-                newBounds.y = newY
-                newBounds.width = bounds.x + bounds.width - newX
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 1: // NE
-                newBounds.y = newY
-                newBounds.width = newX - bounds.x
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 2: // SE
-                newBounds.width = newX - bounds.x
-                newBounds.height = newY - bounds.y
-                break
-            case 3: // SW
-                newBounds.x = newX
-                newBounds.width = bounds.x + bounds.width - newX
-                newBounds.height = newY - bounds.y
-                break
-        }
-
-        // Prevent negative dimensions
-        if (newBounds.width < 5) {
-            newBounds.width = 5
-            if (handleIndex === 0 || handleIndex === 3) {
-                newBounds.x = bounds.x + bounds.width - 5
-            }
-        }
-        if (newBounds.height < 5) {
-            newBounds.height = 5
-            if (handleIndex === 0 || handleIndex === 1) {
-                newBounds.y = bounds.y + bounds.height - 5
-            }
+        // Create new bounds from fixed point and cursor position
+        const newBounds = {
+            x: Math.min(fixedX, newX),
+            y: Math.min(fixedY, newY),
+            width: Math.max(1, Math.abs(newX - fixedX)),
+            height: Math.max(1, Math.abs(newY - fixedY))
         }
 
         this.applyBounds(newBounds, handleIndex)

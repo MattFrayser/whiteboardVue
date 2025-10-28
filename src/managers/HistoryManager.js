@@ -7,11 +7,7 @@ export class HistoryManager {
         this.getUserId = getUserId // Function to get current user ID
         this.history = ['[]']
         this.historyIndex = 0
-
-        // History size management constants
-        this.MAX_HISTORY_SIZE = 50 // Target maximum history size
-        this.TRIM_THRESHOLD = 60 // Trigger batch trim at this size
-        this.TRIM_TO = 40 // Trim back to this size
+        this.MAX_HISTORY_SIZE = 50
     }
 
 
@@ -21,27 +17,21 @@ export class HistoryManager {
             this.history = this.history.slice(0, this.historyIndex + 1)
         }
 
-        // Save only THIS user's objects (personal undo/redo)
+        // Save only THIS user's objects
+        // This keeps undo/redo personal
         const userId = this.getUserId()
         const myObjects = objects.filter(obj => obj.userId === userId)
         const state = myObjects.map(obj => obj.toJSON())
         this.history.push(JSON.stringify(state))
         this.historyIndex++
 
-        // Batch trim: slice off oldest entries when threshold is exceeded
-        // This amortizes the O(n) cost over multiple saves instead of
-        // doing shift() on every save (which is O(n) every time)
-        if (this.history.length > this.TRIM_THRESHOLD) {
-            const trimAmount = this.history.length - this.TRIM_TO
-            this.history = this.history.slice(trimAmount)
-            this.historyIndex -= trimAmount
+        // Old history is trimmed to avoid memory congestion 
+        if (this.history.length > this.MAX_HISTORY_SIZE) {
+            this.history.shift()
+            this.historyIndex--
         }
 
-        // Emit history changed event
-        this.eventBus.publish('objectManager:historyChanged', {
-            canUndo: this.historyIndex > 0,
-            canRedo: this.historyIndex < this.history.length - 1,
-        })
+        this.publishHistoryChanged()
     }
 
 
@@ -53,7 +43,7 @@ export class HistoryManager {
     undo() {
         if (this.historyIndex > 0) {
             this.historyIndex--
-            this.emitHistoryChanged()
+            this.publishHistoryChanged()
             return this.history[this.historyIndex]
         }
         return null
@@ -63,13 +53,13 @@ export class HistoryManager {
     redo() {
         if (this.historyIndex < this.history.length - 1) {
             this.historyIndex++
-            this.emitHistoryChanged()
+            this.publishHistoryChanged()
             return this.history[this.historyIndex]
         }
         return null
     }
 
-    emitHistoryChanged() {
+    publishHistoryChanged() {
         this.eventBus.publish('objectManager:historyChanged', {
             canUndo: this.historyIndex > 0,
             canRedo: this.historyIndex < this.history.length - 1,

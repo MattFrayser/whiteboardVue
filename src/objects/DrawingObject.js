@@ -5,7 +5,6 @@ export class DrawingObject {
         this.data = data
         this.selected = false
         this.userId = null
-        this.zIndex = 0
     }
 
     generateId() {
@@ -83,63 +82,63 @@ export class DrawingObject {
         ]
     }
 
-    resize(handleIndex, newX, newY) {
-        const bounds = this.getBounds()
+    /**
+     * Calculate new bounds based on resize handle drag
+     * Returns bounds without applying them (for subclass customization)
+     */
+    calculateResizedBounds(handleIndex, newX, newY, fixedPoint, initialBounds) {
+        const isSideHandle = [1, 3, 5, 7].includes(handleIndex)
 
-        const newBounds = { ...bounds }
+        if (isSideHandle) {
+            // For side handles, keep the perpendicular dimension fixed
+            const left = initialBounds.x
+            const right = initialBounds.x + initialBounds.width
+            const top = initialBounds.y
+            const bottom = initialBounds.y + initialBounds.height
 
-        switch (handleIndex) {
-            case 0: // north-west
-                newBounds.x = newX
-                newBounds.y = newY
-                newBounds.width = bounds.x + bounds.width - newX
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 1: // north
-                newBounds.y = newY
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 2: // north-east
-                newBounds.y = newY
-                newBounds.width = newX - bounds.x
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 3: // east
-                newBounds.width = newX - bounds.x
-                break
-            case 4: // south-east
-                newBounds.width = newX - bounds.x
-                newBounds.height = newY - bounds.y
-                break
-            case 5: // south
-                newBounds.height = newY - bounds.y
-                break
-            case 6: // south-west
-                newBounds.x = newX
-                newBounds.width = bounds.x + bounds.width - newX
-                newBounds.height = newY - bounds.y
-                break
-            case 7: // west
-                newBounds.x = newX
-                newBounds.width = bounds.x + bounds.width - newX
-                break
-        }
-
-        // Prevent negative dimensions
-        if (newBounds.width < 5) {
-            newBounds.width = 5
-            // Adjust x if needed to prevent flipping
-            if (handleIndex === 0 || handleIndex === 6 || handleIndex === 7) {
-                newBounds.x = bounds.x + bounds.width - 5
+            switch (handleIndex) {
+                case 1: // North
+                    return {
+                        x: Math.min(left, right),
+                        y: Math.min(newY, bottom),
+                        width: Math.abs(right - left),
+                        height: Math.max(1, Math.abs(bottom - newY))
+                    }
+                case 3: // East
+                    return {
+                        x: Math.min(left, newX),
+                        y: Math.min(top, bottom),
+                        width: Math.max(1, Math.abs(newX - left)),
+                        height: Math.abs(bottom - top)
+                    }
+                case 5: // South
+                    return {
+                        x: Math.min(left, right),
+                        y: Math.min(top, newY),
+                        width: Math.abs(right - left),
+                        height: Math.max(1, Math.abs(newY - top))
+                    }
+                case 7: // West
+                    return {
+                        x: Math.min(newX, right),
+                        y: Math.min(top, bottom),
+                        width: Math.max(1, Math.abs(right - newX)),
+                        height: Math.abs(bottom - top)
+                    }
+            }
+        } else {
+            // Corner handles - use fixed point approach
+            return {
+                x: Math.min(fixedPoint.x, newX),
+                y: Math.min(fixedPoint.y, newY),
+                width: Math.max(1, Math.abs(newX - fixedPoint.x)),
+                height: Math.max(1, Math.abs(newY - fixedPoint.y))
             }
         }
-        if (newBounds.height < 5) {
-            newBounds.height = 5
-            // Adjust y if needed to prevent flipping
-            if (handleIndex === 0 || handleIndex === 1 || handleIndex === 2) {
-                newBounds.y = bounds.y + bounds.height - 5
-            }
-        }
+    }
+
+    resize(handleIndex, newX, newY, fixedPoint, initialBounds) {
+        const newBounds = this.calculateResizedBounds(handleIndex, newX, newY, fixedPoint, initialBounds)
         this.applyBounds(newBounds, handleIndex)
     }
 
@@ -149,7 +148,6 @@ export class DrawingObject {
             type: this.type,
             data: this.data,
             userId: this.userId,
-            zIndex: this.zIndex,
         }
     }
 }

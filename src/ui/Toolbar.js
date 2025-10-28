@@ -1,7 +1,7 @@
 export class Toolbar {
     constructor(eventBus) {
         this.eventBus = eventBus
-        this.clickTimers = new Map()
+        this.swatchClickTimer = null
         this.activeSwatch = null
         this.activeSwatchForMenu = null
         this.colors = [
@@ -77,26 +77,22 @@ export class Toolbar {
             this.selectColor(e.target.value)
         })
 
-        // Color swatches -- double click
+        // Color swatches - single click selects, double click opens menu
         document.querySelectorAll('.swatch').forEach(swatch => {
             swatch.addEventListener('click', () => {
+                clearTimeout(this.swatchClickTimer)
                 const swatchColor = swatch.dataset.color
-                const swatchSize = parseInt(swatch.dataset.size) || this.engine.currentWidth
+                const swatchSize = parseInt(swatch.dataset.size) || this.currentWidth
 
-                if (this.clickTimers.has(swatch)) {
-                    // Double click
-                    clearTimeout(this.clickTimers.get(swatch))
-                    this.clickTimers.delete(swatch)
-                    this.openMenu(swatch)
-                } else {
-                    // single click
-                    const timer = setTimeout(() => {
-                        this.selectColor(swatchColor)
-                        this.selectBrushSize(swatchSize)
-                        this.clickTimers.delete(swatch)
-                    }, 250)
-                    this.clickTimers.set(swatch, timer)
-                }
+                this.swatchClickTimer = setTimeout(() => {
+                    this.selectColor(swatchColor)
+                    this.selectBrushSize(swatchSize)
+                }, 250)
+            })
+
+            swatch.addEventListener('dblclick', () => {
+                clearTimeout(this.swatchClickTimer)
+                this.openMenu(swatch)
             })
         })
 

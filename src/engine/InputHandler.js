@@ -8,6 +8,7 @@ export class InputHandler {
         this.rightMouseDown = false
         this.lastMousePos = { x: 0, y: 0 }
         this.lastCursorBroadcast = 0
+        this.cursorThrottle = 33
 
         this.setupEventListeners()
     }
@@ -23,7 +24,7 @@ export class InputHandler {
 
         this.canvas.addEventListener('mousedown', this.boundHandleMouseDown)
         this.canvas.addEventListener('mousemove', this.boundHandleMouseMove)
-        this.canvas.addEventListener('mouseup', this.boundHandleMouseUp)
+        document.addEventListener('mouseup', this.boundHandleMouseUp)
         this.canvas.addEventListener('wheel', this.boundHandleMouseWheel)
         this.canvas.addEventListener('contextmenu', this.boundPreventContext)
 
@@ -55,7 +56,7 @@ export class InputHandler {
 
         // Broadcast cursor position with throttling
         const now = Date.now()
-        if (now - this.lastCursorBroadcast >= 50) {
+        if (now - this.lastCursorBroadcast >= this.cursorThrottle) {
             this.lastCursorBroadcast = now
             const toolName = Object.keys(this.engine.tools).find(
                 key => this.engine.tools[key] === this.engine.currentTool
@@ -70,11 +71,11 @@ export class InputHandler {
         // left click
         if (e.buttons === 1) {
             this.engine.currentTool.onMouseMove(worldPos, e)
-            // right click
+        // right click
         } else if (e.buttons === 2) {
             e.preventDefault()
             this.engine.coordinates.pan({ x: e.clientX, y: e.clientY })
-            this.engine.renderOptimizer.forceFullRedraw = true
+            this.engine.needsRedraw = true
             this.engine.render()
         }
     }
@@ -93,12 +94,15 @@ export class InputHandler {
             this.updateCursor(worldPos)
         }
     }
-
+    
+    /**
+    * Zooming in and out
+    */
     handleMouseWheel(e) {
         e.preventDefault()
         const zoomPoint = { x: e.clientX, y: e.clientY }
         this.engine.coordinates.zoom(e.deltaY, zoomPoint, this.canvas)
-        this.engine.renderOptimizer.forceFullRedraw = true
+        this.engine.needsRedraw = true
         this.engine.render()
     }
 
@@ -111,12 +115,14 @@ export class InputHandler {
                 // SelectTool has dynamic cursor based on hover position
                 this.engine.currentTool.updateCursor(worldPos)
             } else {
-                this.engine.eventBus.emit('engine:cursorChanged', {})
+                this.engine.eventBus.publish('engine:cursorChanged', {})
             }
         }
     }
 
     handleKeyDown(e) {
+
+        // Tool Shortcuts
         const shortcuts = {
             S: 'select',
             D: 'draw',
@@ -126,7 +132,7 @@ export class InputHandler {
             T: 'text',
             E: 'eraser',
         }
-
+        
         if (shortcuts[e.key]) {
             this.engine.setTool(shortcuts[e.key])
             this.updateCursor()
@@ -175,7 +181,7 @@ export class InputHandler {
         if (this.boundHandleMouseDown) {
             this.canvas.removeEventListener('mousedown', this.boundHandleMouseDown)
             this.canvas.removeEventListener('mousemove', this.boundHandleMouseMove)
-            this.canvas.removeEventListener('mouseup', this.boundHandleMouseUp)
+            document.removeEventListener('mouseup', this.boundHandleMouseUp)
             this.canvas.removeEventListener('wheel', this.boundHandleMouseWheel)
             this.canvas.removeEventListener('contextmenu', this.boundPreventContext)
 

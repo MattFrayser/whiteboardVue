@@ -1,32 +1,35 @@
 import { ClipboardManager } from './ClipboardManager'
 import { HistoryManager } from './HistoryManager'
-import { ObjectSerializer } from './ObjectSerializer'
-import { Quadtree } from '../utils/Quadtree'
+import { SelectionManager } from './SelectionManager'
+import { ObjectStore } from './ObjectStore'
 
 export class ObjectManager {
     constructor(engine, eventBus) {
-        this.objects = []
-        this.selectedObjects = []
         this.engine = engine
         this.eventBus = eventBus
         this.userId = null // Will be set via event
 
-        // Initialize quadtree with large bounds (will expand as needed)
-        this.quadtree = new Quadtree(
-            { x: -10000, y: -10000, width: 20000, height: 20000 },
-            10, // max objects per node
-            8 // max levels
-        )
-
         // Initialize managers
+        this.objectStore = new ObjectStore(eventBus)
         this.historyManager = new HistoryManager(eventBus, () => this.userId)
         this.clipboardManager = new ClipboardManager()
+        this.selectionManager = new SelectionManager(this, this.objectStore, this.historyManager)
 
         this.subscribeToEvents()
     }
 
+    /**
+     * Public API getters
+     */
+    get selectedObjects() {
+        return this.selectionManager.selectedObjects
+    }
+
+    getAllObjects() {
+        return this.objectStore.getAllObjects()
+    }
+
     subscribeToEvents() {
-        // Listen for authenticated user ID from network
         this.eventBus.subscribe('network:authenticated', ({ userId }) => {
             this.userId = userId
         })
@@ -38,115 +41,78 @@ export class ObjectManager {
             object.userId = this.userId
         }
 
-        this.objects.push(object)
-
-        // Add to quadtree
-        const bounds = object.getBounds()
-        this.quadtree.insert(object, bounds)
-
-        this.historyManager.saveState(this.objects)
-
-        this.eventBus.publish('objectManager:objectAdded', { object })
+        this.objectStore.addObject(object)
+        this.historyManager.saveState(this.objectStore.getAllObjects())
 
         return object
     }
 
     removeObject(object) {
-        const index = this.objects.indexOf(object)
-        if (index > -1) {
-            // Remove from quadtree
-            const bounds = object.getBounds()
-            this.quadtree.remove(object, bounds)
-
-            this.objects.splice(index, 1)
-            this.historyManager.saveState(this.objects)
-
-            // Emit event for broadcasting
-            this.eventBus.publish('objectManager:objectDeleted', { object })
+        const result = this.objectStore.removeObject(object)
+        if (result) {
+            this.historyManager.saveState(this.objectStore.getAllObjects())
         }
-    }
-
-    selectObject(object, multi = false) {
-        if (!multi) {
-            this.clearSelection()
-        }
-        object.selected = true
-        this.selectedObjects.push(object)
-    }
-
-    clearSelection() {
-        this.selectedObjects.forEach(obj => (obj.selected = false))
-        this.selectedObjects = []
-    }
-
-    deleteSelected() {
-        const toDelete = [...this.selectedObjects]
-        this.clearSelection()
-
-        // Use removeObject to trigger broadcasts
-        toDelete.forEach(obj => {
-            this.removeObject(obj)
-        })
-    }
-
-    getObjectAt(point) {
-        const candidates = this.quadtree.queryPoint(point)
-
-        // Search from top to bottom (reverse order for z-index)
-        for (let i = candidates.length - 1; i >= 0; i--) {
-            if (candidates[i].containsPoint(point)) {
-                return candidates[i]
-            }
-        }
-        return null
-    }
-
-    selectObjectsInRect(rect, multi = false) {
-        if (!multi) {
-            this.clearSelection()
-        }
-
-        const candidates = this.quadtree.query(rect)
-
-        // Check each candidate for intersection with select rectangle
-        candidates.forEach(obj => {
-            const bounds = obj.getBounds()
-
-            const intersects = !(
-                bounds.x + bounds.width < rect.x ||
-                bounds.x > rect.x + rect.width ||
-                bounds.y + bounds.height < rect.y ||
-                bounds.y > rect.y + rect.height
-            )
-
-            if (intersects && !obj.selected) {
-                obj.selected = true
-                this.selectedObjects.push(obj)
-            }
-        })
-    }
-
-    moveSelected(dx, dy) {
-        this.selectedObjects.forEach(obj => {
-            const oldBounds = obj.getBounds()
-            this.quadtree.remove(obj, oldBounds)
-
-            obj.move(dx, dy)
-
-            const newBounds = obj.getBounds()
-            this.quadtree.insert(obj, newBounds)
-        })
-        this.historyManager.saveState(this.objects)
     }
 
     /**
-     * Update quadtree entry when an object's bounds change
-     * Call this after resizing or transforming objects
+     * Update object's position in quadtree and rebuild if bounds exceeded
      */
-    updateObjectInQuadtree(object, oldBounds) {
-        this.quadtree.remove(object, oldBounds)
-        const newBounds = object.getBounds()
-        this.quadtree.insert(object, newBounds)
+    updateObjectInQuadtree(object, oldBounds, newBounds = null) {
+        this.objectStore.updateObjectInQuadtree(object, oldBounds, newBounds)
+    }
+
+
+    broadcast(action, objectsOrObject) {
+        const objects = Array.isArray(objectsOrObject) ? objectsOrObject : [objectsOrObject]
+
+        objects.forEach(obj => {
+            if (action === 'update') {
+                this.eventBus.publish('objectManager:objectUpdated', { object: obj })
+            } else if (action === 'add') {
+                this.eventBus.publish('objectManager:objectAdded', { object: obj })
+            } else if (action === 'delete') {
+                this.eventBus.publish('objectManager:objectDeleted', { object: obj })
+            }
+        })
+    }
+
+    /**
+     * Save current state to history (wrapper for tools)
+     */
+    saveState() {
+        this.historyManager.saveState(this.objectStore.getAllObjects())
+    }
+
+    selectObject(object, multi = false) {
+        this.selectionManager.selectObject(object, multi)
+    }
+
+    clearSelection() {
+        this.selectionManager.clearSelection()
+    }
+
+    deleteSelected() {
+        this.selectionManager.deleteSelected()
+    }
+
+    getObjectAt(point) {
+        return this.objectStore.getObjectAt(point)
+    }
+
+    selectObjectsInRect(rect, multi = false) {
+        this.selectionManager.selectObjectsInRect(rect, multi)
+    }
+
+    moveSelected(dx, dy) {
+        this.selectionManager.moveSelected(dx, dy)
+    }
+
+    /**
+     * Rebuild the entire quadtree, optionally expanding bounds
+     * Call when objects exceed current bounds or structure becomes corrupted
+     */
+    rebuildQuadtree(expandBounds = false) {
+        this.objectStore.rebuildQuadtree(expandBounds)
     }
 
     copySelected() {
@@ -173,7 +139,7 @@ export class ObjectManager {
         const newObjects = clipboard.map(data => {
             // Deep clone
             const clonedData = JSON.parse(JSON.stringify(data))
-            clonedData.id = null // will trigger new ID
+            clonedData.id = null // setting null will trigger new ID
             const newObject = this.createObjectFromData(clonedData)
             this.addObject(newObject)
             return newObject
@@ -209,18 +175,18 @@ export class ObjectManager {
             this.eventBus.publish('objectManager:objectUpdated', { object: obj })
         )
 
-        this.historyManager.saveState(this.objects)
+        this.historyManager.saveState(this.objectStore.getAllObjects())
     }
 
     undo() {
         if (this.historyManager.canUndo()) {
-            const before = this.objects.filter(o => o.userId === this.userId)
+            const before = this.objectStore.getAllObjects().filter(o => o.userId === this.userId)
 
             // Apply undo
             const stateStr = this.historyManager.undo()
             this.loadState(stateStr)
 
-            const after = this.objects.filter(o => o.userId === this.userId)
+            const after = this.objectStore.getAllObjects().filter(o => o.userId === this.userId)
 
             this.publishDiff(before, after)
         }
@@ -228,13 +194,13 @@ export class ObjectManager {
 
     redo() {
         if (this.historyManager.canRedo()) {
-            const before = this.objects.filter(o => o.userId === this.userId)
+            const before = this.objectStore.getAllObjects().filter(o => o.userId === this.userId)
 
             // Apply redo
             const stateStr = this.historyManager.redo()
             this.loadState(stateStr)
 
-            const after = this.objects.filter(o => o.userId === this.userId)
+            const after = this.objectStore.getAllObjects().filter(o => o.userId === this.userId)
 
             this.publishDiff(before, after)
         }
@@ -242,73 +208,88 @@ export class ObjectManager {
 
     loadState(stateStr) {
         const state = JSON.parse(stateStr)
-
-        // Capture old objects BEFORE filtering (for incremental quadtree update)
-        const oldObjects = this.objects.filter(obj => obj.userId === this.userId)
-
-        // Remove only THIS user's objects
-        this.objects = this.objects.filter(obj => obj.userId !== this.userId)
-
-        // Restore THIS user's objects from history
-        const myRestoredObjects = state.map(data => this.createObjectFromData(data))
-        this.objects.push(...myRestoredObjects)
-
+        this.objectStore.loadUserState(this.userId, state)
         this.clearSelection()
-
-        // only update changed objects, much faster than entire rebuild
-        oldObjects.forEach(obj => {
-            this.quadtree.remove(obj, obj.getBounds())
-        })
-        myRestoredObjects.forEach(obj => {
-            this.quadtree.insert(obj, obj.getBounds())
-        })
     }
 
     publishDiff(before, after) {
-        // deleted (in before but not in after)
-        const deleted = before.filter(b => !after.find(a => a.id === b.id))
+        const beforeMap = new Map(before.map(obj => [obj.id, obj]))
+        const afterMap = new Map(after.map(obj => [obj.id, obj]))
 
-        // added (in after but not in before)
-        const added = after.filter(a => !before.find(b => b.id === a.id))
+        const deleted = []
+        const added = []
+        const modified = []
 
-        // modified (same ID, different data)
-        const modified = after.filter(a => {
-            const beforeObj = before.find(b => b.id === a.id)
-            if (!beforeObj) {
-                return false
+        // Find deleted (in before but not in after)
+        for (const obj of before) {
+            if (!afterMap.has(obj.id)) {
+                deleted.push(obj)
             }
-            return JSON.stringify(beforeObj.data) !== JSON.stringify(a.data)
-        })
+        }
 
-        if (deleted.length > 0) {
-            deleted.forEach(obj =>
-                this.eventBus.publish('objectManager:objectDeleted', { object: obj })
-            )
+        // Find added and modified
+        for (const obj of after) {
+            const beforeObj = beforeMap.get(obj.id)
+            if (!beforeObj) {
+                added.push(obj)
+            } else if (JSON.stringify(beforeObj.data) !== JSON.stringify(obj.data)) {
+                modified.push(obj)
+            }
         }
-        if (added.length > 0) {
-            added.forEach(obj =>
-                this.eventBus.publish('objectManager:objectAdded', { object: obj })
-            )
-        }
-        if (modified.length > 0) {
-            modified.forEach(obj =>
-                this.eventBus.publish('objectManager:objectUpdated', { object: obj })
-            )
-        }
+
+        // Publish events
+        deleted.forEach(obj =>
+            this.eventBus.publish('objectManager:objectDeleted', { object: obj })
+        )
+        added.forEach(obj =>
+            this.eventBus.publish('objectManager:objectAdded', { object: obj })
+        )
+        modified.forEach(obj =>
+            this.eventBus.publish('objectManager:objectUpdated', { object: obj })
+        )
     }
 
     createObjectFromData(data) {
-        return ObjectSerializer.createObjectFromData(data)
+        return this.objectStore.createObjectFromData(data)
+    }
+
+    /**
+     * Get object by ID (for remote updates)
+     */
+    getObjectById(id) {
+        return this.objectStore.getObjectById(id)
+    }
+
+    /**
+     * Add object from network (no history, no local broadcast)
+     */
+    addRemoteObject(objectData) {
+        return this.objectStore.addRemoteObject(objectData)
+    }
+
+    /**
+     * Update object from network (no history, no local broadcast)
+     */
+    updateRemoteObject(objectId, objectData) {
+        return this.objectStore.updateRemoteObject(objectId, objectData)
+    }
+
+    /**
+     * Remove object from network (no history, no local broadcast)
+     */
+    removeRemoteObject(objectId) {
+        return this.objectStore.removeRemoteObject(objectId)
+    }
+
+    /**
+     * Load objects from network (full sync)
+     */
+    loadRemoteObjects(objectDataArray) {
+        this.objectStore.loadRemoteObjects(objectDataArray)
     }
 
     render(ctx, viewport = null) {
-        // If viewport is provided, use quadtree for culling
-        if (viewport) {
-            const visibleObjects = this.quadtree.query(viewport)
-            visibleObjects.forEach(obj => obj.render(ctx))
-        } else {
-            // Full render (fallback)
-            this.objects.forEach(obj => obj.render(ctx))
-        }
+        this.objectStore.render(ctx, viewport, this.selectedObjects)
     }
+
 }

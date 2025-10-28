@@ -8,7 +8,6 @@ import { TextTool } from '../tools/TextTool'
 import { Coordinates } from './Coordinates'
 import { InputHandler } from './InputHandler'
 import { ObjectManager } from '../managers/ObjectManager'
-import { RenderOptimizer } from './RenderOptimizer'
 
 export class DrawingEngine {
     constructor(canvas, eventBus) {
@@ -18,7 +17,7 @@ export class DrawingEngine {
 
         this.objectManager = new ObjectManager(this, eventBus)
         this.coordinates = new Coordinates()
-        this.renderOptimizer = new RenderOptimizer()
+        this.needsRedraw = true
 
         this.tools = {
             draw: new DrawTool(this),
@@ -40,7 +39,7 @@ export class DrawingEngine {
         this.boundResize = () => this.resize()
         window.addEventListener('resize', this.boundResize)
 
-        // Initialize input handler (manages mouse/keyboard events)
+        // manages mouse/keyboard events
         this.inputHandler = new InputHandler(this, canvas)
 
         this.subscribeToEvents()
@@ -48,7 +47,9 @@ export class DrawingEngine {
     }
 
     subscribeToEvents() {
+
         // Toolbar events
+
         this.eventBus.subscribe('toolbar:toolChanged', ({ toolName }) => {
             this.setTool(toolName)
         })
@@ -72,57 +73,51 @@ export class DrawingEngine {
         })
 
         // Network events (remote changes)
+
         this.eventBus.subscribe('network:objectAdded', ({ object }) => {
-            const obj = this.objectManager.createObjectFromData(object)
+            const obj = this.objectManager.addRemoteObject(object)
             if (obj) {
-                this.objectManager.objects.push(obj)
                 const bounds = obj.getBounds()
-                this.objectManager.quadtree.insert(obj, bounds)
                 this.markDirty(bounds)
                 this.render()
             }
         })
 
         this.eventBus.subscribe('network:objectUpdated', ({ object }) => {
-            const obj = this.objectManager.objects.find(o => o.id === object.id)
+            const obj = this.objectManager.getObjectById(object.id)
             if (obj) {
                 const oldBounds = obj.getBounds()
                 this.markDirty(oldBounds)
-                this.objectManager.quadtree.remove(obj, oldBounds)
 
-                obj.data = object.data
+                this.objectManager.updateRemoteObject(object.id, object.data)
 
                 const newBounds = obj.getBounds()
                 this.markDirty(newBounds)
-                this.objectManager.quadtree.insert(obj, newBounds)
                 this.render()
             }
         })
 
         this.eventBus.subscribe('network:objectDeleted', ({ objectId }) => {
-            const obj = this.objectManager.objects.find(o => o.id === objectId)
+            const obj = this.objectManager.getObjectById(objectId)
             if (obj) {
                 const bounds = obj.getBounds()
                 this.markDirty(bounds)
-                this.objectManager.quadtree.remove(obj, bounds)
 
-                const index = this.objectManager.objects.indexOf(obj)
-                if (index > -1) {
-                    this.objectManager.objects.splice(index, 1)
-                    this.render()
-                }
+                this.objectManager.removeRemoteObject(objectId)
+                this.render()
             }
         })
 
         this.eventBus.subscribe('network:sync', ({ objects }) => {
-            this.objectManager.objects = []
-            objects.forEach(objData => {
-                const obj = this.objectManager.createObjectFromData(objData)
-                if (obj) {
-                    this.objectManager.objects.push(obj)
-                }
-            })
+            this.objectManager.loadRemoteObjects(objects)
             this.render()
+        })
+
+        this.eventBus.subscribe('network:userDisconnected', ({ userId }) => {
+            if (this.remoteCursors) {
+                this.remoteCursors.delete(userId)
+                this.render()
+            }
         })
 
         // Remote cursor updates
@@ -157,12 +152,6 @@ export class DrawingEngine {
             this.render()
         })
 
-        this.eventBus.subscribe('network:userDisconnected', ({ userId }) => {
-            if (this.remoteCursors) {
-                this.remoteCursors.delete(userId)
-                this.render()
-            }
-        })
     }
 
     setTool(toolName) {
@@ -185,16 +174,15 @@ export class DrawingEngine {
     resize() {
         this.canvas.width = window.innerWidth
         this.canvas.height = window.innerHeight
-        this.renderOptimizer.forceFullRedraw = true
+        this.needsRedraw = true
         this.render()
     }
 
     /**
-     * Mark a region as dirty (needs redrawing)
-     * Delegates to RenderOptimizer
+     * Mark canvas as needing redraw
      */
-    markDirty(bounds, padding = 10) {
-        this.renderOptimizer.markDirty(bounds, padding)
+    markDirty() {
+        this.needsRedraw = true
     }
 
     /**
@@ -211,17 +199,12 @@ export class DrawingEngine {
     }
 
     render() {
-        // Check if we should use dirty rectangle optimization
-        if (
-            this.renderOptimizer.dirtyRegions.length > 0 &&
-            !this.renderOptimizer.shouldUseFullRedraw(this.coordinates, this.canvas)
-        ) {
-            this.renderDirty()
-        } else {
-            this.renderFull()
+        if (!this.needsRedraw) {
+            return
         }
 
-        this.renderOptimizer.clearDirtyRegions()
+        this.renderFull()
+        this.needsRedraw = false
     }
 
     /**
@@ -255,62 +238,6 @@ export class DrawingEngine {
         }
 
         this.ctx.restore()
-    }
-
-    /**
-     * Render only dirty regions
-     */
-    renderDirty() {
-        const mergedRegions = this.renderOptimizer.mergeDirtyRegions()
-        const { offsetX, offsetY, scale } = this.coordinates
-
-        for (const region of mergedRegions) {
-            this.ctx.save()
-
-            // Transform to viewport coordinates
-            const viewportX = region.x * scale + offsetX
-            const viewportY = region.y * scale + offsetY
-            const viewportWidth = region.width * scale
-            const viewportHeight = region.height * scale
-
-            // Set clipping region in viewport coordinates
-            this.ctx.beginPath()
-            this.ctx.rect(viewportX, viewportY, viewportWidth, viewportHeight)
-            this.ctx.clip()
-
-            // Clear the dirty region
-            this.ctx.clearRect(viewportX, viewportY, viewportWidth, viewportHeight)
-
-            // Apply world transformations
-            this.ctx.translate(offsetX, offsetY)
-            this.ctx.scale(scale, scale)
-
-            // Query objects in dirty region using quadtree
-            const objectsToRender = this.objectManager.quadtree.query(region)
-            objectsToRender.forEach(obj => obj.render(this.ctx))
-
-            // Render current tool preview if it intersects dirty region
-            if (this.currentTool && this.currentTool.renderPreview) {
-                this.currentTool.renderPreview(this.ctx)
-            }
-
-            // Render remote cursors in dirty region
-            if (this.remoteCursors) {
-                this.remoteCursors.forEach(cursor => {
-                    // Check if cursor is in dirty region
-                    if (
-                        cursor.x >= region.x &&
-                        cursor.x <= region.x + region.width &&
-                        cursor.y >= region.y &&
-                        cursor.y <= region.y + region.height
-                    ) {
-                        this.renderRemoteCursor(this.ctx, cursor)
-                    }
-                })
-            }
-
-            this.ctx.restore()
-        }
     }
 
     renderRemoteCursor(ctx, cursor) {
@@ -356,6 +283,5 @@ export class DrawingEngine {
         this.tools = null
         this.currentTool = null
         this.inputHandler = null
-        this.renderOptimizer = null
     }
 }

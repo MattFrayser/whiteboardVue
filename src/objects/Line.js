@@ -65,72 +65,17 @@ export class Line extends DrawingObject {
         this.data.y2 += dy
     }
 
-    resize(handleIndex, newX, newY) {
-        // Override resize to handle padding correctly
+    resize(handleIndex, newX, newY, fixedPoint, initialBounds) {
+        // Use parent's calculation, then adjust for padding
+        const visualBounds = this.calculateResizedBounds(handleIndex, newX, newY, fixedPoint, initialBounds)
         const padding = this.data.width / 2
-        const bounds = this.getBounds()
-        const newBounds = { ...bounds }
-
-        // Calculate new visual bounds based on handle dragging
-        switch (handleIndex) {
-            case 0: // north-west
-                newBounds.x = newX
-                newBounds.y = newY
-                newBounds.width = bounds.x + bounds.width - newX
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 1: // north
-                newBounds.y = newY
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 2: // north-east
-                newBounds.y = newY
-                newBounds.width = newX - bounds.x
-                newBounds.height = bounds.y + bounds.height - newY
-                break
-            case 3: // east
-                newBounds.width = newX - bounds.x
-                break
-            case 4: // south-east
-                newBounds.width = newX - bounds.x
-                newBounds.height = newY - bounds.y
-                break
-            case 5: // south
-                newBounds.height = newY - bounds.y
-                break
-            case 6: // south-west
-                newBounds.x = newX
-                newBounds.width = bounds.x + bounds.width - newX
-                newBounds.height = newY - bounds.y
-                break
-            case 7: // west
-                newBounds.x = newX
-                newBounds.width = bounds.x + bounds.width - newX
-                break
-        }
-
-        // Prevent negative dimensions
-        const minVisualSize = padding * 2 + 5
-
-        if (newBounds.width < minVisualSize) {
-            newBounds.width = minVisualSize
-            if (handleIndex === 0 || handleIndex === 6 || handleIndex === 7) {
-                newBounds.x = bounds.x + bounds.width - minVisualSize
-            }
-        }
-        if (newBounds.height < minVisualSize) {
-            newBounds.height = minVisualSize
-            if (handleIndex === 0 || handleIndex === 1 || handleIndex === 2) {
-                newBounds.y = bounds.y + bounds.height - minVisualSize
-            }
-        }
 
         // Convert visual bounds to content bounds (remove padding)
         const contentBounds = {
-            x: newBounds.x + padding,
-            y: newBounds.y + padding,
-            width: newBounds.width - padding * 2,
-            height: newBounds.height - padding * 2,
+            x: visualBounds.x + padding,
+            y: visualBounds.y + padding,
+            width: Math.max(1, visualBounds.width - padding * 2),
+            height: Math.max(1, visualBounds.height - padding * 2),
         }
 
         this.applyBounds(contentBounds)

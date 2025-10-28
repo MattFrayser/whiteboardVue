@@ -7,8 +7,7 @@ export class WebSocketManager {
         this.connectionStatus = 'disconnected' //  'connected', 'disconnected', 'error'
         this.statusCallback = null
         this.reconnectAttempts = 0
-        this.maxReconnectAttempts = 5
-        this.reconnectDelay = 1000
+        this.maxReconnectAttempts = 3
         this.reconnectTimeout = null
         this.authTimeout = null
         this.userColor = null
@@ -17,14 +16,13 @@ export class WebSocketManager {
     }
 
     subscribeToEvents() {
-        // Listen for cursor movements from engine
+
         this.eventBus.subscribe('engine:cursorMove', ({ x, y, tool }) => {
             if (this.userId) {
                 this.broadcastCursor({ x, y, tool })
             }
         })
 
-        // Listen for object changes from ObjectManager
         this.eventBus.subscribe('objectManager:objectAdded', ({ object }) => {
             this.broadcastObjectAdded(object)
         })
@@ -37,7 +35,6 @@ export class WebSocketManager {
             this.broadcastObjectDeleted(object)
         })
 
-        // Listen for engine destroy
         this.eventBus.subscribe('engine:destroy', () => {
             this.disconnect()
         })
@@ -122,12 +119,10 @@ export class WebSocketManager {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++
 
+            // Retry with 2-second delay
             this.reconnectTimeout = setTimeout(() => {
                 this.connect(this.roomCode)
-            }, this.reconnectDelay)
-
-            // Exponential backoff
-            this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 10000)
+            }, 2000)
         } else {
             this.updateStatus('error')
         }
@@ -193,6 +188,11 @@ export class WebSocketManager {
                 console.warn('[WebSocket] Unknown message type:', msg.type, msg)
         }
     }
+    
+
+    //----------
+    // Message Handlers
+    //----------
 
     handleAuthenticated(msg) {
         // Clear auth timeout - authentication succeeded
@@ -211,19 +211,18 @@ export class WebSocketManager {
     }
 
     handleRoomJoined(msg) {
-        // Store user color and update status
         this.userColor = msg.color
         this.updateStatus('connected')
         this.reconnectAttempts = 0
-        this.reconnectDelay = 1000
     }
 
     handleSync(msg) {
         this.eventBus.publish('network:sync', { objects: msg.objects })
     }
 
+    // When handling objects if the userId matches 
+    // object belongs to user and should be skipped
     handleObjectAdded(objectData) {
-        // skip if users obj
         if (objectData.userId == this.userId) {
             return
         }

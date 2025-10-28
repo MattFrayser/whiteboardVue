@@ -205,6 +205,19 @@ body {
     color: white;
 }
 
+.settings {
+    position: fixed;
+    align-items: center;
+    background: white;
+    border-radius: 4px;
+    padding: 50px;
+    opacity: 1;
+}
+
+.setting.show {
+    opacity: 1;
+}
+
 .invite-notification {
     position: fixed;
     top: 60px;

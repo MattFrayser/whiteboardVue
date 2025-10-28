@@ -1,5 +1,5 @@
 {
-  "name": "whiteboard-vue",
+  "name": "whiteboard",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,12 +15,9 @@
     "format": "prettier --write \"src/**/*.{js,css,html}\"",
     "format:check": "prettier --check \"src/**/*.{js,css,html}\""
   },
-  "dependencies": {
-    "vue": "^3.5.22"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^9.38.0",
-    "@vitejs/plugin-vue": "^6.0.1",
     "eslint": "^9.38.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
