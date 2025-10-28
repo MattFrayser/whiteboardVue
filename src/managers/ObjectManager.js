@@ -4,18 +4,22 @@ import { SelectionManager } from './SelectionManager'
 import { ObjectStore } from './ObjectStore'
 
 export class ObjectManager {
-    constructor(engine, eventBus) {
-        this.engine = engine
-        this.eventBus = eventBus
-        this.userId = null // Will be set via event
+    constructor(networkManager) {
+        this.networkManager = networkManager
+        this.userId = null // Will be set by network manager
 
         // Initialize managers
-        this.objectStore = new ObjectStore(eventBus)
-        this.historyManager = new HistoryManager(eventBus, () => this.userId)
+        this.objectStore = new ObjectStore()
+        this.historyManager = new HistoryManager(() => this.userId)
         this.clipboardManager = new ClipboardManager()
         this.selectionManager = new SelectionManager(this, this.objectStore, this.historyManager)
+    }
 
-        this.subscribeToEvents()
+    /**
+     * Set the current user ID (called by network manager)
+     */
+    setUserId(userId) {
+        this.userId = userId
     }
 
     /**
@@ -29,29 +33,43 @@ export class ObjectManager {
         return this.objectStore.getAllObjects()
     }
 
-    subscribeToEvents() {
-        this.eventBus.subscribe('network:authenticated', ({ userId }) => {
-            this.userId = userId
-        })
-    }
-
+    /**
+     * Add object locally (triggers history and network broadcast)
+     */
     addObject(object) {
         // Update userId to current user when adding
         if (this.userId) {
             object.userId = this.userId
         }
 
-        this.objectStore.addObject(object)
+        // Add to store
+        this.objectStore.add(object)
+        
+        // Save to history
         this.historyManager.saveState(this.objectStore.getAllObjects())
+
+        // Broadcast to network
+        if (this.networkManager && this.networkManager.isConnected()) {
+            this.networkManager.broadcastObjectAdded(object)
+        }
 
         return object
     }
 
+    /**
+     * Remove object locally (triggers history and network broadcast)
+     */
     removeObject(object) {
-        const result = this.objectStore.removeObject(object)
+        const result = this.objectStore.remove(object)
         if (result) {
             this.historyManager.saveState(this.objectStore.getAllObjects())
+            
+            // Broadcast to network
+            if (this.networkManager && this.networkManager.isConnected()) {
+                this.networkManager.broadcastObjectDeleted(object)
+            }
         }
+        return result
     }
 
     /**
@@ -61,19 +79,13 @@ export class ObjectManager {
         this.objectStore.updateObjectInQuadtree(object, oldBounds, newBounds)
     }
 
-
-    broadcast(action, objectsOrObject) {
-        const objects = Array.isArray(objectsOrObject) ? objectsOrObject : [objectsOrObject]
-
-        objects.forEach(obj => {
-            if (action === 'update') {
-                this.eventBus.publish('objectManager:objectUpdated', { object: obj })
-            } else if (action === 'add') {
-                this.eventBus.publish('objectManager:objectAdded', { object: obj })
-            } else if (action === 'delete') {
-                this.eventBus.publish('objectManager:objectDeleted', { object: obj })
-            }
-        })
+    /**
+     * Broadcast object update to network
+     */
+    broadcastObjectUpdate(object) {
+        if (this.networkManager && this.networkManager.isConnected()) {
+            this.networkManager.broadcastObjectUpdated(object)
+        }
     }
 
     /**
@@ -171,9 +183,10 @@ export class ObjectManager {
             this.selectObject(obj, true)
         })
 
-        newObjects.forEach(obj =>
-            this.eventBus.publish('objectManager:objectUpdated', { object: obj })
-        )
+        // Broadcast updates to network
+        newObjects.forEach(obj => {
+            this.broadcastObjectUpdate(obj)
+        })
 
         this.historyManager.saveState(this.objectStore.getAllObjects())
     }
@@ -237,16 +250,21 @@ export class ObjectManager {
             }
         }
 
-        // Publish events
-        deleted.forEach(obj =>
-            this.eventBus.publish('objectManager:objectDeleted', { object: obj })
-        )
-        added.forEach(obj =>
-            this.eventBus.publish('objectManager:objectAdded', { object: obj })
-        )
-        modified.forEach(obj =>
-            this.eventBus.publish('objectManager:objectUpdated', { object: obj })
-        )
+        deleted.forEach(obj => {
+            if (this.networkManager && this.networkManager.isConnected()) {
+                this.networkManager.broadcastObjectDeleted(obj)
+            }
+        })
+        added.forEach(obj => {
+            if (this.networkManager && this.networkManager.isConnected()) {
+                this.networkManager.broadcastObjectAdded(obj)
+            }
+        })
+        modified.forEach(obj => {
+            if (this.networkManager && this.networkManager.isConnected()) {
+                this.networkManager.broadcastObjectUpdated(obj)
+            }
+        })
     }
 
     createObjectFromData(data) {

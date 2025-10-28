@@ -61,10 +61,13 @@ export class InputHandler {
             const toolName = Object.keys(this.engine.tools).find(
                 key => this.engine.tools[key] === this.engine.currentTool
             )
-            this.engine.eventBus.publish('engine:cursorMove', {
+            
+            // Direct call to engine's broadcast method
+            this.engine.broadcastCursor({
                 x: worldPos.x,
                 y: worldPos.y,
                 tool: toolName,
+                color: this.engine.currentColor
             })
         }
 
@@ -114,9 +117,8 @@ export class InputHandler {
             if (this.engine.currentTool === this.engine.tools.select && worldPos) {
                 // SelectTool has dynamic cursor based on hover position
                 this.engine.currentTool.updateCursor(worldPos)
-            } else {
-                this.engine.eventBus.publish('engine:cursorChanged', {})
             }
+            // Cursor is handled by organize state store subscriptions
         }
     }
 

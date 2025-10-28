@@ -10,12 +10,12 @@ import { InputHandler } from './InputHandler'
 import { ObjectManager } from '../managers/ObjectManager'
 
 export class DrawingEngine {
-    constructor(canvas, eventBus) {
+    constructor(canvas, networkManager) {
         this.canvas = canvas
         this.ctx = canvas.getContext('2d')
-        this.eventBus = eventBus
+        this.networkManager = networkManager
 
-        this.objectManager = new ObjectManager(this, eventBus)
+        this.objectManager = new ObjectManager(networkManager)
         this.coordinates = new Coordinates()
         this.needsRedraw = true
 
@@ -42,116 +42,97 @@ export class DrawingEngine {
         // manages mouse/keyboard events
         this.inputHandler = new InputHandler(this, canvas)
 
-        this.subscribeToEvents()
+        // Set up network message handler
+        if (networkManager) {
+            this.setupNetworkHandler()
+        }
+
         this.resize()
     }
 
-    subscribeToEvents() {
+    setupNetworkHandler() {
+        // Wire up message handler
+        if (this.networkManager) {
+            this.networkManager.messageHandler = (message) => {
+                this.handleNetworkMessage(message)
+            }
+        }
+    }
 
-        // Toolbar events
-
-        this.eventBus.subscribe('toolbar:toolChanged', ({ toolName }) => {
-            this.setTool(toolName)
-        })
-
-        this.eventBus.subscribe('toolbar:colorChanged', ({ color }) => {
-            this.currentColor = color
-        })
-
-        this.eventBus.subscribe('toolbar:brushSizeChanged', ({ size }) => {
-            this.currentWidth = size
-        })
-
-        this.eventBus.subscribe('toolbar:undoRequested', () => {
-            this.objectManager.undo()
-            this.render()
-        })
-
-        this.eventBus.subscribe('toolbar:redoRequested', () => {
-            this.objectManager.redo()
-            this.render()
-        })
-
-        // Network events (remote changes)
-
-        this.eventBus.subscribe('network:objectAdded', ({ object }) => {
-            const obj = this.objectManager.addRemoteObject(object)
-            if (obj) {
-                const bounds = obj.getBounds()
-                this.markDirty(bounds)
+    handleNetworkMessage(message) {
+        switch(message.type) {
+            case 'network:authenticated':
+                this.objectManager.setUserId(message.userId)
+                break
+            case 'network:objectAdded': {
+                const addedObj = this.objectManager.addRemoteObject(message.object)
+                if (addedObj) {
+                    const bounds = addedObj.getBounds()
+                    this.markDirty(bounds)
+                    this.render()
+                }
+                break
+            }
+            case 'network:objectUpdated': {
+                const updatedObj = this.objectManager.getObjectById(message.object.id)
+                if (updatedObj) {
+                    const oldBounds = updatedObj.getBounds()
+                    this.markDirty(oldBounds)
+                    this.objectManager.updateRemoteObject(message.object.id, message.object.data)
+                    const newBounds = updatedObj.getBounds()
+                    this.markDirty(newBounds)
+                    this.render()
+                }
+                break
+            }
+            case 'network:objectDeleted': {
+                const deletedObj = this.objectManager.getObjectById(message.objectId)
+                if (deletedObj) {
+                    this.markDirty(deletedObj.getBounds())
+                    this.objectManager.removeRemoteObject(message.objectId)
+                    this.render()
+                }
+                break
+            }
+            case 'network:sync':
+                this.objectManager.loadRemoteObjects(message.objects)
                 this.render()
-            }
-        })
-
-        this.eventBus.subscribe('network:objectUpdated', ({ object }) => {
-            const obj = this.objectManager.getObjectById(object.id)
-            if (obj) {
-                const oldBounds = obj.getBounds()
-                this.markDirty(oldBounds)
-
-                this.objectManager.updateRemoteObject(object.id, object.data)
-
-                const newBounds = obj.getBounds()
-                this.markDirty(newBounds)
+                break
+            case 'network:userDisconnected':
+                this.remoteCursors.delete(message.userId)
                 this.render()
-            }
-        })
+                break
+            case 'network:remoteCursorMove':
+                this.handleRemoteCursor(message)
+                break
+        }
+    }
 
-        this.eventBus.subscribe('network:objectDeleted', ({ objectId }) => {
-            const obj = this.objectManager.getObjectById(objectId)
-            if (obj) {
-                const bounds = obj.getBounds()
-                this.markDirty(bounds)
+    handleRemoteCursor({ userId, x, y, color, tool }) {
+        const oldCursor = this.remoteCursors.get(userId)
+        if (oldCursor) {
+            this.markDirty({ x: oldCursor.x - 10, y: oldCursor.y - 10, width: 20, height: 20 }, 5)
+        }
+        this.remoteCursors.set(userId, { x, y, color, tool })
+        this.markDirty({ x: x - 10, y: y - 10, width: 20, height: 20 }, 5)
+        this.render()
+    }
 
-                this.objectManager.removeRemoteObject(objectId)
-                this.render()
-            }
-        })
+    // Public methods for Toolbar and InputHandler
+    undo() {
+        this.objectManager.undo()
+        this.render()
+    }
 
-        this.eventBus.subscribe('network:sync', ({ objects }) => {
-            this.objectManager.loadRemoteObjects(objects)
-            this.render()
-        })
+    redo() {
+        this.objectManager.redo()
+        this.render()
+    }
 
-        this.eventBus.subscribe('network:userDisconnected', ({ userId }) => {
-            if (this.remoteCursors) {
-                this.remoteCursors.delete(userId)
-                this.render()
-            }
-        })
-
-        // Remote cursor updates
-        this.eventBus.subscribe('network:remoteCursorMove', ({ userId, x, y, color, tool }) => {
-            const oldCursor = this.remoteCursors.get(userId)
-            if (oldCursor) {
-                const cursorRadius = 10
-                this.markDirty(
-                    {
-                        x: oldCursor.x - cursorRadius,
-                        y: oldCursor.y - cursorRadius,
-                        width: cursorRadius * 2,
-                        height: cursorRadius * 2,
-                    },
-                    5
-                )
-            }
-
-            this.remoteCursors.set(userId, { x, y, color, tool })
-
-            const cursorRadius = 10
-            this.markDirty(
-                {
-                    x: x - cursorRadius,
-                    y: y - cursorRadius,
-                    width: cursorRadius * 2,
-                    height: cursorRadius * 2,
-                },
-                5
-            )
-
-            this.render()
-        })
-
+    broadcastCursor(cursor) {
+        if (this.networkManager && this.networkManager.isConnected()) {
+            this.networkManager.broadcastCursor(cursor)
+        }
     }
 
     setTool(toolName) {
@@ -167,7 +148,6 @@ export class DrawingEngine {
         this.currentTool = this.tools[toolName]
         this.currentTool.activate()
 
-        this.eventBus.publish('engine:toolChanged', { toolName })
         this.render()
     }
 
@@ -265,8 +245,6 @@ export class DrawingEngine {
         if (this.boundResize) {
             window.removeEventListener('resize', this.boundResize)
         }
-
-        this.eventBus.publish('engine:destroy', {})
 
         // Cleanup tools
         if (this.tools) {

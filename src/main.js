@@ -1,18 +1,19 @@
 import './style.css'
-import { EventBus } from './utils/EventBus'
 import { DrawingEngine } from './engine/DrawingEngine'
 import { Toolbar } from './ui/Toolbar'
 import { WebSocketManager } from './network/WebSocketManager'
 import { InviteManager } from './ui/InviteManager'
+import { appState } from './stores/AppState'
 
-// Create shared event bus
-const eventBus = new EventBus()
+// Create network manager with message handler
+const networkManager = new WebSocketManager((message) => {
+    // Messages will be handled by engine's message handler
+})
 
-// Initialize components with event bus
+// Initialize components
 const canvas = document.getElementById('canvas')
-const engine = new DrawingEngine(canvas, eventBus)
-const toolbar = new Toolbar(eventBus)
-const wsManager = new WebSocketManager(eventBus)
+const engine = new DrawingEngine(canvas, networkManager)
+const toolbar = new Toolbar(engine)
 
 // get or create roomCode
 const urlParams = new URLSearchParams(window.location.search)
@@ -29,8 +30,8 @@ new InviteManager(roomCode)
 const statusIndicator = document.getElementById('connection-status')
 const statusText = statusIndicator.querySelector('.status-text')
 
-// Listen to network status events
-eventBus.subscribe('network:statusChanged', ({ status }) => {
+// Subscribe to network status changes from state
+appState.subscribe('network.status', (status) => {
     statusIndicator.className = `connection-status status-${status}`
 
     const statusLabels = {
@@ -43,7 +44,7 @@ eventBus.subscribe('network:statusChanged', ({ status }) => {
 })
 
 // Connect to WebSocket
-wsManager.connect(roomCode)
+networkManager.connect(roomCode)
 
 // Start engine
 engine.start()
@@ -51,5 +52,6 @@ engine.start()
 // Clean up on exit
 window.addEventListener('beforeunload', () => {
     engine.destroy()
-    eventBus.clear() // Clean up all listeners
+    toolbar.destroy()
+    appState.clear() // Clean up state subscriptions
 })

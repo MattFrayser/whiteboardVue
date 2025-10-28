@@ -1,9 +1,11 @@
+import { actions } from '../stores/AppState'
+
 export class WebSocketManager {
-    constructor(eventBus) {
-        this.eventBus = eventBus
+    constructor(messageHandler) {
         this.socket = null
         this.roomCode = null
-
+        this.messageHandler = messageHandler // Callback for handling incoming messages
+        
         this.connectionStatus = 'disconnected' //  'connected', 'disconnected', 'error'
         this.statusCallback = null
         this.reconnectAttempts = 0
@@ -11,33 +13,11 @@ export class WebSocketManager {
         this.reconnectTimeout = null
         this.authTimeout = null
         this.userColor = null
-
-        this.subscribeToEvents()
+        this.userId = null
     }
-
-    subscribeToEvents() {
-
-        this.eventBus.subscribe('engine:cursorMove', ({ x, y, tool }) => {
-            if (this.userId) {
-                this.broadcastCursor({ x, y, tool })
-            }
-        })
-
-        this.eventBus.subscribe('objectManager:objectAdded', ({ object }) => {
-            this.broadcastObjectAdded(object)
-        })
-
-        this.eventBus.subscribe('objectManager:objectUpdated', ({ object }) => {
-            this.broadcastObjectUpdated(object)
-        })
-
-        this.eventBus.subscribe('objectManager:objectDeleted', ({ object }) => {
-            this.broadcastObjectDeleted(object)
-        })
-
-        this.eventBus.subscribe('engine:destroy', () => {
-            this.disconnect()
-        })
+    
+    isConnected() {
+        return this.connectionStatus === 'connected'
     }
 
     setStatusCallback(callback) {
@@ -50,11 +30,14 @@ export class WebSocketManager {
             this.statusCallback(status)
         }
 
-        this.eventBus.publish('network:statusChanged', { status })
+        actions.setNetworkStatus(status)
     }
 
     connect(roomCode) {
         this.roomCode = roomCode
+
+        // Update state with roomCode
+        actions.setRoomCode(roomCode)
 
         try {
             this.socket = new WebSocket(`ws://localhost:8080/ws?room=${roomCode}`)
@@ -88,7 +71,6 @@ export class WebSocketManager {
             }
 
             this.socket.onclose = event => {
-                // Connection closed - handled by handleDisconnect
                 this.handleDisconnect()
             }
         } catch (error) {
@@ -113,8 +95,10 @@ export class WebSocketManager {
         this.socket = null
         this.updateStatus('disconnected')
 
-        // Emit event
-        this.eventBus.publish('network:disconnected', {})
+        // Notify message handler
+        if (this.messageHandler) {
+            this.messageHandler({ type: 'network:disconnected' })
+        }
 
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++
@@ -207,7 +191,13 @@ export class WebSocketManager {
             this.storeToken(msg.token)
         }
 
-        this.eventBus.publish('network:authenticated', { userId: this.userId })
+        // Update state with userId
+        actions.setUserId(this.userId)
+
+        // Notify message handler
+        if (this.messageHandler) {
+            this.messageHandler({ type: 'network:authenticated', userId: this.userId })
+        }
     }
 
     handleRoomJoined(msg) {
@@ -217,7 +207,9 @@ export class WebSocketManager {
     }
 
     handleSync(msg) {
-        this.eventBus.publish('network:sync', { objects: msg.objects })
+        if (this.messageHandler) {
+            this.messageHandler({ type: 'network:sync', objects: msg.objects })
+        }
     }
 
     // When handling objects if the userId matches 
@@ -227,10 +219,13 @@ export class WebSocketManager {
             return
         }
 
-        this.eventBus.publish('network:objectAdded', {
-            object: objectData.object,
-            userId: objectData.userId,
-        })
+        if (this.messageHandler) {
+            this.messageHandler({
+                type: 'network:objectAdded',
+                object: objectData.object,
+                userId: objectData.userId,
+            })
+        }
     }
 
     handleObjectUpdated(objectData) {
@@ -238,10 +233,13 @@ export class WebSocketManager {
             return
         }
 
-        this.eventBus.publish('network:objectUpdated', {
-            object: objectData.object,
-            userId: objectData.userId,
-        })
+        if (this.messageHandler) {
+            this.messageHandler({
+                type: 'network:objectUpdated',
+                object: objectData.object,
+                userId: objectData.userId,
+            })
+        }
     }
 
     handleObjectDeleted(objectData) {
@@ -249,10 +247,13 @@ export class WebSocketManager {
             return
         }
 
-        this.eventBus.publish('network:objectDeleted', {
-            objectId: objectData.objectId,
-            userId: objectData.userId,
-        })
+        if (this.messageHandler) {
+            this.messageHandler({
+                type: 'network:objectDeleted',
+                objectId: objectData.objectId,
+                userId: objectData.userId,
+            })
+        }
     }
 
     handleCursor(cursor) {
@@ -260,19 +261,25 @@ export class WebSocketManager {
             return
         }
 
-        this.eventBus.publish('network:remoteCursorMove', {
-            userId: cursor.userId,
-            x: cursor.x,
-            y: cursor.y,
-            color: cursor.color,
-            tool: cursor.tool,
-        })
+        if (this.messageHandler) {
+            this.messageHandler({
+                type: 'network:remoteCursorMove',
+                userId: cursor.userId,
+                x: cursor.x,
+                y: cursor.y,
+                color: cursor.color,
+                tool: cursor.tool,
+            })
+        }
     }
 
     handleUserDisconnect(user) {
-        this.eventBus.publish('network:userDisconnected', {
-            userId: user.userId,
-        })
+        if (this.messageHandler) {
+            this.messageHandler({
+                type: 'network:userDisconnected',
+                userId: user.userId,
+            })
+        }
     }
 
     broadcastObjectAdded(object) {

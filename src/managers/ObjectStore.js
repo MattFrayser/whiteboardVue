@@ -9,9 +9,8 @@ import { Text } from '../objects/Text'
  * Manages object storage, spatial indexing, and CRUD operations
  */
 export class ObjectStore {
-    constructor(eventBus) {
+    constructor() {
         this.objects = []
-        this.eventBus = eventBus
 
         // Initialize quadtree with large bounds (will expand as needed)
         this.quadtree = new Quadtree(
@@ -21,39 +20,66 @@ export class ObjectStore {
         )
     }
 
-    addObject(object, source) {
+    // Storage Operations
 
-        switch (source) {
+    add(object, origin) {
+        switch (origin) {
             case 'local':
+                this.objects.push(object)
+
+                // Add to quadtree
+                const bounds = object.getBounds()
+                this.quadtree.insert(object, bounds)
+
+                return object
+
             case 'remote':
+                const obj = this.createObjectFromData(objectData)
+                if (obj) {
+                    this.objects.push(obj)
+                    const bounds = obj.getBounds()
+                    this.quadtree.insert(obj, bounds)
+                    return obj
+                }
+                return null
         }
-
-        this.objects.push(object)
-
-        // Add to quadtree
-        const bounds = object.getBounds()
-        this.quadtree.insert(object, bounds)
-
-        this.eventBus.publish('objectManager:objectAdded', { object })
-
-        return object
     }
 
-    /**
-     * Remove object (with history and broadcasting)
-     */
-    removeObject(object, options = {}) {
-        const index = this.objects.indexOf(object)
-        if (index > -1) {
-            // Remove from quadtree
-            const bounds = object.getBounds()
-            this.quadtree.remove(object, bounds)
+    remove(object, origin) {
+        switch (origin) {
+            case 'local':
+                const index = this.objects.indexOf(object)
+                if (index > -1) {
+                    // Remove from quadtree
+                    const bounds = object.getBounds()
+                    this.quadtree.remove(object, bounds)
 
-            this.objects.splice(index, 1)
+                    this.objects.splice(index, 1)
 
-            this.eventBus.publish('objectManager:objectDeleted', { object })
+                    return object
+                }
+                return null
 
-            return object
+            case 'remote':
+                const obj = this.getObjectById(objectId)
+                if (obj) {
+                    const bounds = obj.getBounds()
+                    this.quadtree.remove(obj, bounds)
+
+                    const index = this.objects.indexOf(obj)
+                    if (index > -1) {
+                        this.objects.splice(index, 1)
+                        return obj
+                    }
+                }
+                return null
+            }
+    }
+
+    removeById(id) {
+        const obj = this.getObjectById(id)
+        if (obj) {
+            return this.remove(obj)
         }
         return null
     }
@@ -74,29 +100,41 @@ export class ObjectStore {
         }
         return null
     }
+    
+    updateRemoteObject(objectId, objectData) {
+        const obj = this.getObjectById(objectId)
+        if (obj) {
+            const oldBounds = obj.getBounds()
+            this.quadtree.remove(obj, oldBounds)
+
+            obj.data = objectData
+
+            const newBounds = obj.getBounds()
+            this.quadtree.insert(obj, newBounds)
+            return obj
+        }
+        return null
+    }
+
+    loadRemoteObjects(objectDataArray) {
+        this.objects = []
+        this.quadtree = new Quadtree(
+            { x: -10000, y: -10000, width: 20000, height: 20000 },
+            10,
+            8
+        )
+        objectDataArray.forEach(objData => {
+            const obj = this.createObjectFromData(objData)
+            if (obj) {
+                this.objects.push(obj)
+                const bounds = obj.getBounds()
+                this.quadtree.insert(obj, bounds)
+            }
+        })
+    }
 
     /**
-    * Quadtree Operations
-    */
-
-    queryQuadtree(rect) {
-        return this.quadtree.query(rect)
-    }
-
-    removeFromQuadtree(object, bounds) {
-        this.quadtree.remove(object, bounds)
-    }
-
-    insertIntoQuadtree(object, bounds) {
-        this.quadtree.insert(object, bounds)
-    }
-
-    getAllObjects() {
-        return this.objects
-    }
-
-    /**
-     * Load state for a specific user (for undo/redo)
+     * (for undo/redo)
      * Replaces only the specified user's objects
      */
     loadUserState(userId, stateData) {
@@ -119,9 +157,6 @@ export class ObjectStore {
         })
     }
 
-    /**
-     * Create object from serialized data
-     */
     createObjectFromData(data) {
         let obj = null
         switch (data.type) {
@@ -151,81 +186,24 @@ export class ObjectStore {
     }
 
     /**
-     * Add object from network (no history, no local broadcast)
-     */
-    addRemoteObject(objectData) {
-        const obj = this.createObjectFromData(objectData)
-        if (obj) {
-            this.objects.push(obj)
-            const bounds = obj.getBounds()
-            this.quadtree.insert(obj, bounds)
-            return obj
-        }
-        return null
+    * Quadtree Operations
+    */
+    queryQuadtree(rect) {
+        return this.quadtree.query(rect)
     }
 
-    /**
-     * Update object from network (no history, no local broadcast)
-     */
-    updateRemoteObject(objectId, objectData) {
-        const obj = this.getObjectById(objectId)
-        if (obj) {
-            const oldBounds = obj.getBounds()
-            this.quadtree.remove(obj, oldBounds)
-
-            obj.data = objectData
-
-            const newBounds = obj.getBounds()
-            this.quadtree.insert(obj, newBounds)
-            return obj
-        }
-        return null
+    removeFromQuadtree(object, bounds) {
+        this.quadtree.remove(object, bounds)
     }
 
-    /**
-     * Remove object from network (no history, no local broadcast)
-     */
-    removeRemoteObject(objectId) {
-        const obj = this.getObjectById(objectId)
-        if (obj) {
-            const bounds = obj.getBounds()
-            this.quadtree.remove(obj, bounds)
-
-            const index = this.objects.indexOf(obj)
-            if (index > -1) {
-                this.objects.splice(index, 1)
-                return obj
-            }
-        }
-        return null
+    insertIntoQuadtree(object, bounds) {
+        this.quadtree.insert(object, bounds)
     }
 
-    /**
-     * Load objects from network (full sync)
-     */
-    loadRemoteObjects(objectDataArray) {
-        this.objects = []
-        this.quadtree = new Quadtree(
-            { x: -10000, y: -10000, width: 20000, height: 20000 },
-            10,
-            8
-        )
-        objectDataArray.forEach(objData => {
-            const obj = this.createObjectFromData(objData)
-            if (obj) {
-                this.objects.push(obj)
-                const bounds = obj.getBounds()
-                this.quadtree.insert(obj, bounds)
-            }
-        })
+    getAllObjects() {
+        return this.objects
     }
 
-    /**
-     * Update object's position in quadtree and rebuild if bounds exceeded
-     * @param {Object} object - The object to update
-     * @param {Object} oldBounds - The object's old bounds
-     * @param {Object} [newBounds] - Optional new bounds (if not provided, will get from object)
-     */
     updateObjectInQuadtree(object, oldBounds, newBounds = null) {
         if (!newBounds) {
             newBounds = object.getBounds()

@@ -1,73 +1,62 @@
+import { appState, actions } from '../stores/AppState'
+
 export class Toolbar {
-    constructor(eventBus) {
-        this.eventBus = eventBus
-        this.swatchClickTimer = null
+    constructor(engine) {
+        this.engine = engine
         this.activeSwatch = null
         this.activeSwatchForMenu = null
+        this.unsubscribers = [] // Track subscriptions for cleanup
         this.colors = [
-            '#000000',
-            '#FFFFFF',
-            '#FF0000',
-            '#00FF00',
-            '#0000FF',
-            '#FFFF00',
-            '#FF00FF',
-            '#00FFFF',
-            '#800000',
-            '#008000',
-            '#000080',
-            '#808000',
-            '#800080',
-            '#008080',
-            '#C0C0C0',
-            '#808080',
-            '#FFA500',
-            '#A52A2A',
-            '#FFC0CB',
-            '#FFD700',
-            '#4B0082',
-            '#9370DB',
-            '#90EE90',
-            '#FF6347',
+            '#000000','#FFFFFF','#FF0000','#00FF00','#0000FF','#FFFF00',
+            '#FF00FF','#00FFFF','#800000','#008000','#000080','#808000',
+            '#800080','#008080','#C0C0C0','#808080','#FFA500','#A52A2A',
+            '#FFC0CB','#FFD700','#4B0082','#9370DB','#90EE90','#FF6347',
         ]
 
-        // Track state locally
-        this.currentColor = '#000000'
-        this.currentWidth = 5
-        this.currentTool = 'draw'
-
+        // init
         this.setupEventListeners()
-        this.subscribeToEvents()
+        this.subscribeToState()
         this.initColorGrid()
         this.initSwatches()
     }
 
-    subscribeToEvents() {
-        // Listen for tool changes from engine
-        this.eventBus.subscribe('engine:toolChanged', ({ toolName }) => {
-            this.currentTool = toolName
-            this.updateToolButtons()
+    subscribeToState() {
+        const unsubTool = appState.subscribe('ui.tool', (tool) => {
+            this.updateToolButtons(tool)
         })
+        this.unsubscribers.push(unsubTool)
 
-        // Listen for cursor changes
-        this.eventBus.subscribe('engine:cursorChanged', () => {
-            this.updateToolButtons()
+        const unsubCursor = appState.subscribe('ui.cursor', () => {
+            const currentTool = appState.get('ui.tool')
+            this.updateToolButtons(currentTool)
         })
+        this.unsubscribers.push(unsubCursor)
 
-        // Listen for history changes from ObjectManager
-        this.eventBus.subscribe('objectManager:historyChanged', ({ canUndo, canRedo }) => {
+        const unsubColor = appState.subscribe('ui.color', (color) => {
+            this.updateColorUI(color)
+        })
+        this.unsubscribers.push(unsubColor)
+
+        const unsubSize = appState.subscribe('ui.brushSize', (size) => {
+            this.updateBrushSizeUI(size)
+        })
+        this.unsubscribers.push(unsubSize)
+
+        // History state changes
+        const unsubHistory = appState.subscribe('history', ({ canUndo, canRedo }) => {
             const undoBtn = document.getElementById('undoBtn')
             const redoBtn = document.getElementById('redoBtn')
             undoBtn.disabled = !canUndo
             redoBtn.disabled = !canRedo
         })
+        this.unsubscribers.push(unsubHistory)
     }
 
     setupEventListeners() {
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tool = btn.dataset.tool
-                this.eventBus.publish('toolbar:toolChanged', { toolName: tool })
+                actions.setTool(tool)
             })
         })
 
@@ -80,18 +69,13 @@ export class Toolbar {
         // Color swatches - single click selects, double click opens menu
         document.querySelectorAll('.swatch').forEach(swatch => {
             swatch.addEventListener('click', () => {
-                clearTimeout(this.swatchClickTimer)
                 const swatchColor = swatch.dataset.color
-                const swatchSize = parseInt(swatch.dataset.size) || this.currentWidth
-
-                this.swatchClickTimer = setTimeout(() => {
-                    this.selectColor(swatchColor)
-                    this.selectBrushSize(swatchSize)
-                }, 250)
+                const swatchSize = parseInt(swatch.dataset.size) || appState.get('ui.brushSize')
+                this.selectColor(swatchColor)
+                this.selectBrushSize(swatchSize)
             })
 
             swatch.addEventListener('dblclick', () => {
-                clearTimeout(this.swatchClickTimer)
                 this.openMenu(swatch)
             })
         })
@@ -100,7 +84,7 @@ export class Toolbar {
         colorMenu.addEventListener('click', e => {
             e.stopPropagation()
         })
-
+        // Select color square changes color and closes menu
         colorGrid.addEventListener('click', e => {
             if (e.target.classList.contains('color-option')) {
                 this.selectColor(e.target.dataset.color)
@@ -120,14 +104,16 @@ export class Toolbar {
             this.selectBrushSize(parseInt(e.target.value))
         })
 
-        // Undo/Redo
+        // Undo/Redo - direct calls to engine
         document.getElementById('undoBtn').addEventListener('click', () => {
-            // Emit event instead of calling engine directly
-            this.eventBus.publish('toolbar:undoRequested', {})
+            if (this.engine) {
+                this.engine.undo()
+            }
         })
         document.getElementById('redoBtn').addEventListener('click', () => {
-            // Emit event instead of calling engine directly
-            this.eventBus.publish('toolbar:redoRequested', {})
+            if (this.engine) {
+                this.engine.redo()
+            }
         })
     }
 
@@ -150,21 +136,20 @@ export class Toolbar {
     }
 
     selectBrushSize(size) {
-        this.currentWidth = size
-
-        const brushSize = document.getElementById('brushSize')
-        if (brushSize) {
-            brushSize.value = size
-        }
+        // Update state (will trigger UI update via subscription)
+        actions.setBrushSize(size)
 
         // Store size on active swatch
         if (this.activeSwatch) {
             this.activeSwatch.dataset.size = size
         }
+    }
 
-        // Emit event
-        this.eventBus.publish('toolbar:brushSizeChanged', { size })
-
+    updateBrushSizeUI(size) {
+        const brushSize = document.getElementById('brushSize')
+        if (brushSize) {
+            brushSize.value = size
+        }
         this.updateBrushPreview()
     }
 
@@ -172,15 +157,19 @@ export class Toolbar {
         if (this.activeSwatch) {
             const circle = this.activeSwatch.querySelector('.swatch-circle')
             if (circle) {
-                const size = Math.min(28, Math.max(8, this.currentWidth * 1.5))
+                const currentWidth = appState.get('ui.brushSize')
+                const size = Math.min(28, Math.max(8, currentWidth * 1.5))
                 circle.style.width = `${size}px`
                 circle.style.height = `${size}px`
             }
         }
     }
     selectColor(color) {
-        this.currentColor = color
+        // Update state (will trigger UI update via subscription)
+        actions.setColor(color)
+    }
 
+    updateColorUI(color) {
         // Remove active from current swatch
         if (this.activeSwatch) {
             this.activeSwatch.classList.remove('active')
@@ -218,9 +207,6 @@ export class Toolbar {
         if (colorPicker) {
             colorPicker.value = color
         }
-
-        // Emit event
-        this.eventBus.publish('toolbar:colorChanged', { color })
     }
     openMenu(swatch) {
         this.activeSwatchForMenu = swatch
@@ -234,8 +220,8 @@ export class Toolbar {
 
         // Update toolbar state with this swatch's settings
         const swatchColor = swatch.dataset.color
-        const swatchSize = parseInt(swatch.dataset.size) || this.currentWidth
-        this.currentColor = swatchColor
+        const swatchSize = parseInt(swatch.dataset.size) || appState.get('ui.brushSize')
+        actions.setColor(swatchColor)
 
         colorMenu.classList.remove('hidden')
         const colorPicker = document.getElementById('colorPicker')
@@ -251,19 +237,18 @@ export class Toolbar {
         this.activeSwatchForMenu = null
     }
 
-    updateToolButtons() {
+    updateToolButtons(tool) {
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.classList.remove('active')
-            if (btn.dataset.tool === this.currentTool) {
+            if (btn.dataset.tool === tool) {
                 btn.classList.add('active')
             }
         })
 
         // Get canvas directly from DOM
         const canvas = document.getElementById('canvas')
-        const currentToolName = this.currentTool
 
-        switch (currentToolName) {
+        switch (tool) {
             case 'rectangle':
                 canvas.style.cursor = 'crosshair'
                 break
@@ -288,5 +273,11 @@ export class Toolbar {
             default:
                 canvas.style.cursor = 'default'
         }
+    }
+
+    destroy() {
+        // Clean up all subscriptions
+        this.unsubscribers.forEach(unsub => unsub())
+        this.unsubscribers = []
     }
 }

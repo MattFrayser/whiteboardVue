@@ -1,15 +1,15 @@
+import { actions } from '../stores/AppState'
+
 /**
  * Manages undo/redo history for objects
  */
 export class HistoryManager {
-    constructor(eventBus, getUserId) {
-        this.eventBus = eventBus
+    constructor(getUserId) {
         this.getUserId = getUserId // Function to get current user ID
         this.history = ['[]']
         this.historyIndex = 0
         this.MAX_HISTORY_SIZE = 50
     }
-
 
     saveState(objects) {
         // Remove future history if we're not at the end
@@ -60,10 +60,12 @@ export class HistoryManager {
     }
 
     publishHistoryChanged() {
-        this.eventBus.publish('objectManager:historyChanged', {
-            canUndo: this.historyIndex > 0,
-            canRedo: this.historyIndex < this.history.length - 1,
-        })
+        actions.setHistoryState(
+            this.historyIndex > 0, // canUndo
+            this.historyIndex < this.history.length - 1, // canRedo
+            this.historyIndex, // pointer
+            this.history.length // size
+        )
     }
 
     canUndo() {

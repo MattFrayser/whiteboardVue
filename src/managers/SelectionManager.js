@@ -1,3 +1,5 @@
+import { appState, actions } from '../stores/AppState'
+
 /**
  * Manages object selection state and operations
  */
@@ -6,33 +8,48 @@ export class SelectionManager {
         this.objectManager = objectManager
         this.objectStore = objectStore
         this.historyManager = historyManager
-        this.selectedObjects = []
     }
 
-    /**
-     * Select an object
-     * @param {Object} object - The object to select
-     * @param {boolean} multi - If true, add to selection. If false, clear existing selection first
-     */
+    get selectedObjects() {
+        const selectedIds = appState.get('selection.objectIds')
+        return selectedIds.map(id => this.objectStore.getObjectById(id)).filter(obj => obj !== undefined)
+    }
+
+    // Multi is used for selecting mutiple objects
     selectObject(object, multi = false) {
-        if (!multi) {
-            this.clearSelection()
+        const currentIds = appState.get('selection.objectIds')
+        let newIds
+
+        if (multi) {
+            // Add to selection if not already selected
+            if (!currentIds.includes(object.id)) {
+                newIds = [...currentIds, object.id]
+            } else {
+                newIds = currentIds
+            }
+        } else {
+            // Replace selection
+            newIds = [object.id]
         }
-        object.selected = true
-        this.selectedObjects.push(object)
+
+        // Clear old selected flags
+        this.selectedObjects.forEach(obj => (obj.selected = false))
+
+        // Set new selected flags
+        newIds.forEach(id => {
+            const obj = this.objectStore.getObjectById(id)
+            if (obj) obj.selected = true
+        })
+
+        // Update state
+        actions.setSelection(newIds)
     }
 
-    /**
-     * Clear all selections
-     */
     clearSelection() {
         this.selectedObjects.forEach(obj => (obj.selected = false))
-        this.selectedObjects = []
+        actions.clearSelection()
     }
 
-    /**
-     * Delete all selected objects
-     */
     deleteSelected() {
         const toDelete = [...this.selectedObjects]
         this.clearSelection()
@@ -43,15 +60,9 @@ export class SelectionManager {
         })
     }
 
-    /**
-     * Select all objects within a rectangle
-     * @param {Object} rect - Rectangle with x, y, width, height
-     * @param {boolean} multi - If true, add to selection. If false, clear existing selection first
-     */
     selectObjectsInRect(rect, multi = false) {
-        if (!multi) {
-            this.clearSelection()
-        }
+        const currentIds = multi ? appState.get('selection.objectIds') : []
+        const newIds = [...currentIds]
 
         const candidates = this.objectStore.queryQuadtree(rect)
 
@@ -66,18 +77,27 @@ export class SelectionManager {
                 bounds.y > rect.y + rect.height
             )
 
-            if (intersects && !obj.selected) {
-                obj.selected = true
-                this.selectedObjects.push(obj)
+            if (intersects && !newIds.includes(obj.id)) {
+                newIds.push(obj.id)
             }
         })
+
+        // Clear old selected flags if not multi
+        if (!multi) {
+            this.selectedObjects.forEach(obj => (obj.selected = false))
+        }
+
+        // Set new selected flags
+        newIds.forEach(id => {
+            const obj = this.objectStore.getObjectById(id)
+            if (obj) obj.selected = true
+        })
+
+        // Update state
+        actions.setSelection(newIds)
     }
 
-    /**
-     * Move all selected objects by a delta
-     * @param {number} dx - X delta
-     * @param {number} dy - Y delta
-     */
+
     moveSelected(dx, dy) {
         this.selectedObjects.forEach(obj => {
             const oldBounds = obj.getBounds()
@@ -91,16 +111,10 @@ export class SelectionManager {
         this.historyManager.saveState(this.objectStore.getAllObjects())
     }
 
-    /**
-     * Get the number of selected objects
-     */
     get length() {
         return this.selectedObjects.length
     }
 
-    /**
-     * Check if there are any selected objects
-     */
     hasSelection() {
         return this.selectedObjects.length > 0
     }
