@@ -3,13 +3,16 @@ export class InviteManager {
         this.roomCode = roomCode
         this.button = document.querySelector('.invite-link button')
         this.notification = document.querySelector('.invite-notification')
-        this.settings = document.querySelector('.settings')
+        this.passwordToggle = document.getElementById('password-toggle');
+        this.passwordInput = document.getElementById('password-input');
+        this.createSessionMenu = document.querySelector('.createSession-overlay')
 
         this.setUpListeners()
     }
 
     setUpListeners() {
         this.button.addEventListener('click', () => this.handleClick('session'))
+        this.passwordToggle.addEventListener('change', () => this.togglePassword())
     }
 
     handleClick(button) {
@@ -21,6 +24,16 @@ export class InviteManager {
                 const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${this.roomCode}`
                 this.copyToClipboard(inviteUrl)
                 break
+        }
+    }
+
+    togglePassword() {
+        if (this.passwordToggle.checked) {
+            this.passwordInput.disabled = false;
+            this.passwordInput.focus();
+        } else {
+            this.passwordInput.disabled = true;
+            this.passwordInput.value = '';
         }
     }
 
@@ -45,6 +58,7 @@ export class InviteManager {
     }
 
     showSettings() {
+        this.createSessionMenu.style.display = 'block'
         this.settings.classList.add('show')
     }
 }

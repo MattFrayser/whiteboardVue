@@ -97,15 +97,64 @@
             </button>
             </div>
         </div>
-        
+       
         <div class="invite-link">
             <button> Start Session </button>
         </div>
-        <div class="settings"> 
-            Start a Session
+        <div class="createSession-overlay">
+          <div class="createSession-container"> 
+              <h1>Start a Collaborative Session</h1>
+              <p>Invite Others to join your whiteboard.</p>
+
+              <div class="createSession-settings">
+                  <div class="option password-option">
+                      <div class="password-toggle">
+                          <div class="option-content">
+                              <div class="option-header">
+                                  <span class="option-label">Password Protection</span>
+                                  <span class="optional-tag">Optional</span>
+                                  <div class="info-icon" data-tooltip="Add a password to restrict access to your session. Only users with the password can join.">i</div>
+                              </div>
+                              <div class="option-description">
+                                  Protect your session with a password
+                              </div>
+                          </div>
+                          <input type="checkbox" id="password-toggle"/> 
+                      </div>
+                      <input type="password" class="password-input" id="password-input" placeholder="Enter password" disabled />
+                  </div>
+                  <div class="option">
+                      <div class="option-content">
+                          <div class="option-header">
+                              <span class="option-label">Only edit owned objects</span>
+                              <span class="optional-tag">Optional</span>
+                              <div class="info-icon" data-tooltip="Users can only modify objects they created. This prevents accidental edits to others' work.">i</div>
+                          </div>
+                          <div class="option-description">
+                              Users can only modify their own drawings
+                          </div>
+                      </div>
+                      <input type="checkbox"/> 
+                  </div>
+                  <div class="option">
+                      <div class="option-content">
+                          <div class="option-header">
+                              <span class="option-label">View Only</span>
+                              <span class="optional-tag">Optional</span>
+                              <div class="info-icon" data-tooltip="Participants can view the whiteboard but cannot make any changes. Ideal for presentations.">i</div>
+                          </div>
+                          <div class="option-description">
+                              Restrict participants to viewing only
+                          </div>
+                      </div>
+                      <input type="checkbox"/> 
+                  </div>
+              </div>
+
+              <button>Create Session</button>
+              <p> 
+          </div>
         </div>
-
-
         <div class="invite-notification"> </div>
 
         <div id="connection-status" class="connection-status status-disconnected">
@@ -113,7 +162,7 @@
             <span class="status-text">Disconnected</span>
         </div>
 
-        <canvas id="canvas"></canvas>
+    <canvas id="canvas"></canvas>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
