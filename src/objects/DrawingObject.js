@@ -1,10 +1,11 @@
 export class DrawingObject {
-    constructor(id, type, data) {
+    constructor(id, type, data, zIndex) {
         this.id = id || this.generateId()
         this.type = type
         this.data = data
         this.selected = false
         this.userId = null
+        this.zIndex = zIndex
     }
 
     generateId() {
@@ -148,6 +149,7 @@ export class DrawingObject {
             type: this.type,
             data: this.data,
             userId: this.userId,
+            zIndex: this.zIndex,
         }
     }
 }

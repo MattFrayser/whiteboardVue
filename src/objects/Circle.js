@@ -1,8 +1,8 @@
 import { DrawingObject } from './DrawingObject'
 
 export class Circle extends DrawingObject {
-    constructor(id, data) {
-        super(id, 'circle', data)
+    constructor(id, data, zIndex) {
+        super(id, 'circle', data, zIndex)
     }
 
     getBounds() {

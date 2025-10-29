@@ -1,8 +1,8 @@
 import { DrawingObject } from './DrawingObject'
 
 export class Line extends DrawingObject {
-    constructor(id, data) {
-        super(id, 'line', data)
+    constructor(id, data, zIndex) {
+        super(id, 'line', data, zIndex)
     }
 
     getBounds() {

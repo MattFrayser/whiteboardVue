@@ -1,8 +1,8 @@
 import { DrawingObject } from './DrawingObject'
 
 export class Text extends DrawingObject {
-    constructor(id, data) {
-        super(id, 'text', data)
+    constructor(id, data, zIndex) {
+        super(id, 'text', data, zIndex)
         this.measureBounds()
     }
 

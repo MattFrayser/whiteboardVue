@@ -1,8 +1,8 @@
 import { DrawingObject } from './DrawingObject'
 
 export class Rectangle extends DrawingObject {
-    constructor(id, data) {
-        super(id, 'rectangle', data)
+    constructor(id, data, zIndex) {
+        super(id, 'rectangle', data, zIndex)
     }
 
     getBounds() {

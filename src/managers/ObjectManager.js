@@ -7,6 +7,7 @@ export class ObjectManager {
     constructor(networkManager) {
         this.networkManager = networkManager
         this.userId = null // Will be set by network manager
+        this.nextZIndex = 0 // Track next available zIndex
 
         // Initialize managers
         this.objectStore = new ObjectStore()
@@ -40,6 +41,14 @@ export class ObjectManager {
         // Update userId to current user when adding
         if (this.userId) {
             object.userId = this.userId
+        }
+
+        // Assign zIndex if not already set
+        if (object.zIndex === undefined || object.zIndex === null) {
+            object.zIndex = this.nextZIndex++
+        } else {
+            // Update nextZIndex if object has higher zIndex
+            this.nextZIndex = Math.max(this.nextZIndex, object.zIndex + 1)
         }
 
         // Add to store

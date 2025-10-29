@@ -155,21 +155,23 @@ export class ObjectStore {
 
     createObjectFromData(data) {
         let obj = null
+        const zIndex = data.zIndex
+
         switch (data.type) {
             case 'stroke':
-                obj = new Stroke(data.id, data.data)
+                obj = new Stroke(data.id, data.data, zIndex)
                 break
             case 'rectangle':
-                obj = new Rectangle(data.id, data.data)
+                obj = new Rectangle(data.id, data.data, zIndex)
                 break
             case 'circle':
-                obj = new Circle(data.id, data.data)
+                obj = new Circle(data.id, data.data, zIndex)
                 break
             case 'line':
-                obj = new Line(data.id, data.data)
+                obj = new Line(data.id, data.data, zIndex)
                 break
             case 'text':
-                obj = new Text(data.id, data.data)
+                obj = new Text(data.id, data.data, zIndex)
                 break
         }
 
