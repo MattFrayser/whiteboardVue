@@ -22,58 +22,54 @@ export class ObjectStore {
 
     // Storage Operations
 
-    add(object, origin) {
-        switch (origin) {
-            case 'local':
-                this.objects.push(object)
+    addLocal(object) {
+        this.objects.push(object)
 
-                // Add to quadtree
-                const bounds = object.getBounds()
-                this.quadtree.insert(object, bounds)
+        // Add to quadtree
+        const bounds = object.getBounds()
+        this.quadtree.insert(object, bounds)
 
-                return object
-
-            case 'remote':
-                const obj = this.createObjectFromData(objectData)
-                if (obj) {
-                    this.objects.push(obj)
-                    const bounds = obj.getBounds()
-                    this.quadtree.insert(obj, bounds)
-                    return obj
-                }
-                return null
-        }
+        return object
     }
 
-    remove(object, origin) {
-        switch (origin) {
-            case 'local':
-                const index = this.objects.indexOf(object)
-                if (index > -1) {
-                    // Remove from quadtree
-                    const bounds = object.getBounds()
-                    this.quadtree.remove(object, bounds)
+    addRemote(objectData) {
+        const obj = this.createObjectFromData(objectData)
+        if (obj) {
+            this.objects.push(obj)
+            const bounds = obj.getBounds()
+            this.quadtree.insert(obj, bounds)
+            return obj
+        }
+        return null
+    }
 
-                    this.objects.splice(index, 1)
+    removeLocal(object) {
+        const index = this.objects.indexOf(object)
+        if (index > -1) {
+            // Remove from quadtree
+            const bounds = object.getBounds()
+            this.quadtree.remove(object, bounds)
 
-                    return object
-                }
-                return null
+            this.objects.splice(index, 1)
 
-            case 'remote':
-                const obj = this.getObjectById(objectId)
-                if (obj) {
-                    const bounds = obj.getBounds()
-                    this.quadtree.remove(obj, bounds)
+            return object
+        }
+        return null
+    }
 
-                    const index = this.objects.indexOf(obj)
-                    if (index > -1) {
-                        this.objects.splice(index, 1)
-                        return obj
-                    }
-                }
-                return null
+    removeRemote(objectId) {
+        const obj = this.getObjectById(objectId)
+        if (obj) {
+            const bounds = obj.getBounds()
+            this.quadtree.remove(obj, bounds)
+
+            const index = this.objects.indexOf(obj)
+            if (index > -1) {
+                this.objects.splice(index, 1)
+                return obj
             }
+        }
+        return null
     }
 
     removeById(id) {

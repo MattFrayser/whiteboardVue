@@ -121,11 +121,13 @@ export class DrawingEngine {
     // Public methods for Toolbar and InputHandler
     undo() {
         this.objectManager.undo()
+        this.markDirty()
         this.render()
     }
 
     redo() {
         this.objectManager.redo()
+        this.markDirty()
         this.render()
     }
 

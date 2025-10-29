@@ -9,6 +9,9 @@ export class HistoryManager {
         this.history = ['[]']
         this.historyIndex = 0
         this.MAX_HISTORY_SIZE = 50
+
+        // Publish initial history state to sync with AppState
+        this.publishHistoryChanged()
     }
 
     saveState(objects) {

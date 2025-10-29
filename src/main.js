@@ -15,6 +15,19 @@ const canvas = document.getElementById('canvas')
 const engine = new DrawingEngine(canvas, networkManager)
 const toolbar = new Toolbar(engine)
 
+// Sync AppState UI changes to engine
+appState.subscribe('ui.tool', (tool) => {
+    engine.setTool(tool)
+})
+
+appState.subscribe('ui.color', (color) => {
+    engine.currentColor = color
+})
+
+appState.subscribe('ui.brushSize', (size) => {
+    engine.currentWidth = size
+})
+
 // get or create roomCode
 const urlParams = new URLSearchParams(window.location.search)
 let roomCode = urlParams.get('room')

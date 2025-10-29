@@ -43,8 +43,8 @@ export class ObjectManager {
         }
 
         // Add to store
-        this.objectStore.add(object)
-        
+        this.objectStore.addLocal(object)
+
         // Save to history
         this.historyManager.saveState(this.objectStore.getAllObjects())
 
@@ -60,10 +60,10 @@ export class ObjectManager {
      * Remove object locally (triggers history and network broadcast)
      */
     removeObject(object) {
-        const result = this.objectStore.remove(object)
+        const result = this.objectStore.removeLocal(object)
         if (result) {
             this.historyManager.saveState(this.objectStore.getAllObjects())
-            
+
             // Broadcast to network
             if (this.networkManager && this.networkManager.isConnected()) {
                 this.networkManager.broadcastObjectDeleted(object)
@@ -282,7 +282,7 @@ export class ObjectManager {
      * Add object from network (no history, no local broadcast)
      */
     addRemoteObject(objectData) {
-        return this.objectStore.addRemoteObject(objectData)
+        return this.objectStore.addRemote(objectData)
     }
 
     /**
@@ -296,7 +296,7 @@ export class ObjectManager {
      * Remove object from network (no history, no local broadcast)
      */
     removeRemoteObject(objectId) {
-        return this.objectStore.removeRemoteObject(objectId)
+        return this.objectStore.removeRemote(objectId)
     }
 
     /**
