@@ -514,6 +514,23 @@ body {
     color: #f44336;
 }
 
+.status-local .status-dot {
+    background: #2196f3;
+}
+
+.status-local .status-text {
+    color: #2196f3;
+}
+
+.status-connecting .status-dot {
+    background: #ff9800;
+    animation: pulse-orange 1.5s ease-in-out infinite;
+}
+
+.status-connecting .status-text {
+    color: #ff9800;
+}
+
 /* Pulse Animations */
 @keyframes pulse-green {
     0%,
@@ -534,5 +551,115 @@ body {
     50% {
         opacity: 0.6;
         transform: scale(1.3);
+    }
+}
+
+@keyframes pulse-orange {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Join Room Dialog */
+.join-room-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+}
+
+.join-room-dialog {
+    background: white;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    max-width: 400px;
+    width: 90%;
+    animation: slideUp 0.3s ease;
+}
+
+.join-room-dialog h2 {
+    margin: 0 0 16px 0;
+    font-size: 24px;
+    color: #333;
+}
+
+.join-room-dialog p {
+    margin: 0 0 12px 0;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.join-room-dialog p strong {
+    color: #2196f3;
+    font-weight: 600;
+}
+
+.join-room-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.join-room-btn {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.join-btn {
+    background: #2196f3;
+    color: white;
+}
+
+.join-btn:hover {
+    background: #1976d2;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+.stay-local-btn {
+    background: #f5f5f5;
+    color: #666;
+}
+
+.stay-local-btn:hover {
+    background: #e0e0e0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
 }

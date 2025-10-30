@@ -78,4 +78,32 @@ export class HistoryManager {
     canRedo() {
         return this.historyIndex < this.history.length - 1
     }
+
+    /**
+     * Migrate userId in all history entries (for local-first mode transition)
+     * Updates all objects in history from oldUserId to newUserId
+     * @param {string} oldUserId - The temporary local userId to replace
+     * @param {string} newUserId - The server-assigned userId
+     */
+    migrateUserId(oldUserId, newUserId) {
+        console.log(`[HistoryManager] Migrating history from userId ${oldUserId} to ${newUserId}`)
+
+        this.history = this.history.map(stateStr => {
+            try {
+                const state = JSON.parse(stateStr)
+                const migratedState = state.map(obj => {
+                    if (obj.userId === oldUserId) {
+                        return { ...obj, userId: newUserId }
+                    }
+                    return obj
+                })
+                return JSON.stringify(migratedState)
+            } catch (error) {
+                console.error('[HistoryManager] Error migrating history entry:', error)
+                return stateStr // Return unchanged on error
+            }
+        })
+
+        console.log(`[HistoryManager] Migrated ${this.history.length} history entries`)
+    }
 }

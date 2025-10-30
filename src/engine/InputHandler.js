@@ -117,8 +117,35 @@ export class InputHandler {
             if (this.engine.currentTool === this.engine.tools.select && worldPos) {
                 // SelectTool has dynamic cursor based on hover position
                 this.engine.currentTool.updateCursor(worldPos)
+            } else {
+                // Get current tool name
+                const toolName = Object.keys(this.engine.tools).find(
+                    key => this.engine.tools[key] === this.engine.currentTool
+                )
+
+                // Restore cursor based on tool
+                switch (toolName) {
+                    case 'rectangle':
+                    case 'circle':
+                    case 'line':
+                        this.canvas.style.cursor = 'crosshair'
+                        break
+                    case 'draw':
+                        this.canvas.style.cursor = 'url(/draw-cursor.svg) 2 17, crosshair'
+                        break
+                    case 'eraser':
+                        this.canvas.style.cursor = 'url(/eraser-cursor.svg) 10 9, pointer'
+                        break
+                    case 'select':
+                        this.canvas.style.cursor = 'url(/select-cursor.svg) 2 2, default'
+                        break
+                    case 'text':
+                        this.canvas.style.cursor = 'text'
+                        break
+                    default:
+                        this.canvas.style.cursor = 'default'
+                }
             }
-            // Cursor is handled by organize state store subscriptions
         }
     }
 

@@ -40,9 +40,9 @@ const initialState = {
 
     // Network: WebSocket connection state
     network: {
-        status: 'disconnected', // 'connecting' | 'connected' | 'disconnected' | 'error'
-        roomCode: null,         // Current room code
-        userId: null,           // Current user's ID
+        status: 'local',        // 'local' | 'connecting' | 'connected' | 'disconnected' | 'error'
+        roomCode: null,         // Current room code (null in local mode)
+        userId: null,           // Current user's ID (temporary local ID in local mode, server ID when connected)
         users: [],              // Other connected users [{ id, color, cursor }]
     },
 }
@@ -83,6 +83,7 @@ export const selectors = {
     getUserId: () => appState.get('network.userId'),
     getUsers: () => appState.get('network.users'),
     isConnected: () => appState.get('network.status') === 'connected',
+    isLocalMode: () => appState.get('network.status') === 'local',
 }
 
 export const actions = {

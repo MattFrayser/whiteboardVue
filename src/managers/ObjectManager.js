@@ -2,18 +2,26 @@ import { ClipboardManager } from './ClipboardManager'
 import { HistoryManager } from './HistoryManager'
 import { SelectionManager } from './SelectionManager'
 import { ObjectStore } from './ObjectStore'
+import { LocalStorageManager } from '../storage/LocalStorageManager'
 
 export class ObjectManager {
     constructor(networkManager) {
         this.networkManager = networkManager
         this.userId = null // Will be set by network manager
         this.nextZIndex = 0 // Track next available zIndex
+        this.isLocalMode = !networkManager // Track if in local mode
 
         // Initialize managers
         this.objectStore = new ObjectStore()
         this.historyManager = new HistoryManager(() => this.userId)
         this.clipboardManager = new ClipboardManager()
         this.selectionManager = new SelectionManager(this, this.objectStore, this.historyManager)
+        this.localStorageManager = new LocalStorageManager()
+
+        // Load objects from localStorage if in local mode
+        if (this.isLocalMode) {
+            this.loadFromLocalStorage()
+        }
     }
 
     /**
@@ -21,6 +29,84 @@ export class ObjectManager {
      */
     setUserId(userId) {
         this.userId = userId
+    }
+
+    /**
+     * Load objects from localStorage (local-first mode)
+     */
+    loadFromLocalStorage() {
+        const savedObjects = this.localStorageManager.loadObjects()
+        if (savedObjects.length > 0) {
+            console.log(`[ObjectManager] Loading ${savedObjects.length} objects from localStorage`)
+            this.objectStore.loadRemoteObjects(savedObjects)
+
+            // Update nextZIndex to be higher than any loaded object
+            savedObjects.forEach(obj => {
+                if (obj.zIndex !== undefined && obj.zIndex !== null) {
+                    this.nextZIndex = Math.max(this.nextZIndex, obj.zIndex + 1)
+                }
+            })
+
+            // Save initial state to history
+            this.historyManager.saveState(this.objectStore.getAllObjects())
+        }
+    }
+
+    /**
+     * Save objects to localStorage (local-first mode)
+     */
+    saveToLocalStorage() {
+        if (this.isLocalMode) {
+            const allObjects = this.objectStore.getAllObjects()
+            this.localStorageManager.saveObjects(allObjects)
+        }
+    }
+
+    /**
+     * Attach network manager after initialization (for local-first mode)
+     * Migrates local objects to networked mode and broadcasts to server
+     * @param {WebSocketManager} networkManager - The network manager to attach
+     * @param {string} newUserId - The server-assigned userId to replace local userId
+     */
+    attachNetworkManager(networkManager, newUserId) {
+        console.log('[ObjectManager] Attaching network manager, migrating from local to networked mode')
+
+        const oldUserId = this.userId
+
+        // Update network manager and userId
+        this.networkManager = networkManager
+        this.userId = newUserId
+        this.isLocalMode = false // No longer in local mode
+
+        // Clear localStorage and disable auto-save (now using network)
+        this.localStorageManager.clear()
+        this.localStorageManager.disable()
+
+        // Migrate all local objects to new userId
+        const localObjects = this.getAllObjects().filter(obj => obj.userId === oldUserId)
+        console.log(`[ObjectManager] Migrating ${localObjects.length} local objects to userId: ${newUserId}`)
+
+        localObjects.forEach(obj => {
+            obj.userId = newUserId
+        })
+
+        // Migrate history manager userId
+        if (this.historyManager) {
+            this.historyManager.migrateUserId(oldUserId, newUserId)
+        }
+
+        // Broadcast all local objects to network after a short delay
+        // This gives the server time to fully set up the room connection
+        setTimeout(() => {
+            console.log(`[ObjectManager] Broadcasting ${localObjects.length} local objects to network`)
+            localObjects.forEach(obj => {
+                if (networkManager && networkManager.isConnected()) {
+                    networkManager.broadcastObjectAdded(obj)
+                }
+            })
+        }, 100)
+
+        console.log('[ObjectManager] Network attachment complete')
     }
 
     /**
@@ -57,6 +143,9 @@ export class ObjectManager {
         // Save to history
         this.historyManager.saveState(this.objectStore.getAllObjects())
 
+        // Save to localStorage if in local mode
+        this.saveToLocalStorage()
+
         // Broadcast to network
         if (this.networkManager && this.networkManager.isConnected()) {
             this.networkManager.broadcastObjectAdded(object)
@@ -72,6 +161,9 @@ export class ObjectManager {
         const result = this.objectStore.removeLocal(object)
         if (result) {
             this.historyManager.saveState(this.objectStore.getAllObjects())
+
+            // Save to localStorage if in local mode
+            this.saveToLocalStorage()
 
             // Broadcast to network
             if (this.networkManager && this.networkManager.isConnected()) {
@@ -102,6 +194,9 @@ export class ObjectManager {
      */
     saveState() {
         this.historyManager.saveState(this.objectStore.getAllObjects())
+
+        // Save to localStorage if in local mode
+        this.saveToLocalStorage()
     }
 
     selectObject(object, multi = false) {
@@ -198,6 +293,9 @@ export class ObjectManager {
         })
 
         this.historyManager.saveState(this.objectStore.getAllObjects())
+
+        // Save to localStorage if in local mode
+        this.saveToLocalStorage()
     }
 
     undo() {

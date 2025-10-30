@@ -59,6 +59,26 @@ export class DrawingEngine {
         }
     }
 
+    /**
+     * Attach network manager after initialization (for local-first mode)
+     * Transitions from local mode to networked mode
+     * @param {WebSocketManager} networkManager - The network manager to attach
+     * @param {string} newUserId - The server-assigned userId to replace local userId
+     */
+    attachNetworkManager(networkManager, newUserId) {
+        console.log('[DrawingEngine] Attaching network manager, transitioning to networked mode')
+
+        this.networkManager = networkManager
+        this.setupNetworkHandler()
+
+        // Attach network to object manager and migrate local objects
+        if (this.objectManager) {
+            this.objectManager.attachNetworkManager(networkManager, newUserId)
+        }
+
+        console.log('[DrawingEngine] Network manager attached successfully')
+    }
+
     handleNetworkMessage(message) {
         switch(message.type) {
             case 'network:authenticated':
@@ -96,10 +116,12 @@ export class DrawingEngine {
             }
             case 'network:sync':
                 this.objectManager.loadRemoteObjects(message.objects)
+                this.markDirty()
                 this.render()
                 break
             case 'network:userDisconnected':
                 this.remoteCursors.delete(message.userId)
+                this.markDirty()
                 this.render()
                 break
             case 'network:remoteCursorMove':
@@ -185,6 +207,16 @@ export class DrawingEngine {
             return
         }
 
+        this.renderFull()
+        this.needsRedraw = false
+    }
+
+    /**
+     * Force render - bypasses needsRedraw check for critical updates
+     * Use for network events where rendering must happen immediately
+     */
+    renderForce() {
+        this.needsRedraw = true
         this.renderFull()
         this.needsRedraw = false
     }

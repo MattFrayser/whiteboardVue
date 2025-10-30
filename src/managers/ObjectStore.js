@@ -113,18 +113,17 @@ export class ObjectStore {
     }
 
     loadRemoteObjects(objectDataArray) {
-        this.objects = []
-        this.quadtree = new Quadtree(
-            { x: -10000, y: -10000, width: 20000, height: 20000 },
-            10,
-            8
-        )
+        // Merge remote objects instead of replacing to preserve local objects
+        // This prevents race condition where local objects are destroyed during sync
         objectDataArray.forEach(objData => {
-            const obj = this.createObjectFromData(objData)
-            if (obj) {
-                this.objects.push(obj)
-                const bounds = obj.getBounds()
-                this.quadtree.insert(obj, bounds)
+            // Skip if object already exists (avoid duplicates)
+            if (!this.getObjectById(objData.id)) {
+                const obj = this.createObjectFromData(objData)
+                if (obj) {
+                    this.objects.push(obj)
+                    const bounds = obj.getBounds()
+                    this.quadtree.insert(obj, bounds)
+                }
             }
         })
     }
