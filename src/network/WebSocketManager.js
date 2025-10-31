@@ -16,6 +16,11 @@ export class WebSocketManager {
         this.userId = null
         this.isAuthenticating = false // Track if we're in password authentication flow
         this.isReconnecting = false // Track if this is a reconnection (not initial connection)
+
+        // Track pending acknowledgments for object operations
+        // Map: objectId -> {resolve, reject, timeoutId}
+        this.pendingAcks = new Map()
+        this.ackTimeout = 5000 // 5 seconds timeout for acknowledgments
     }
     
     isConnected() {
@@ -197,6 +202,12 @@ export class WebSocketManager {
             case 'userDisconnected':
                 this.handleUserDisconnect(msg)
                 break
+            case 'objectAdded_ack':
+                this.handleObjectAddedAck(msg)
+                break
+            case 'objectAdded_error':
+                this.handleObjectAddedError(msg)
+                break
             case 'error':
                 this.handleError(msg)
                 break
@@ -336,6 +347,42 @@ export class WebSocketManager {
         this.updateStatus('error')
     }
 
+    handleObjectAddedAck(msg) {
+        const { objectId, success } = msg
+        const pending = this.pendingAcks.get(objectId)
+
+        if (pending) {
+            // Clear timeout
+            clearTimeout(pending.timeoutId)
+
+            // Remove from pending map
+            this.pendingAcks.delete(objectId)
+
+            // Resolve the promise
+            pending.resolve({ objectId, success: true })
+
+            console.log(`[WebSocket] Object ${objectId} confirmed by server`)
+        }
+    }
+
+    handleObjectAddedError(msg) {
+        const { objectId, error } = msg
+        const pending = this.pendingAcks.get(objectId)
+
+        if (pending) {
+            // Clear timeout
+            clearTimeout(pending.timeoutId)
+
+            // Remove from pending map
+            this.pendingAcks.delete(objectId)
+
+            // Reject the promise
+            pending.reject(new Error(error || 'Failed to add object'))
+
+            console.error(`[WebSocket] Object ${objectId} failed: ${error}`)
+        }
+    }
+
     broadcastObjectAdded(object) {
         this.send({
             type: 'objectAdded',
@@ -343,6 +390,39 @@ export class WebSocketManager {
             userId: this.userId,
         })
     }
+
+    /**
+     * Broadcast object added with server confirmation
+     * Returns a Promise that resolves when server confirms, or rejects on error/timeout
+     */
+    broadcastObjectAddedWithConfirmation(object) {
+        return new Promise((resolve, reject) => {
+            // Check if connected
+            if (!this.isConnected()) {
+                reject(new Error('Not connected to server'))
+                return
+            }
+
+            const objectId = object.id
+
+            // Create timeout to reject if no response within ackTimeout
+            const timeoutId = setTimeout(() => {
+                this.pendingAcks.delete(objectId)
+                reject(new Error(`Timeout waiting for server confirmation (${this.ackTimeout}ms)`))
+            }, this.ackTimeout)
+
+            // Store promise handlers
+            this.pendingAcks.set(objectId, { resolve, reject, timeoutId })
+
+            // Send the message
+            this.send({
+                type: 'objectAdded',
+                object: object.toJSON(),
+                userId: this.userId,
+            })
+        })
+    }
+
     broadcastObjectUpdated(object) {
         this.send({
             type: 'objectUpdated',
@@ -377,6 +457,13 @@ export class WebSocketManager {
             clearTimeout(this.reconnectTimeout)
             this.reconnectTimeout = null
         }
+
+        // Reject all pending acknowledgments
+        this.pendingAcks.forEach((pending, objectId) => {
+            clearTimeout(pending.timeoutId)
+            pending.reject(new Error('Connection closed'))
+        })
+        this.pendingAcks.clear()
 
         // Close socket connection
         if (this.socket) {

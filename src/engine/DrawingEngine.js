@@ -64,6 +64,7 @@ export class DrawingEngine {
      * Transitions from local mode to networked mode
      * @param {WebSocketManager} networkManager - The network manager to attach
      * @param {string} newUserId - The server-assigned userId to replace local userId
+     * @returns {Promise} Promise that resolves with migration results {succeeded, failed}
      */
     attachNetworkManager(networkManager, newUserId) {
         console.log('[DrawingEngine] Attaching network manager, transitioning to networked mode')
@@ -71,12 +72,16 @@ export class DrawingEngine {
         this.networkManager = networkManager
         this.setupNetworkHandler()
 
+        console.log('[DrawingEngine] Network manager attached successfully')
+
         // Attach network to object manager and migrate local objects
+        // Return the migration promise so caller can handle results
         if (this.objectManager) {
-            this.objectManager.attachNetworkManager(networkManager, newUserId)
+            return this.objectManager.attachNetworkManager(networkManager, newUserId)
         }
 
-        console.log('[DrawingEngine] Network manager attached successfully')
+        // No object manager, return empty result
+        return Promise.resolve({ succeeded: [], failed: [] })
     }
 
     handleNetworkMessage(message) {

@@ -458,6 +458,14 @@ body {
     background: #f44336;
 }
 
+.invite-notification.warning {
+    background: #ff9800;
+}
+
+.invite-notification.info {
+    background: #2196f3;
+}
+
 /* Connection Status */
 .connection-status {
     position: fixed;

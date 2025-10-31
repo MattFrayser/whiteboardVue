@@ -1,10 +1,11 @@
 import { appState, selectors } from '../stores/AppState'
 
 export class InviteManager {
-    constructor(roomCode) {
+    constructor(roomCode, notificationManager = null, sessionManager = null) {
         this.roomCode = roomCode // null in local mode, string when networked
+        this.notificationManager = notificationManager
+        this.sessionManager = sessionManager
         this.button = document.querySelector('.invite-link button')
-        this.notification = document.querySelector('.invite-notification')
         this.passwordToggle = document.getElementById('password-toggle')
         this.passwordInput = document.getElementById('password-input')
         this.createSessionMenu = document.querySelector('.createSession-overlay')
@@ -17,6 +18,14 @@ export class InviteManager {
         appState.subscribe('network.status', () => {
             this.updateUI()
         })
+    }
+
+    /**
+     * Set session manager (called after SessionManager is created)
+     * @param {SessionManager} sessionManager - The session manager instance
+     */
+    setSessionManager(sessionManager) {
+        this.sessionManager = sessionManager
     }
 
     setUpListeners() {
@@ -87,17 +96,21 @@ export class InviteManager {
         // Hide settings modal
         this.hideSettings()
 
-        // Call global createSession function from main.js
-        if (window.whiteboardApp && window.whiteboardApp.createSession) {
+        // Create session using SessionManager
+        if (this.sessionManager) {
             try {
-                await window.whiteboardApp.createSession(settings)
-                this.showNotification('Session created successfully!')
+                await this.sessionManager.createSession(settings)
+                if (this.notificationManager) {
+                    this.notificationManager.showSuccess('Session created successfully!', 3000)
+                }
             } catch (error) {
                 console.error('[InviteManager] Failed to create session:', error)
-                this.showNotification('Failed to create session', 'error')
+                if (this.notificationManager) {
+                    this.notificationManager.showError('Failed to create session', 3000)
+                }
             }
         } else {
-            console.error('[InviteManager] whiteboardApp.createSession not found')
+            console.error('[InviteManager] SessionManager not set')
         }
     }
 
@@ -122,21 +135,14 @@ export class InviteManager {
     async copyToClipboard(link) {
         try {
             await navigator.clipboard.writeText(link)
-            this.showNotification('Copied to clipboard')
+            if (this.notificationManager) {
+                this.notificationManager.showSuccess('Copied to clipboard', 3000)
+            }
         } catch (error) {
-            this.showNotification('Error encountered while copying to clipboard', 'error')
+            if (this.notificationManager) {
+                this.notificationManager.showError('Error encountered while copying to clipboard', 3000)
+            }
         }
-    }
-
-    showNotification(message, type = 'success') {
-        this.notification.textContent = message
-        this.notification.className = `invite-notification ${type}`
-        this.notification.classList.add('show')
-
-        // fade out
-        setTimeout(() => {
-            this.notification.classList.remove('show')
-        }, 3000)
     }
 
     showSettings() {

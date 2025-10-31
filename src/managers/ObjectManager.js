@@ -67,6 +67,7 @@ export class ObjectManager {
      * Migrates local objects to networked mode and broadcasts to server
      * @param {WebSocketManager} networkManager - The network manager to attach
      * @param {string} newUserId - The server-assigned userId to replace local userId
+     * @returns {Promise} Promise that resolves with migration results {succeeded, failed}
      */
     attachNetworkManager(networkManager, newUserId) {
         console.log('[ObjectManager] Attaching network manager, migrating from local to networked mode')
@@ -95,18 +96,64 @@ export class ObjectManager {
             this.historyManager.migrateUserId(oldUserId, newUserId)
         }
 
-        // Broadcast all local objects to network after a short delay
-        // This gives the server time to fully set up the room connection
-        setTimeout(() => {
-            console.log(`[ObjectManager] Broadcasting ${localObjects.length} local objects to network`)
-            localObjects.forEach(obj => {
-                if (networkManager && networkManager.isConnected()) {
-                    networkManager.broadcastObjectAdded(obj)
-                }
-            })
-        }, 100)
-
         console.log('[ObjectManager] Network attachment complete')
+
+        // Return migration promise so caller can handle results
+        return this.migrateLocalObjectsToNetwork(localObjects, networkManager)
+    }
+
+    /**
+     * Migrate local objects to network with server confirmation
+     * Returns results of migration for error handling
+     */
+    async migrateLocalObjectsToNetwork(objects, networkManager) {
+        if (!objects || objects.length === 0) {
+            console.log('[ObjectManager] No objects to migrate')
+            return { succeeded: [], failed: [] }
+        }
+
+        console.log(`[ObjectManager] Migrating ${objects.length} local objects to network`)
+
+        // Use Promise.allSettled to track both successes and failures
+        const results = await Promise.allSettled(
+            objects.map(obj =>
+                networkManager.broadcastObjectAddedWithConfirmation(obj)
+                    .then(() => ({ status: 'success', objectId: obj.id }))
+                    .catch(err => ({ status: 'error', objectId: obj.id, error: err.message }))
+            )
+        )
+
+        // Separate succeeded and failed objects
+        const succeeded = []
+        const failed = []
+
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                const migrationResult = result.value
+                if (migrationResult.status === 'success') {
+                    succeeded.push(migrationResult.objectId)
+                } else {
+                    failed.push({
+                        objectId: migrationResult.objectId,
+                        error: migrationResult.error
+                    })
+                }
+            } else {
+                // Promise rejected
+                failed.push({
+                    objectId: objects[index].id,
+                    error: result.reason?.message || 'Unknown error'
+                })
+            }
+        })
+
+        console.log(`[ObjectManager] Migration complete: ${succeeded.length} succeeded, ${failed.length} failed`)
+
+        if (failed.length > 0) {
+            console.error('[ObjectManager] Failed objects:', failed)
+        }
+
+        return { succeeded, failed }
     }
 
     /**

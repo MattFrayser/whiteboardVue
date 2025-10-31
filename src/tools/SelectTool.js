@@ -71,6 +71,16 @@ export class SelectTool extends Tool {
     }
 
     onMouseDown(worldPos, e) {
+        // Clear any previous interaction state (defensive - ensures clean start)
+        // This handles cases where mouseup events were missed or didn't fire
+        this.isResizing = false
+        this.resizeHandleIndex = null
+        this.resizeObject = null
+        this.resizeFixedPoint = null
+        this.resizeInitialBounds = null
+        this.isDragging = false
+        this.isSelecting = false
+
         // Resize handles?
         if (this.engine.objectManager.selectedObjects.length === 1) {
             const obj = this.engine.objectManager.selectedObjects[0]
@@ -232,13 +242,17 @@ export class SelectTool extends Tool {
                 })
 
                 this.draggedObjectsBounds.clear()
-                this.engine.objectManager.broadcast('update', this.engine.objectManager.selectedObjects)
+                // Broadcast updates for all dragged objects
+                this.engine.objectManager.selectedObjects.forEach(obj => {
+                    this.engine.objectManager.broadcastObjectUpdate(obj)
+                })
             }
 
             if (this.isResizing && this.resizeObject) {
                 const bounds = this.resizeObject.getBounds()
                 this.engine.objectManager.updateObjectInQuadtree(this.resizeObject, bounds, bounds)
-                this.engine.objectManager.broadcast('update', this.resizeObject)
+                // Broadcast update for resized object
+                this.engine.objectManager.broadcastObjectUpdate(this.resizeObject)
             }
 
             // Mark final positions as dirty
