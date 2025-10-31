@@ -4,6 +4,8 @@
  * Enables local-first mode where users can draw before creating a session
  */
 
+import { ErrorHandler, ErrorCategory, ErrorCode } from '../utils/ErrorHandler'
+
 const STORAGE_KEY = 'whiteboard_local_objects'
 const DEBOUNCE_MS = 500 // Save after 500ms of inactivity
 
@@ -28,11 +30,20 @@ export class LocalStorageManager {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized))
                 console.log(`[LocalStorage] Saved ${objects.length} objects`)
             } catch (error) {
-                console.error('[LocalStorage] Failed to save objects:', error)
                 // Disable if quota exceeded
                 if (error.name === 'QuotaExceededError') {
-                    console.warn('[LocalStorage] Storage quota exceeded, disabling auto-save')
                     this.enabled = false
+                    ErrorHandler.storage(error, {
+                        context: 'LocalStorageManager',
+                        code: ErrorCode.STORAGE_QUOTA_EXCEEDED,
+                        metadata: { objectCount: objects.length }
+                    })
+                } else {
+                    ErrorHandler.storage(error, {
+                        context: 'LocalStorageManager',
+                        code: ErrorCode.SAVE_FAILED,
+                        metadata: { objectCount: objects.length }
+                    })
                 }
             }
         }, DEBOUNCE_MS)
@@ -56,7 +67,10 @@ export class LocalStorageManager {
             console.log(`[LocalStorage] Loaded ${objects.length} objects`)
             return objects
         } catch (error) {
-            console.error('[LocalStorage] Failed to load objects:', error)
+            ErrorHandler.storage(error, {
+                context: 'LocalStorageManager',
+                code: ErrorCode.LOAD_FAILED
+            })
             return []
         }
     }
@@ -70,7 +84,11 @@ export class LocalStorageManager {
             localStorage.removeItem(STORAGE_KEY)
             console.log('[LocalStorage] Cleared saved objects')
         } catch (error) {
-            console.error('[LocalStorage] Failed to clear objects:', error)
+            // Use silent error - clearing is not critical
+            ErrorHandler.silent(error, {
+                context: 'LocalStorageManager',
+                metadata: { operation: 'clear' }
+            })
         }
     }
 

@@ -1,4 +1,5 @@
 import { actions } from '../stores/AppState'
+import { ErrorHandler } from '../utils/ErrorHandler'
 
 /**
  * Manages undo/redo history for objects
@@ -99,7 +100,10 @@ export class HistoryManager {
                 })
                 return JSON.stringify(migratedState)
             } catch (error) {
-                console.error('[HistoryManager] Error migrating history entry:', error)
+                ErrorHandler.silent(error, {
+                    context: 'HistoryManager',
+                    metadata: { operation: 'migrateUserId', oldUserId, newUserId }
+                })
                 return stateStr // Return unchanged on error
             }
         })

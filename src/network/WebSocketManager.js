@@ -1,4 +1,5 @@
 import { actions } from '../stores/AppState'
+import { ErrorHandler, ErrorCategory, ErrorCode } from '../utils/ErrorHandler'
 
 export class WebSocketManager {
     constructor(messageHandler) {
@@ -78,7 +79,11 @@ export class WebSocketManager {
 
                 // Set authentication timeout (6 seconds - slightly longer than backend's 5s)
                 this.authTimeout = setTimeout(() => {
-                    console.error('[WebSocket] Authentication timeout - no response from server')
+                    ErrorHandler.network(new Error('Authentication timeout'), {
+                        context: 'WebSocketManager',
+                        code: ErrorCode.TIMEOUT,
+                        userMessage: 'Connection timed out while authenticating. Please try again.'
+                    })
                     this.updateStatus('error')
                     if (this.socket) {
                         this.socket.close()
@@ -91,11 +96,13 @@ export class WebSocketManager {
             }
 
             this.socket.onerror = error => {
-                console.error('[WebSocket] Connection Error:', error)
-                console.error('[WebSocket] Error event details:', {
-                    type: error.type,
-                    target: error.target,
-                    readyState: this.socket?.readyState
+                ErrorHandler.network(error, {
+                    context: 'WebSocketManager',
+                    code: ErrorCode.CONNECTION_FAILED,
+                    metadata: {
+                        type: error.type,
+                        readyState: this.socket?.readyState
+                    }
                 })
                 this.updateStatus('error')
             }
@@ -109,11 +116,13 @@ export class WebSocketManager {
                 this.handleDisconnect()
             }
         } catch (error) {
-            console.error('[WebSocket] Failed to connect:', error)
-            console.error('[WebSocket] Error details:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack
+            ErrorHandler.network(error, {
+                context: 'WebSocketManager',
+                code: ErrorCode.CONNECTION_FAILED,
+                metadata: {
+                    name: error.name,
+                    message: error.message
+                }
             })
             this.handleDisconnect()
         }
@@ -158,6 +167,12 @@ export class WebSocketManager {
                 this.connect(this.roomCode)
             }, 2000)
         } else {
+            ErrorHandler.network(new Error('Max reconnection attempts exceeded'), {
+                context: 'WebSocketManager',
+                code: ErrorCode.CONNECTION_FAILED,
+                userMessage: 'Unable to reconnect to the session after multiple attempts. Please refresh the page.',
+                metadata: { attempts: this.maxReconnectAttempts }
+            })
             this.updateStatus('error')
         }
     }
@@ -328,19 +343,19 @@ export class WebSocketManager {
     }
 
     handleError(error) {
-        console.error('[WebSocket] Error from server:', error)
+        // Silent error - SessionManager handles user notifications for server errors
+        ErrorHandler.silent(new Error(error.message), {
+            context: 'WebSocketManager',
+            metadata: { code: error.code, message: error.message }
+        })
 
-        // Notify message handler about the error
-        console.log('[WebSocket] this.messageHandler exists?', !!this.messageHandler)
+        // Notify message handler about the error (SessionManager will handle user notification)
         if (this.messageHandler) {
-            console.log('[WebSocket] Calling messageHandler with network:error')
             this.messageHandler({
                 type: 'network:error',
                 code: error.code,
                 message: error.message,
             })
-        } else {
-            console.error('[WebSocket] messageHandler is not set!')
         }
 
         // Update connection status to error
@@ -377,9 +392,14 @@ export class WebSocketManager {
             this.pendingAcks.delete(objectId)
 
             // Reject the promise
-            pending.reject(new Error(error || 'Failed to add object'))
+            const errorObj = new Error(error || 'Failed to add object')
+            pending.reject(errorObj)
 
-            console.error(`[WebSocket] Object ${objectId} failed: ${error}`)
+            // Silent error - object-level failures shouldn't spam users
+            ErrorHandler.silent(errorObj, {
+                context: 'WebSocketManager',
+                metadata: { objectId, serverError: error }
+            })
         }
     }
 

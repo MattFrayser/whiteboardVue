@@ -7,6 +7,7 @@
  */
 import { WebSocketManager } from './WebSocketManager'
 import { actions } from '../stores/AppState'
+import { ErrorHandler, ErrorCategory } from '../utils/ErrorHandler'
 
 export class SessionManager {
     constructor(engine, notificationManager, dialogManager, inviteManager) {
@@ -85,7 +86,10 @@ export class SessionManager {
                                 }
                             })
                             .catch(err => {
-                                console.error('[SessionManager] Migration error:', err)
+                                ErrorHandler.silent(err, {
+                                    context: 'SessionManager',
+                                    metadata: { operation: 'migration' }
+                                })
                             })
 
                         // Update URL with room code
@@ -113,7 +117,11 @@ export class SessionManager {
             return { roomCode, userId }
 
         } catch (error) {
-            console.error('[SessionManager] Failed to create session:', error)
+            ErrorHandler.network(error, {
+                context: 'SessionManager',
+                userMessage: 'Failed to create session. Please try again.',
+                metadata: { operation: 'createSession' }
+            })
             actions.setNetworkStatus('error')
             throw error
         }
@@ -185,7 +193,10 @@ export class SessionManager {
                                 }
                             })
                             .catch(err => {
-                                console.error('[SessionManager] Migration error:', err)
+                                ErrorHandler.silent(err, {
+                                    context: 'SessionManager',
+                                    metadata: { operation: 'migration' }
+                                })
                             })
 
                         // Update invite manager
@@ -197,7 +208,10 @@ export class SessionManager {
 
                     } else if (message.type === 'network:error') {
                         // Handle specific error types
-                        console.error('[SessionManager] Error from backend:', message)
+                        ErrorHandler.silent(new Error(message.message), {
+                            context: 'SessionManager',
+                            metadata: { code: message.code, phase: 'joinRoom' }
+                        })
 
                         if (message.code === 'PASSWORD_REQUIRED') {
                             console.log('[SessionManager] Password required for room')
@@ -279,7 +293,10 @@ export class SessionManager {
             return { userId }
 
         } catch (error) {
-            console.error('[SessionManager] Failed to join room:', error)
+            ErrorHandler.silent(error, {
+                context: 'SessionManager',
+                metadata: { operation: 'joinSession', roomCode }
+            })
             actions.setNetworkStatus('error')
 
             // Clean up network manager if connection failed
@@ -289,6 +306,7 @@ export class SessionManager {
             }
 
             // Show user-friendly error notification if not already shown
+            // Password-related errors are handled by the password dialog flow above
             if (error.message !== 'Password required' &&
                 error.message !== 'Password authentication cancelled' &&
                 error.message !== 'Maximum password attempts exceeded') {

@@ -8,6 +8,7 @@ import { TextTool } from '../tools/TextTool'
 import { Coordinates } from './Coordinates'
 import { InputHandler } from './InputHandler'
 import { ObjectManager } from '../managers/ObjectManager'
+import { ErrorHandler, ErrorCategory } from '../utils/ErrorHandler'
 
 export class DrawingEngine {
     constructor(canvas, networkManager) {
@@ -85,53 +86,61 @@ export class DrawingEngine {
     }
 
     handleNetworkMessage(message) {
-        switch(message.type) {
-            case 'network:authenticated':
-                this.objectManager.setUserId(message.userId)
-                break
-            case 'network:objectAdded': {
-                const addedObj = this.objectManager.addRemoteObject(message.object)
-                if (addedObj) {
-                    const bounds = addedObj.getBounds()
-                    this.markDirty(bounds)
-                    this.render()
+        try {
+            switch(message.type) {
+                case 'network:authenticated':
+                    this.objectManager.setUserId(message.userId)
+                    break
+                case 'network:objectAdded': {
+                    const addedObj = this.objectManager.addRemoteObject(message.object)
+                    if (addedObj) {
+                        const bounds = addedObj.getBounds()
+                        this.markDirty(bounds)
+                        this.render()
+                    }
+                    break
                 }
-                break
-            }
-            case 'network:objectUpdated': {
-                const updatedObj = this.objectManager.getObjectById(message.object.id)
-                if (updatedObj) {
-                    const oldBounds = updatedObj.getBounds()
-                    this.markDirty(oldBounds)
-                    this.objectManager.updateRemoteObject(message.object.id, message.object.data)
-                    const newBounds = updatedObj.getBounds()
-                    this.markDirty(newBounds)
-                    this.render()
+                case 'network:objectUpdated': {
+                    const updatedObj = this.objectManager.getObjectById(message.object.id)
+                    if (updatedObj) {
+                        const oldBounds = updatedObj.getBounds()
+                        this.markDirty(oldBounds)
+                        this.objectManager.updateRemoteObject(message.object.id, message.object.data)
+                        const newBounds = updatedObj.getBounds()
+                        this.markDirty(newBounds)
+                        this.render()
+                    }
+                    break
                 }
-                break
-            }
-            case 'network:objectDeleted': {
-                const deletedObj = this.objectManager.getObjectById(message.objectId)
-                if (deletedObj) {
-                    this.markDirty(deletedObj.getBounds())
-                    this.objectManager.removeRemoteObject(message.objectId)
-                    this.render()
+                case 'network:objectDeleted': {
+                    const deletedObj = this.objectManager.getObjectById(message.objectId)
+                    if (deletedObj) {
+                        this.markDirty(deletedObj.getBounds())
+                        this.objectManager.removeRemoteObject(message.objectId)
+                        this.render()
+                    }
+                    break
                 }
-                break
+                case 'network:sync':
+                    this.objectManager.loadRemoteObjects(message.objects)
+                    this.markDirty()
+                    this.render()
+                    break
+                case 'network:userDisconnected':
+                    this.remoteCursors.delete(message.userId)
+                    this.markDirty()
+                    this.render()
+                    break
+                case 'network:remoteCursorMove':
+                    this.handleRemoteCursor(message)
+                    break
             }
-            case 'network:sync':
-                this.objectManager.loadRemoteObjects(message.objects)
-                this.markDirty()
-                this.render()
-                break
-            case 'network:userDisconnected':
-                this.remoteCursors.delete(message.userId)
-                this.markDirty()
-                this.render()
-                break
-            case 'network:remoteCursorMove':
-                this.handleRemoteCursor(message)
-                break
+        } catch (error) {
+            ErrorHandler.handle(error, ErrorCategory.NETWORK, {
+                context: 'DrawingEngine',
+                userMessage: 'Failed to process network update. Your local changes are safe.',
+                metadata: { messageType: message?.type }
+            })
         }
     }
 
@@ -230,33 +239,48 @@ export class DrawingEngine {
      * Full canvas redraw with viewport culling
      */
     renderFull() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+        try {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
-        // Apply transformations
-        this.ctx.save()
-        const { offsetX, offsetY, scale } = this.coordinates
-        this.ctx.translate(offsetX, offsetY)
-        this.ctx.scale(scale, scale)
+            // Apply transformations
+            this.ctx.save()
+            const { offsetX, offsetY, scale } = this.coordinates
+            this.ctx.translate(offsetX, offsetY)
+            this.ctx.scale(scale, scale)
 
-        // Get viewport bounds for culling
-        const viewport = this.getViewportBounds()
+            // Get viewport bounds for culling
+            const viewport = this.getViewportBounds()
 
-        // Render objects (with viewport culling via quadtree)
-        this.objectManager.render(this.ctx, viewport)
+            // Render objects (with viewport culling via quadtree)
+            this.objectManager.render(this.ctx, viewport)
 
-        // Render current tool preview
-        if (this.currentTool && this.currentTool.renderPreview) {
-            this.currentTool.renderPreview(this.ctx)
-        }
+            // Render current tool preview
+            if (this.currentTool && this.currentTool.renderPreview) {
+                this.currentTool.renderPreview(this.ctx)
+            }
 
-        // Render remote cursors
-        if (this.remoteCursors) {
-            this.remoteCursors.forEach(cursor => {
-                this.renderRemoteCursor(this.ctx, cursor)
+            // Render remote cursors
+            if (this.remoteCursors) {
+                this.remoteCursors.forEach(cursor => {
+                    this.renderRemoteCursor(this.ctx, cursor)
+                })
+            }
+
+            this.ctx.restore()
+        } catch (error) {
+            // Restore context state even on error
+            try {
+                this.ctx.restore()
+            } catch (restoreError) {
+                // Ignore restore errors
+            }
+
+            ErrorHandler.handle(error, ErrorCategory.CRITICAL, {
+                context: 'DrawingEngine',
+                userMessage: 'Rendering error occurred. Please refresh if the canvas appears blank.',
+                code: 'RENDER_FAILED'
             })
         }
-
-        this.ctx.restore()
     }
 
     renderRemoteCursor(ctx, cursor) {

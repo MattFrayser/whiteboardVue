@@ -1,4 +1,5 @@
 import { appState, selectors } from '../stores/AppState'
+import { ErrorHandler, ErrorCategory } from '../utils/ErrorHandler'
 
 export class InviteManager {
     constructor(roomCode, notificationManager = null, sessionManager = null) {
@@ -104,13 +105,19 @@ export class InviteManager {
                     this.notificationManager.showSuccess('Session created successfully!', 3000)
                 }
             } catch (error) {
-                console.error('[InviteManager] Failed to create session:', error)
+                ErrorHandler.silent(error, {
+                    context: 'InviteManager',
+                    metadata: { operation: 'createSession' }
+                })
                 if (this.notificationManager) {
                     this.notificationManager.showError('Failed to create session', 3000)
                 }
             }
         } else {
-            console.error('[InviteManager] SessionManager not set')
+            ErrorHandler.silent(new Error('SessionManager not set'), {
+                context: 'InviteManager',
+                metadata: { operation: 'createSession' }
+            })
         }
     }
 

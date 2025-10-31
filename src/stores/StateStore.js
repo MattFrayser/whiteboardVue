@@ -11,6 +11,8 @@
  *   unsubscribe() // Clean up
  */
 
+import { ErrorHandler } from '../utils/ErrorHandler'
+
 export class StateStore {
     constructor(initialState = {}) {
         this.state = this._deepClone(initialState)
@@ -122,7 +124,10 @@ export class StateStore {
             try {
                 callback(currentValue)
             } catch (error) {
-                console.error(`Error in subscriber for "${path}":`, error)
+                ErrorHandler.silent(error, {
+                    context: 'StateStore',
+                    metadata: { path, phase: 'initialCall', subscriberError: true }
+                })
             }
         }
 
@@ -155,7 +160,10 @@ export class StateStore {
                 try {
                     callback(value)
                 } catch (error) {
-                    console.error(`Error in subscriber for "${path}":`, error)
+                    ErrorHandler.silent(error, {
+                        context: 'StateStore',
+                        metadata: { path, subscriberError: true }
+                    })
                 }
             })
         }
@@ -172,7 +180,10 @@ export class StateStore {
                     try {
                         callback(parentValue)
                     } catch (error) {
-                        console.error(`Error in subscriber for "${parentPath}":`, error)
+                        ErrorHandler.silent(error, {
+                            context: 'StateStore',
+                            metadata: { path: parentPath, parentPath, subscriberError: true }
+                        })
                     }
                 })
             }

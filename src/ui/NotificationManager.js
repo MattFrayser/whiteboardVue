@@ -79,17 +79,17 @@ export class NotificationManager {
 
     /**
      * Show migration result notification (specialized for object sync)
+     * Only shows notification if there are failures - success is silent
      * @param {number} succeeded - Number of objects that succeeded
      * @param {number} failed - Number of objects that failed
      */
     showMigrationResult(succeeded, failed) {
+        // Only notify users about failures, not successes
         if (failed > 0) {
             const message = `⚠️ ${failed} object${failed > 1 ? 's' : ''} failed to sync. ${succeeded} succeeded.`
             this.showWarning(message, 5000)
-        } else if (succeeded > 0) {
-            const message = `✓ All ${succeeded} objects synced successfully`
-            this.showSuccess(message, 3000)
         }
+        // Success case: silent - no need to interrupt users when everything works
     }
 
     /**

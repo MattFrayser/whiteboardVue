@@ -1,3 +1,5 @@
+import { ErrorHandler, ErrorCategory } from '../utils/ErrorHandler'
+
 /**
  * Handles mouse and keyboard input for the drawing engine
  */
@@ -32,69 +34,90 @@ export class InputHandler {
     }
 
     handleMouseDown(e) {
-        const worldPos = this.engine.coordinates.viewportToWorld(
-            { x: e.clientX, y: e.clientY },
-            this.canvas
-        )
+        try {
+            const worldPos = this.engine.coordinates.viewportToWorld(
+                { x: e.clientX, y: e.clientY },
+                this.canvas
+            )
 
-        if (e.button === 0) {
-            this.engine.currentTool.onMouseDown(worldPos, e)
-        } else if (e.button === 2) {
-            this.engine.coordinates.startPan({ x: e.clientX, y: e.clientY })
-            this.rightMouseDown = true
-            this.updateCursor()
+            if (e.button === 0) {
+                this.engine.currentTool._safeOnMouseDown(worldPos, e)
+            } else if (e.button === 2) {
+                this.engine.coordinates.startPan({ x: e.clientX, y: e.clientY })
+                this.rightMouseDown = true
+                this.updateCursor()
+            }
+        } catch (error) {
+            ErrorHandler.silent(error, {
+                context: 'InputHandler',
+                metadata: { event: 'mousedown' }
+            })
         }
     }
 
     handleMouseMove(e) {
-        this.lastMousePos = { x: e.clientX, y: e.clientY }
+        try {
+            this.lastMousePos = { x: e.clientX, y: e.clientY }
 
-        const worldPos = this.engine.coordinates.viewportToWorld(
-            { x: e.clientX, y: e.clientY },
-            this.canvas
-        )
-
-        // Broadcast cursor position with throttling
-        const now = Date.now()
-        if (now - this.lastCursorBroadcast >= this.cursorThrottle) {
-            this.lastCursorBroadcast = now
-            const toolName = Object.keys(this.engine.tools).find(
-                key => this.engine.tools[key] === this.engine.currentTool
+            const worldPos = this.engine.coordinates.viewportToWorld(
+                { x: e.clientX, y: e.clientY },
+                this.canvas
             )
-            
-            // Direct call to engine's broadcast method
-            this.engine.broadcastCursor({
-                x: worldPos.x,
-                y: worldPos.y,
-                tool: toolName,
-                color: this.engine.currentColor
-            })
-        }
 
-        // left click
-        if (e.buttons === 1) {
-            this.engine.currentTool.onMouseMove(worldPos, e)
-        // right click
-        } else if (e.buttons === 2) {
-            e.preventDefault()
-            this.engine.coordinates.pan({ x: e.clientX, y: e.clientY })
-            this.engine.needsRedraw = true
-            this.engine.render()
+            // Broadcast cursor position with throttling
+            const now = Date.now()
+            if (now - this.lastCursorBroadcast >= this.cursorThrottle) {
+                this.lastCursorBroadcast = now
+                const toolName = Object.keys(this.engine.tools).find(
+                    key => this.engine.tools[key] === this.engine.currentTool
+                )
+
+                // Direct call to engine's broadcast method
+                this.engine.broadcastCursor({
+                    x: worldPos.x,
+                    y: worldPos.y,
+                    tool: toolName,
+                    color: this.engine.currentColor
+                })
+            }
+
+            // left click
+            if (e.buttons === 1) {
+                this.engine.currentTool._safeOnMouseMove(worldPos, e)
+            // right click
+            } else if (e.buttons === 2) {
+                e.preventDefault()
+                this.engine.coordinates.pan({ x: e.clientX, y: e.clientY })
+                this.engine.needsRedraw = true
+                this.engine.render()
+            }
+        } catch (error) {
+            ErrorHandler.silent(error, {
+                context: 'InputHandler',
+                metadata: { event: 'mousemove' }
+            })
         }
     }
 
     handleMouseUp(e) {
-        const worldPos = this.engine.coordinates.viewportToWorld(
-            { x: e.clientX, y: e.clientY },
-            this.canvas
-        )
+        try {
+            const worldPos = this.engine.coordinates.viewportToWorld(
+                { x: e.clientX, y: e.clientY },
+                this.canvas
+            )
 
-        if (e.button === 0) {
-            this.engine.currentTool.onMouseUp(worldPos, e)
-        } else if (e.button === 2) {
-            this.engine.coordinates.endPan()
-            this.rightMouseDown = false
-            this.updateCursor(worldPos)
+            if (e.button === 0) {
+                this.engine.currentTool._safeOnMouseUp(worldPos, e)
+            } else if (e.button === 2) {
+                this.engine.coordinates.endPan()
+                this.rightMouseDown = false
+                this.updateCursor(worldPos)
+            }
+        } catch (error) {
+            ErrorHandler.silent(error, {
+                context: 'InputHandler',
+                metadata: { event: 'mouseup' }
+            })
         }
     }
     
@@ -150,59 +173,65 @@ export class InputHandler {
     }
 
     handleKeyDown(e) {
+        try {
+            // Tool Shortcuts
+            const shortcuts = {
+                S: 'select',
+                D: 'draw',
+                R: 'rectangle',
+                C: 'circle',
+                L: 'line',
+                T: 'text',
+                E: 'eraser',
+            }
 
-        // Tool Shortcuts
-        const shortcuts = {
-            S: 'select',
-            D: 'draw',
-            R: 'rectangle',
-            C: 'circle',
-            L: 'line',
-            T: 'text',
-            E: 'eraser',
-        }
-        
-        if (shortcuts[e.key]) {
-            this.engine.setTool(shortcuts[e.key])
-            this.updateCursor()
-        }
+            if (shortcuts[e.key]) {
+                this.engine.setTool(shortcuts[e.key])
+                this.updateCursor()
+            }
 
-        // Copy (ctrl-c)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-            e.preventDefault()
-            this.engine.objectManager.copySelected()
-        }
+            // Copy (ctrl-c)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                e.preventDefault()
+                this.engine.objectManager.copySelected()
+            }
 
-        // Cut (ctrl-x)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-            e.preventDefault()
-            this.engine.objectManager.cutSelected()
-            this.engine.render()
-        }
+            // Cut (ctrl-x)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+                e.preventDefault()
+                this.engine.objectManager.cutSelected()
+                this.engine.render()
+            }
 
-        // paste (ctrl-v)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-            e.preventDefault()
-            const worldPos = this.engine.coordinates.viewportToWorld(this.lastMousePos, this.canvas)
-            this.engine.objectManager.paste(worldPos.x, worldPos.y)
-            this.engine.render()
-        }
+            // paste (ctrl-v)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                e.preventDefault()
+                const worldPos = this.engine.coordinates.viewportToWorld(this.lastMousePos, this.canvas)
+                this.engine.objectManager.paste(worldPos.x, worldPos.y)
+                this.engine.render()
+            }
 
-        // Undo (ctrl-z) / redo (ctrl-shift-z)
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
-            e.preventDefault()
-            this.engine.objectManager.redo()
-            this.engine.render()
-        } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-            e.preventDefault()
-            this.engine.objectManager.undo()
-            this.engine.render()
-        }
+            // Undo (ctrl-z) / redo (ctrl-shift-z)
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault()
+                this.engine.objectManager.redo()
+                this.engine.render()
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault()
+                this.engine.objectManager.undo()
+                this.engine.render()
+            }
 
-        // Delete
-        if (e.key === 'Delete') {
-            this.engine.objectManager.deleteSelected()
-            this.engine.render()
+            // Delete
+            if (e.key === 'Delete') {
+                this.engine.objectManager.deleteSelected()
+                this.engine.render()
+            }
+        } catch (error) {
+            ErrorHandler.silent(error, {
+                context: 'InputHandler',
+                metadata: { event: 'keydown', key: e.key }
+            })
         }
     }
 

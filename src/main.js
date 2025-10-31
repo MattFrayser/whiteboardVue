@@ -8,6 +8,7 @@ import { ConnectionStatusIndicator } from './ui/ConnectionStatusIndicator'
 import { SessionManager } from './network/SessionManager'
 import { VisibilitySync } from './sync/VisibilitySync'
 import { appState, actions } from './stores/AppState'
+import { ErrorHandler } from './utils/ErrorHandler'
 
 // Generate temporary local userId for local-first mode
 // This will be replaced with server-assigned userId when session is created
@@ -27,6 +28,9 @@ const toolbar = new Toolbar(engine)
 const notificationManager = new NotificationManager()
 const dialogManager = new DialogManager()
 const connectionStatus = new ConnectionStatusIndicator()
+
+// Initialize ErrorHandler with UI managers
+ErrorHandler.init(notificationManager, dialogManager)
 
 // Set temporary local userId
 engine.objectManager.setUserId(localUserId)
@@ -66,7 +70,15 @@ engine.start()
 // Show join room prompt if URL contains room code
 if (roomCodeFromURL) {
     dialogManager.showJoinRoomDialog(roomCodeFromURL, async () => {
-        await sessionManager.joinSession(roomCodeFromURL)
+        try {
+            await sessionManager.joinSession(roomCodeFromURL)
+        } catch (error) {
+            // SessionManager already handles error display, just log here
+            ErrorHandler.silent(error, {
+                context: 'App',
+                metadata: { roomCode: roomCodeFromURL }
+            })
+        }
     }, () => {
         console.log('[App] User chose to stay in local mode')
     })
