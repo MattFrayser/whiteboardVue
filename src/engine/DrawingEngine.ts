@@ -1,4 +1,5 @@
 import type { RemoteCursor, Bounds } from '../types'
+import { DEFAULT_COLOR } from '../constants'
 import { CircleTool } from '../tools/CircleTool'
 import { DrawTool } from '../tools/DrawTool'
 import { EraserTool } from '../tools/EraserTool'
@@ -61,7 +62,7 @@ export class DrawingEngine {
         }
 
         this.currentTool = this.tools.draw
-        this.currentColor = '#000000'
+        this.currentColor = DEFAULT_COLOR
         this.currentWidth = 5
 
         this.remoteCursors = new Map()

@@ -1,4 +1,5 @@
 import { DrawingObject } from './DrawingObject'
+import { DEFAULT_COLOR } from '../constants'
 import type { Bounds, DrawingObjectData } from '../types'
 
 export class Stroke extends DrawingObject {
@@ -59,7 +60,7 @@ export class Stroke extends DrawingObject {
             return
         }
 
-        ctx.strokeStyle = this.data.color || '#000000'
+        ctx.strokeStyle = this.data.color || DEFAULT_COLOR
         ctx.lineWidth = this.data.width || 2
         ctx.lineCap = 'round'
         ctx.lineJoin = 'round'

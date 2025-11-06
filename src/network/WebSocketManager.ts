@@ -1,4 +1,5 @@
 import { actions, type NetworkStatus } from '../stores/AppState'
+import { API_BASE_URL, WS_BASE_URL, MAX_RECONNECT_ATTEMPTS, AUTH_TIMEOUT, ACK_TIMEOUT } from '../constants'
 import { ErrorHandler, ErrorCode } from '../utils/ErrorHandler'
 import type { MessageHandler, StatusCallback, PendingAck, CursorData, NetworkMessage } from '../types/network'
 import type { DrawingObject } from '../objects/DrawingObject'
@@ -28,7 +29,7 @@ export class WebSocketManager {
         this.connectionStatus = 'disconnected' //  'connected', 'disconnected', 'error'
         this.statusCallback = null
         this.reconnectAttempts = 0
-        this.maxReconnectAttempts = 3
+        this.maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS
         this.reconnectTimeout = null
         this.authTimeout = null
         this.userColor = null
@@ -39,7 +40,7 @@ export class WebSocketManager {
         // Track pending acknowledgments for object operations
         // Map: objectId -> {resolve, reject, timeoutId}
         this.pendingAcks = new Map()
-        this.ackTimeout = 5000 // 5 seconds timeout for acknowledgments
+        this.ackTimeout = ACK_TIMEOUT
     }
     
     isConnected(): boolean {
@@ -67,7 +68,7 @@ export class WebSocketManager {
 
         try {
             // Establish session via HTTP first (ensures cookie is set reliably)
-            const sessionResponse = await fetch('http://localhost:8080/api/session', {
+            const sessionResponse = await fetch(`${API_BASE_URL}/api/session`, {
                 method: 'GET',
                 credentials: 'include', // Include cookies in request and store set-cookie response
             })
@@ -84,7 +85,7 @@ export class WebSocketManager {
 
             // Now open WebSocket - cookie will be sent automatically
             console.log('[WebSocket] Opening WebSocket connection...')
-            this.socket = new WebSocket(`ws://localhost:8080/ws?room=${roomCode}`)
+            this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${roomCode}`)
             console.log('[WebSocket] WebSocket object created, readyState:', this.socket.readyState)
 
             this.socket.onopen = () => {
@@ -95,7 +96,7 @@ export class WebSocketManager {
                 }
                 this.send(authMsg)
 
-                // Set authentication timeout (6 seconds - slightly longer than backend's 5s)
+                // Set authentication timeout
                 this.authTimeout = setTimeout(() => {
                     ErrorHandler.network(new Error('Authentication timeout'), {
                         context: 'WebSocketManager',
@@ -106,7 +107,7 @@ export class WebSocketManager {
                     if (this.socket) {
                         this.socket.close()
                     }
-                }, 6000)
+                }, AUTH_TIMEOUT)
             }
 
             this.socket.onmessage = (event: MessageEvent) => {

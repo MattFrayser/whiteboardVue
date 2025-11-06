@@ -1,4 +1,5 @@
 import { DrawingObject } from './DrawingObject'
+import { DEFAULT_COLOR } from '../constants'
 import type { Point, Bounds, DrawingObjectData } from '../types'
 
 export class Circle extends DrawingObject {
@@ -117,7 +118,7 @@ export class Circle extends DrawingObject {
             Math.pow(this.data.x2! - this.data.x1!, 2) + Math.pow(this.data.y2! - this.data.y1!, 2)
         )
 
-        ctx.strokeStyle = this.data.color || '#000000'
+        ctx.strokeStyle = this.data.color || DEFAULT_COLOR
         ctx.lineWidth = this.data.width || 2
         ctx.fillStyle = (this.data as { fill?: string }).fill || 'transparent'
 

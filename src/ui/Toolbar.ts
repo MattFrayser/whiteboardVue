@@ -1,4 +1,5 @@
 import { appState, actions } from '../stores/AppState'
+import { COLOR_PALETTE, CURSORS } from '../constants'
 import type { Tool } from '../stores/AppState'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 
@@ -14,12 +15,7 @@ export class Toolbar {
         this.activeSwatch = null
         this.activeSwatchForMenu = null
         this.unsubscribers = [] // Track subscriptions for cleanup
-        this.colors = [
-            '#000000','#FFFFFF','#FF0000','#00FF00','#0000FF','#FFFF00',
-            '#FF00FF','#00FFFF','#800000','#008000','#000080','#808000',
-            '#800080','#008080','#C0C0C0','#808080','#FFA500','#A52A2A',
-            '#FFC0CB','#FFD700','#4B0082','#9370DB','#90EE90','#FF6347',
-        ]
+        this.colors = COLOR_PALETTE
 
         // init
         this.setupEventListeners()
@@ -299,13 +295,13 @@ export class Toolbar {
                 canvas.style.cursor = 'crosshair'
                 break
             case 'draw':
-                canvas.style.cursor = 'url(/draw-cursor.svg) 2 17, crosshair'
+                canvas.style.cursor = CURSORS.DRAW
                 break
             case 'eraser':
-                canvas.style.cursor = 'url(/eraser-cursor.svg) 10 9, pointer'
+                canvas.style.cursor = CURSORS.ERASER
                 break
             case 'select':
-                canvas.style.cursor = 'url(/select-cursor.svg) 2 2, default'
+                canvas.style.cursor = CURSORS.SELECT
                 break
             case 'text':
                 canvas.style.cursor = 'text'

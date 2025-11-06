@@ -1,5 +1,6 @@
 import { Text } from '../objects/Text'
 import { Tool } from './Tool'
+import { SELECTION_COLOR, FONT_SIZE_MULTIPLIER, TEXT_BLUR_DELAY, TEXT_FOCUS_DELAY } from '../constants'
 import type { Point } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 
@@ -41,10 +42,10 @@ export class TextTool extends Tool {
         const canvasRect = this.engine.canvas.getBoundingClientRect()
         this.inputElement.style.left = `${canvasRect.left + viewportPos.x}px`
         this.inputElement.style.top = `${canvasRect.top + viewportPos.y}px`
-        this.inputElement.style.fontSize = `${this.engine.currentWidth * 3}px`
+        this.inputElement.style.fontSize = `${this.engine.currentWidth * FONT_SIZE_MULTIPLIER}px`
         this.inputElement.style.color = this.engine.currentColor
         this.inputElement.style.background = 'rgba(255, 255, 255, 0.9)'
-        this.inputElement.style.border = '2px solid #0066ff'
+        this.inputElement.style.border = `2px solid ${SELECTION_COLOR}`
         this.inputElement.style.outline = 'none'
         this.inputElement.style.fontFamily = 'Arial, sans-serif'
         this.inputElement.style.minWidth = '100px'
@@ -75,14 +76,14 @@ export class TextTool extends Tool {
             if (this.inputElement && this.blurHandler) {
                 this.inputElement.addEventListener('blur', this.blurHandler)
             }
-        }, 200)
+        }, TEXT_BLUR_DELAY)
 
         // Focus after a small delay to ensure mouseup has completed
         setTimeout(() => {
             if (this.inputElement) {
                 this.inputElement.focus()
             }
-        }, 10)
+        }, TEXT_FOCUS_DELAY)
 
         this.isEditing = true
         this.Position = worldPos
@@ -103,7 +104,7 @@ export class TextTool extends Tool {
                 y: this.Position.y,
                 text,
                 color: this.engine.currentColor,
-                fontSize: this.engine.currentWidth * 3,
+                fontSize: this.engine.currentWidth * FONT_SIZE_MULTIPLIER,
             }, 0)
 
             this.engine.objectManager.addObject(textObj)

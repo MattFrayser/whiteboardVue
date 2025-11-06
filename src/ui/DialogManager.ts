@@ -6,6 +6,8 @@
  * Provides consistent overlay behavior and keyboard handling
  */
 
+import { DIALOG_FOCUS_DELAY } from '../constants'
+
 export class DialogManager {
     currentDialog: HTMLElement | null
 
@@ -88,7 +90,7 @@ export class DialogManager {
             })
 
             // Focus the input
-            setTimeout(() => (passwordInput as HTMLElement).focus(), 100)
+            setTimeout(() => (passwordInput as HTMLElement).focus(), DIALOG_FOCUS_DELAY)
         })
     }
 
@@ -166,7 +168,7 @@ export class DialogManager {
             })
 
             // Focus the join button
-            setTimeout(() => (joinBtn as HTMLElement).focus(), 100)
+            setTimeout(() => (joinBtn as HTMLElement).focus(), DIALOG_FOCUS_DELAY)
         })
     }
 
@@ -257,7 +259,7 @@ export class DialogManager {
             })
 
             // Focus the confirm button
-            setTimeout(() => (confirmBtn as HTMLElement).focus(), 100)
+            setTimeout(() => (confirmBtn as HTMLElement).focus(), DIALOG_FOCUS_DELAY)
         })
     }
 

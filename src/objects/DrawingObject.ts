@@ -1,4 +1,5 @@
 import type { Point, Bounds, DrawingObjectData } from '../types'
+import { SELECTION_COLOR, SELECTION_HANDLE_BG } from '../constants'
 
 interface ResizeHandle extends Point {
     cursor: string
@@ -54,7 +55,7 @@ export class DrawingObject {
 
     renderSelection(ctx: CanvasRenderingContext2D): void {
         const bounds = this.getBounds()
-        ctx.strokeStyle = '#0066ff'
+        ctx.strokeStyle = SELECTION_COLOR
         ctx.lineWidth = 2 / ctx.getTransform().a
         ctx.setLineDash([5, 5])
         ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height)
@@ -63,8 +64,8 @@ export class DrawingObject {
         // Render resize handles
         const handleSize = 12 / ctx.getTransform().a
         const handles = this.getResizeHandles()
-        ctx.fillStyle = '#ffffff'
-        ctx.strokeStyle = '#0066ff'
+        ctx.fillStyle = SELECTION_HANDLE_BG
+        ctx.strokeStyle = SELECTION_COLOR
         ctx.lineWidth = 2 / ctx.getTransform().a
         handles.forEach(handle => {
             ctx.fillRect(

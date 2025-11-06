@@ -1,4 +1,5 @@
 import { DrawingObject } from './DrawingObject'
+import { DEFAULT_COLOR } from '../constants'
 import type { Bounds, DrawingObjectData } from '../types'
 
 export class Rectangle extends DrawingObject {
@@ -32,7 +33,7 @@ export class Rectangle extends DrawingObject {
     override render(ctx: CanvasRenderingContext2D): void {
         const bounds = this.getBounds()
 
-        ctx.strokeStyle = this.data.color || '#000000'
+        ctx.strokeStyle = this.data.color || DEFAULT_COLOR
         ctx.lineWidth = this.data.width || 2
         ctx.fillStyle = (this.data as { fill?: string }).fill || 'transparent'
 

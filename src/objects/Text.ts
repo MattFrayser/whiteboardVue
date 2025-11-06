@@ -1,4 +1,5 @@
 import { DrawingObject } from './DrawingObject'
+import { DEFAULT_COLOR } from '../constants'
 import type { Point, Bounds, DrawingObjectData } from '../types'
 
 interface ResizeHandle extends Point {
@@ -47,7 +48,7 @@ export class Text extends DrawingObject {
         const fontSize = (this.data.fontSize || 16)
         const fontFamily = (this.data as { fontFamily?: string }).fontFamily || 'Arial'
         ctx.font = `${fontSize}px ${fontFamily}`
-        ctx.fillStyle = this.data.color || '#000000'
+        ctx.fillStyle = this.data.color || DEFAULT_COLOR
         ctx.textBaseline = 'alphabetic'
 
         if ((this.data as { bold?: boolean }).bold) {

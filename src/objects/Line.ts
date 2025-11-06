@@ -1,4 +1,5 @@
 import { DrawingObject } from './DrawingObject'
+import { DEFAULT_COLOR } from '../constants'
 import type { Point, Bounds, DrawingObjectData } from '../types'
 
 export class Line extends DrawingObject {
@@ -105,7 +106,7 @@ export class Line extends DrawingObject {
     }
 
     override render(ctx: CanvasRenderingContext2D): void {
-        ctx.strokeStyle = this.data.color || '#000000'
+        ctx.strokeStyle = this.data.color || DEFAULT_COLOR
         ctx.lineWidth = this.data.width || 2
         ctx.lineCap = 'round'
 

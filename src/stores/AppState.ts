@@ -7,6 +7,7 @@
  */
 
 import { StateStore } from './StateStore'
+import { DEFAULT_COLOR } from '../constants'
 
 // Type definitions for the application state
 export type Tool = 'draw' | 'select' | 'erase' | 'text'
@@ -64,7 +65,7 @@ const initialState: AppStateShape = {
     // UI State: Drawing tool settings
     ui: {
         tool: 'draw',           // Current tool: 'draw', 'select', 'erase', 'text'
-        color: '#000000',       // Current drawing color
+        color: DEFAULT_COLOR,   // Current drawing color
         brushSize: 5,           // Current brush size
         cursor: 'crosshair',    // Current cursor style
     },

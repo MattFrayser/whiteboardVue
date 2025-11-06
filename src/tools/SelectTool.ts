@@ -1,5 +1,6 @@
 import { Tool } from './Tool'
 import { MoveObjectsOperation, UpdateObjectOperation } from '../managers/operations'
+import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH, CURSORS } from '../constants'
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { DrawingObject } from '../objects/DrawingObject'
@@ -95,7 +96,7 @@ export class SelectTool extends Tool {
             this.engine.canvas.style.cursor = 'move'
         } else {
             // Use custom select cursor when not hovering over anything
-            this.engine.canvas.style.cursor = 'url(/select-cursor.svg) 2 2, pointer'
+            this.engine.canvas.style.cursor = CURSORS.SELECT
         }
     }
 
@@ -394,10 +395,10 @@ export class SelectTool extends Tool {
             const rect = this.getSelectionRect()
             if (!rect) return
 
-            ctx.strokeStyle = '#0066ff'
-            ctx.fillStyle = 'rgba(0, 102, 255, 0.1)'
+            ctx.strokeStyle = SELECTION_COLOR
+            ctx.fillStyle = SELECTION_RECT_FILL
             ctx.lineWidth = 1 / ctx.getTransform().a
-            ctx.setLineDash([5, 5])
+            ctx.setLineDash(SELECTION_RECT_DASH)
 
             ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
             ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)

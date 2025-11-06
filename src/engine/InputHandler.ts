@@ -1,4 +1,5 @@
 import { ErrorHandler } from '../utils/ErrorHandler'
+import { CURSORS, CURSOR_THROTTLE_MS } from '../constants'
 import type { Point } from '../types'
 import type { DrawingEngine } from './DrawingEngine'
 
@@ -25,7 +26,7 @@ export class InputHandler {
         this.rightMouseDown = false
         this.lastMousePos = { x: 0, y: 0 }
         this.lastCursorBroadcast = 0
-        this.cursorThrottle = 33
+        this.cursorThrottle = CURSOR_THROTTLE_MS
 
         this.boundHandleMouseDown = (e: MouseEvent) => this.handleMouseDown(e)
         this.boundHandleMouseMove = (e: MouseEvent) => this.handleMouseMove(e)
@@ -170,13 +171,13 @@ export class InputHandler {
                         this.canvas.style.cursor = 'crosshair'
                         break
                     case 'draw':
-                        this.canvas.style.cursor = 'url(/draw-cursor.svg) 2 17, crosshair'
+                        this.canvas.style.cursor = CURSORS.DRAW
                         break
                     case 'eraser':
-                        this.canvas.style.cursor = 'url(/eraser-cursor.svg) 10 9, pointer'
+                        this.canvas.style.cursor = CURSORS.ERASER
                         break
                     case 'select':
-                        this.canvas.style.cursor = 'url(/select-cursor.svg) 2 2, default'
+                        this.canvas.style.cursor = CURSORS.SELECT
                         break
                     case 'text':
                         this.canvas.style.cursor = 'text'
