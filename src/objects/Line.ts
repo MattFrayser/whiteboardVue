@@ -1,0 +1,127 @@
+import { DrawingObject } from './DrawingObject'
+import type { Point, Bounds, DrawingObjectData } from '../types'
+
+export class Line extends DrawingObject {
+    constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
+        super(id, 'line', data, zIndex)
+    }
+
+    override getBounds(): Bounds {
+        const padding = (this.data.width || 2) / 2
+        return {
+            x: Math.min(this.data.x1!, this.data.x2!) - padding,
+            y: Math.min(this.data.y1!, this.data.y2!) - padding,
+            width: Math.abs(this.data.x2! - this.data.x1!) + padding * 2,
+            height: Math.abs(this.data.y2! - this.data.y1!) + padding * 2,
+        }
+    }
+
+    override containsPoint(point: Point): boolean {
+        const distance = this.pointToLineDistance(
+            point,
+            { x: this.data.x1!, y: this.data.y1! },
+            { x: this.data.x2!, y: this.data.y2! }
+        )
+
+        return distance <= (this.data.width || 2) + 5
+    }
+
+    pointToLineDistance(point: Point, lineStart: Point, lineEnd: Point): number {
+        const A = point.x - lineStart.x
+        const B = point.y - lineStart.y
+        const C = lineEnd.x - lineStart.x
+        const D = lineEnd.y - lineStart.y
+
+        const dot = A * C + B * D
+        const lenSq = C * C + D * D
+        let param = -1
+
+        if (lenSq !== 0) {
+            param = dot / lenSq
+        }
+
+        let xx: number, yy: number
+
+        if (param < 0) {
+            xx = lineStart.x
+            yy = lineStart.y
+        } else if (param > 1) {
+            xx = lineEnd.x
+            yy = lineEnd.y
+        } else {
+            xx = lineStart.x + param * C
+            yy = lineStart.y + param * D
+        }
+
+        const dx = point.x - xx
+        const dy = point.y - yy
+
+        return Math.sqrt(dx * dx + dy * dy)
+    }
+
+    override move(dx: number, dy: number): void {
+        this.data.x1! += dx
+        this.data.y1! += dy
+        this.data.x2! += dx
+        this.data.y2! += dy
+    }
+
+    override resize(handleIndex: number, newX: number, newY: number, fixedPoint: Point, initialBounds: Bounds): void {
+        // Use parent's calculation, then adjust for padding
+        const visualBounds = this.calculateResizedBounds(handleIndex, newX, newY, fixedPoint, initialBounds)
+        const padding = (this.data.width || 2) / 2
+
+        // Convert visual bounds to content bounds (remove padding)
+        const contentBounds = {
+            x: visualBounds.x + padding,
+            y: visualBounds.y + padding,
+            width: Math.max(1, visualBounds.width - padding * 2),
+            height: Math.max(1, visualBounds.height - padding * 2),
+        }
+
+        this.applyBounds(contentBounds)
+    }
+
+    override applyBounds(newBounds: Bounds): void {
+        // applyBounds expects content bounds (no padding)
+        const padding = (this.data.width || 2) / 2
+        const oldBounds = this.getBounds()
+
+        // Extract old content area (remove padding from visual bounds)
+        const oldContentX = oldBounds.x + padding
+        const oldContentY = oldBounds.y + padding
+        const oldContentWidth = oldBounds.width - padding * 2
+        const oldContentHeight = oldBounds.height - padding * 2
+
+        // Calculate scale based on content dimensions
+        const scaleX = newBounds.width / oldContentWidth
+        const scaleY = newBounds.height / oldContentHeight
+
+        // Apply transformation to line endpoints
+        this.data.x1 = newBounds.x + (this.data.x1! - oldContentX) * scaleX
+        this.data.y1 = newBounds.y + (this.data.y1! - oldContentY) * scaleY
+        this.data.x2 = newBounds.x + (this.data.x2! - oldContentX) * scaleX
+        this.data.y2 = newBounds.y + (this.data.y2! - oldContentY) * scaleY
+    }
+
+    override render(ctx: CanvasRenderingContext2D): void {
+        ctx.strokeStyle = this.data.color || '#000000'
+        ctx.lineWidth = this.data.width || 2
+        ctx.lineCap = 'round'
+
+        if ((this.data as { dashed?: boolean }).dashed) {
+            ctx.setLineDash([(this.data.width || 2) * 2, this.data.width || 2])
+        }
+
+        ctx.beginPath()
+        ctx.moveTo(this.data.x1!, this.data.y1!)
+        ctx.lineTo(this.data.x2!, this.data.y2!)
+        ctx.stroke()
+
+        ctx.setLineDash([])
+
+        if (this.selected) {
+            this.renderSelection(ctx)
+        }
+    }
+}
