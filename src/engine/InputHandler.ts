@@ -2,6 +2,7 @@ import { ErrorHandler } from '../utils/ErrorHandler'
 import { CURSORS, CURSOR_THROTTLE_MS } from '../constants'
 import type { Point } from '../types'
 import type { DrawingEngine } from './DrawingEngine'
+import { selectors } from '../stores/AppState'
 
 /**
  * Handles mouse and keyboard input for the drawing engine
@@ -56,7 +57,10 @@ export class InputHandler {
             )
 
             if (e.button === 0) {
-                this.engine.currentTool._safeOnMouseDown(worldPos, e)
+                // Get current tool from AppState
+                const toolName = selectors.getTool()
+                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+                currentTool._safeOnMouseDown(worldPos, e)
             } else if (e.button === 2) {
                 this.engine.coordinates.startPan({ x: e.clientX, y: e.clientY })
                 this.rightMouseDown = true
@@ -83,22 +87,23 @@ export class InputHandler {
             const now = Date.now()
             if (now - this.lastCursorBroadcast >= this.cursorThrottle) {
                 this.lastCursorBroadcast = now
-                const toolName = Object.keys(this.engine.tools).find(
-                    key => this.engine.tools[key as keyof typeof this.engine.tools] === this.engine.currentTool
-                )
+                const toolName = selectors.getTool()
+                const color = selectors.getColor()
 
                 // Direct call to engine's broadcast method
                 this.engine.broadcastCursor({
                     x: worldPos.x,
                     y: worldPos.y,
-                    tool: toolName || 'draw',
-                    color: this.engine.currentColor
+                    tool: toolName,
+                    color: color
                 })
             }
 
             // left click
             if (e.buttons === 1) {
-                this.engine.currentTool._safeOnMouseMove(worldPos, e)
+                const toolName = selectors.getTool()
+                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+                currentTool._safeOnMouseMove(worldPos, e)
             // right click
             } else if (e.buttons === 2) {
                 e.preventDefault()
@@ -122,7 +127,9 @@ export class InputHandler {
             )
 
             if (e.button === 0) {
-                this.engine.currentTool._safeOnMouseUp(worldPos, e)
+                const toolName = selectors.getTool()
+                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+                currentTool._safeOnMouseUp(worldPos, e)
             } else if (e.button === 2) {
                 this.engine.coordinates.endPan()
                 this.rightMouseDown = false
@@ -151,17 +158,17 @@ export class InputHandler {
         if (this.rightMouseDown) {
             this.canvas.style.cursor = 'grabbing'
         } else {
+            // Get current tool from AppState
+            const toolName = selectors.getTool()
+            const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+
             // Restore tool-specific cursor
-            if (this.engine.currentTool === this.engine.tools.select && worldPos) {
+            if (currentTool === this.engine.tools.select && worldPos) {
                 // SelectTool has dynamic cursor based on hover position
-                if ('updateCursor' in this.engine.currentTool) {
-                    (this.engine.currentTool as any).updateCursor(worldPos)
+                if ('updateCursor' in currentTool) {
+                    (currentTool as any).updateCursor(worldPos)
                 }
             } else {
-                // Get current tool name
-                const toolName = Object.keys(this.engine.tools).find(
-                    key => this.engine.tools[key as keyof typeof this.engine.tools] === this.engine.currentTool
-                )
 
                 // Restore cursor based on tool
                 switch (toolName) {

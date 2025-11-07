@@ -10,6 +10,11 @@ export class InviteManager {
     passwordInput: any
     createSessionMenu: any
     createSessionButton: any
+    unsubscribeNetworkStatus: (() => void) | null
+    boundHandleButtonClick: (() => void) | null
+    boundTogglePassword: (() => void) | null
+    boundHandleCreateSession: (() => void) | null
+    boundHandleOverlayClick: ((e: MouseEvent) => void) | null
 
     constructor(roomCode: string | null, notificationManager: any = null, sessionManager: any = null) {
         this.roomCode = roomCode // null in local mode, string when networked
@@ -21,11 +26,18 @@ export class InviteManager {
         this.createSessionMenu = document.querySelector('.createSession-overlay')
         this.createSessionButton = this.createSessionMenu.querySelector('button')
 
+        // Initialize bound handlers
+        this.unsubscribeNetworkStatus = null
+        this.boundHandleButtonClick = null
+        this.boundTogglePassword = null
+        this.boundHandleCreateSession = null
+        this.boundHandleOverlayClick = null
+
         this.setUpListeners()
         this.updateUI() // Set initial UI state
 
-        // Subscribe to network status changes
-        appState.subscribe('network.status', () => {
+        // Subscribe to network status changes and store unsubscribe function
+        this.unsubscribeNetworkStatus = appState.subscribe('network.status', () => {
             this.updateUI()
         })
     }
@@ -39,16 +51,20 @@ export class InviteManager {
     }
 
     setUpListeners() {
-        this.button.addEventListener('click', () => this.handleButtonClick())
-        this.passwordToggle.addEventListener('change', () => this.togglePassword())
-        this.createSessionButton.addEventListener('click', () => this.handleCreateSession())
-
-        // Close modal on overlay click
-        this.createSessionMenu.addEventListener('click', (e: MouseEvent) => {
+        // Store bound handlers for cleanup
+        this.boundHandleButtonClick = () => this.handleButtonClick()
+        this.boundTogglePassword = () => this.togglePassword()
+        this.boundHandleCreateSession = () => this.handleCreateSession()
+        this.boundHandleOverlayClick = (e: MouseEvent) => {
             if (e.target === this.createSessionMenu) {
                 this.hideSettings()
             }
-        })
+        }
+
+        this.button.addEventListener('click', this.boundHandleButtonClick)
+        this.passwordToggle.addEventListener('change', this.boundTogglePassword)
+        this.createSessionButton.addEventListener('click', this.boundHandleCreateSession)
+        this.createSessionMenu.addEventListener('click', this.boundHandleOverlayClick)
     }
 
     /**
@@ -169,5 +185,34 @@ export class InviteManager {
     hideSettings() {
         this.createSessionMenu.style.display = 'none'
         this.createSessionMenu.classList.remove('show')
+    }
+
+    /**
+     * Cleanup method - remove event listeners and subscriptions
+     */
+    destroy() {
+        // Unsubscribe from state changes
+        if (this.unsubscribeNetworkStatus) {
+            this.unsubscribeNetworkStatus()
+            this.unsubscribeNetworkStatus = null
+        }
+
+        // Remove event listeners
+        if (this.boundHandleButtonClick) {
+            this.button.removeEventListener('click', this.boundHandleButtonClick)
+            this.boundHandleButtonClick = null
+        }
+        if (this.boundTogglePassword) {
+            this.passwordToggle.removeEventListener('change', this.boundTogglePassword)
+            this.boundTogglePassword = null
+        }
+        if (this.boundHandleCreateSession) {
+            this.createSessionButton.removeEventListener('click', this.boundHandleCreateSession)
+            this.boundHandleCreateSession = null
+        }
+        if (this.boundHandleOverlayClick) {
+            this.createSessionMenu.removeEventListener('click', this.boundHandleOverlayClick)
+            this.boundHandleOverlayClick = null
+        }
     }
 }

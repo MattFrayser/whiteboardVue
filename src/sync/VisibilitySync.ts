@@ -14,11 +14,15 @@ export class VisibilitySync {
     sessionManager: SessionManager
     debounceMs: number
     syncDebounceTimer: ReturnType<typeof setTimeout> | null
+    boundHandleVisibilityChange: (() => void) | null
+    boundHandleFocus: (() => void) | null
 
     constructor(sessionManager: SessionManager, debounceMs = 1000) {
         this.sessionManager = sessionManager
         this.debounceMs = debounceMs
         this.syncDebounceTimer = null
+        this.boundHandleVisibilityChange = null
+        this.boundHandleFocus = null
 
         // Setup event listeners
         this.setupListeners()
@@ -28,11 +32,15 @@ export class VisibilitySync {
      * Setup event listeners for visibility changes
      */
     setupListeners(): void {
+        // Store bound handlers for cleanup
+        this.boundHandleVisibilityChange = () => this.handleVisibilityChange()
+        this.boundHandleFocus = () => this.handleFocus()
+
         // Sync when tab becomes visible (handles tab switches, minimization)
-        document.addEventListener('visibilitychange', () => this.handleVisibilityChange())
+        document.addEventListener('visibilitychange', this.boundHandleVisibilityChange)
 
         // Sync when window gains focus (handles dual-monitor, side-by-side scenarios)
-        window.addEventListener('focus', () => this.handleFocus())
+        window.addEventListener('focus', this.boundHandleFocus)
     }
 
     /**
@@ -76,9 +84,15 @@ export class VisibilitySync {
      * Removes event listeners and clears timers
      */
     destroy(): void {
-        // Remove event listeners
-        document.removeEventListener('visibilitychange', () => this.handleVisibilityChange())
-        window.removeEventListener('focus', () => this.handleFocus())
+        // Remove event listeners using stored references
+        if (this.boundHandleVisibilityChange) {
+            document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange)
+            this.boundHandleVisibilityChange = null
+        }
+        if (this.boundHandleFocus) {
+            window.removeEventListener('focus', this.boundHandleFocus)
+            this.boundHandleFocus = null
+        }
 
         // Clear any pending timer
         if (this.syncDebounceTimer) {

@@ -10,7 +10,7 @@ import { StateStore } from './StateStore'
 import { DEFAULT_COLOR } from '../constants'
 
 // Type definitions for the application state
-export type Tool = 'draw' | 'select' | 'erase' | 'text'
+export type Tool = 'draw' | 'rectangle' | 'circle' | 'line' | 'select' | 'eraser' | 'text'
 export type NetworkStatus = 'local' | 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export interface DrawingObject {
@@ -31,6 +31,21 @@ export interface SelectionBounds {
     height: number
 }
 
+export interface RemoteCursor {
+    userId: string
+    x: number
+    y: number
+    color: string
+    tool: string
+    lastUpdate: number
+}
+
+export interface Viewport {
+    offsetX: number
+    offsetY: number
+    scale: number
+}
+
 interface AppStateShape extends Record<string, unknown> {
     ui: {
         tool: Tool
@@ -38,6 +53,7 @@ interface AppStateShape extends Record<string, unknown> {
         brushSize: number
         cursor: string
     }
+    viewport: Viewport
     objects: {
         items: DrawingObject[]
         version: number
@@ -56,7 +72,11 @@ interface AppStateShape extends Record<string, unknown> {
         status: NetworkStatus
         roomCode: string | null
         userId: string | null
+        userColor: string | null
         users: User[]
+        remoteCursors: Record<string, RemoteCursor>
+        isAuthenticating: boolean
+        reconnectAttempts: number
     }
 }
 
@@ -68,6 +88,13 @@ const initialState: AppStateShape = {
         color: DEFAULT_COLOR,   // Current drawing color
         brushSize: 5,           // Current brush size
         cursor: 'crosshair',    // Current cursor style
+    },
+
+    // Viewport: Camera transform (pan/zoom)
+    viewport: {
+        offsetX: 0,             // Pan offset X
+        offsetY: 0,             // Pan offset Y
+        scale: 1,               // Zoom scale
     },
 
     // Objects: Drawing objects in the canvas
@@ -95,7 +122,11 @@ const initialState: AppStateShape = {
         status: 'local',        // 'local' | 'connecting' | 'connected' | 'disconnected' | 'error'
         roomCode: null,         // Current room code (null in local mode)
         userId: null,           // Current user's ID (temporary local ID in local mode, server ID when connected)
+        userColor: null,        // User's assigned color in collaborative session
         users: [],              // Other connected users [{ id, color, cursor }]
+        remoteCursors: {},      // Remote user cursors Record<userId, RemoteCursor>
+        isAuthenticating: false, // Whether currently in authentication flow
+        reconnectAttempts: 0,   // Number of reconnection attempts
     },
 }
 
@@ -112,6 +143,12 @@ export const selectors = {
     getColor: () => appState.get('ui.color') as string,
     getBrushSize: () => appState.get('ui.brushSize') as number,
     getCursor: () => appState.get('ui.cursor') as string,
+
+    // Viewport selectors
+    getViewport: () => appState.get('viewport') as Viewport,
+    getViewportOffsetX: () => appState.get('viewport.offsetX') as number,
+    getViewportOffsetY: () => appState.get('viewport.offsetY') as number,
+    getViewportScale: () => appState.get('viewport.scale') as number,
 
     // Object selectors
     getObjects: () => appState.get('objects.items') as DrawingObject[],
@@ -133,7 +170,11 @@ export const selectors = {
     getNetworkStatus: () => appState.get('network.status') as NetworkStatus,
     getRoomCode: () => appState.get('network.roomCode') as string | null,
     getUserId: () => appState.get('network.userId') as string | null,
+    getUserColor: () => appState.get('network.userColor') as string | null,
     getUsers: () => appState.get('network.users') as User[],
+    getRemoteCursors: () => appState.get('network.remoteCursors') as Record<string, RemoteCursor>,
+    getIsAuthenticating: () => appState.get('network.isAuthenticating') as boolean,
+    getReconnectAttempts: () => appState.get('network.reconnectAttempts') as number,
     isConnected: () => appState.get('network.status') === 'connected',
     isLocalMode: () => appState.get('network.status') === 'local',
 }
@@ -144,6 +185,23 @@ export const actions = {
     setColor: (color: string) => appState.set('ui.color', color),
     setBrushSize: (size: number) => appState.set('ui.brushSize', size),
     setCursor: (cursor: string) => appState.set('ui.cursor', cursor),
+
+    // Viewport actions
+    setViewport: (viewport: Viewport) => appState.set('viewport', viewport),
+    setViewportTransform: (offsetX: number, offsetY: number, scale: number) => {
+        appState.batch({
+            'viewport.offsetX': offsetX,
+            'viewport.offsetY': offsetY,
+            'viewport.scale': scale,
+        })
+    },
+    setViewportOffset: (offsetX: number, offsetY: number) => {
+        appState.batch({
+            'viewport.offsetX': offsetX,
+            'viewport.offsetY': offsetY,
+        })
+    },
+    setViewportScale: (scale: number) => appState.set('viewport.scale', scale),
 
     // Object actions
     setObjects: (objects: DrawingObject[]) => {
@@ -211,8 +269,36 @@ export const actions = {
     setUserId: (userId: string | null) => {
         appState.set('network.userId', userId)
     },
+    setUserColor: (userColor: string | null) => {
+        appState.set('network.userColor', userColor)
+    },
     setUsers: (users: User[]) => {
         appState.set('network.users', users)
+    },
+    setRemoteCursors: (cursors: Record<string, RemoteCursor>) => {
+        appState.set('network.remoteCursors', cursors)
+    },
+    addRemoteCursor: (userId: string, cursor: RemoteCursor) => {
+        const cursors = appState.get('network.remoteCursors') as Record<string, RemoteCursor>
+        appState.set('network.remoteCursors', { ...cursors, [userId]: cursor })
+    },
+    removeRemoteCursor: (userId: string) => {
+        const cursors = appState.get('network.remoteCursors') as Record<string, RemoteCursor>
+        const { [userId]: _, ...newCursors } = cursors
+        appState.set('network.remoteCursors', newCursors)
+    },
+    setIsAuthenticating: (isAuthenticating: boolean) => {
+        appState.set('network.isAuthenticating', isAuthenticating)
+    },
+    setReconnectAttempts: (attempts: number) => {
+        appState.set('network.reconnectAttempts', attempts)
+    },
+    incrementReconnectAttempts: () => {
+        const current = appState.get('network.reconnectAttempts') as number
+        appState.set('network.reconnectAttempts', current + 1)
+    },
+    resetReconnectAttempts: () => {
+        appState.set('network.reconnectAttempts', 0)
     },
     setNetworkState: (status: NetworkStatus, roomCode: string | null = null, userId: string | null = null) => {
         const updates: Record<string, unknown> = { 'network.status': status }

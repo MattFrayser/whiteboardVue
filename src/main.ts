@@ -1,5 +1,6 @@
 import './style.css'
 import { DrawingEngine } from './engine/DrawingEngine'
+import { ObjectManager } from './managers/ObjectManager'
 import { Toolbar } from './ui/Toolbar'
 import { InviteManager } from './ui/InviteManager'
 import { NotificationManager } from './ui/NotificationManager'
@@ -23,7 +24,11 @@ console.log('[App] Starting in local mode with temporary userId:', localUserId)
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
 if (!canvas) throw new Error('Canvas element not found')
 
-const engine = new DrawingEngine(canvas, null) // null = local mode
+// Create ObjectManager first (with no network manager for local mode)
+const objectManager = new ObjectManager(null)
+
+// Create DrawingEngine with injected ObjectManager (null = local mode for network)
+const engine = new DrawingEngine(canvas, objectManager, null)
 const toolbar = new Toolbar(engine)
 
 // Initialize UI components
@@ -35,7 +40,7 @@ const connectionStatus = new ConnectionStatusIndicator()
 ErrorHandler.init(notificationManager as any, dialogManager as any)
 
 // Set temporary local userId
-engine.objectManager.setUserId(localUserId)
+objectManager.setUserId(localUserId)
 actions.setUserId(localUserId)
 
 // Initialize InviteManager first (without SessionManager)
@@ -53,17 +58,10 @@ inviteManager.setSessionManager(sessionManager)
 // Initialize VisibilitySync (auto-sync when user returns to tab)
 const visibilitySync = new VisibilitySync(sessionManager)
 
-// Sync AppState UI changes to engine
-appState.subscribe('ui.tool', (tool) => {
+// Subscribe to tool changes to activate/deactivate tools
+// (Color and brushSize are queried on-demand, no sync needed)
+const unsubscribeToolChange = appState.subscribe('ui.tool', (tool) => {
     engine.setTool(tool as 'draw' | 'rectangle' | 'circle' | 'select' | 'eraser' | 'line' | 'text')
-})
-
-appState.subscribe('ui.color', (color) => {
-    engine.currentColor = color as string
-})
-
-appState.subscribe('ui.brushSize', (size) => {
-    engine.currentWidth = size as number
 })
 
 // Start engine
@@ -88,6 +86,10 @@ if (roomCodeFromURL) {
 
 // Clean up on exit
 window.addEventListener('beforeunload', () => {
+    // Unsubscribe from state changes
+    unsubscribeToolChange()
+
+    // Destroy all components
     engine.destroy()
     toolbar.destroy()
     notificationManager.destroy()
@@ -95,5 +97,8 @@ window.addEventListener('beforeunload', () => {
     connectionStatus.destroy()
     sessionManager.destroy()
     visibilitySync.destroy()
-    appState.clear() // Clean up state subscriptions
+    inviteManager.destroy()
+
+    // Clean up remaining state subscriptions
+    appState.clear()
 })

@@ -1,40 +1,29 @@
-import { actions, type NetworkStatus } from '../stores/AppState'
+import { actions, selectors, type NetworkStatus } from '../stores/AppState'
 import { API_BASE_URL, WS_BASE_URL, MAX_RECONNECT_ATTEMPTS, AUTH_TIMEOUT, ACK_TIMEOUT } from '../constants'
 import { ErrorHandler, ErrorCode } from '../utils/ErrorHandler'
 import type { MessageHandler, StatusCallback, PendingAck, CursorData, NetworkMessage } from '../types/network'
 import type { DrawingObject } from '../objects/DrawingObject'
+import type { INetworkManager } from '../interfaces/INetworkManager'
 
-export class WebSocketManager {
+export class WebSocketManager implements INetworkManager {
     socket: WebSocket | null
-    roomCode: string | null
     messageHandler: MessageHandler | null
-    connectionStatus: string
     statusCallback: StatusCallback | null
-    reconnectAttempts: number
     maxReconnectAttempts: number
     reconnectTimeout: ReturnType<typeof setTimeout> | null
     authTimeout: ReturnType<typeof setTimeout> | null
-    userColor: string | null
-    userId: string | null
-    isAuthenticating: boolean
-    isReconnecting: boolean
+    isReconnecting: boolean  // Transient state during reconnection flow
     pendingAcks: Map<string, PendingAck>
     ackTimeout: number
 
     constructor(messageHandler: MessageHandler | null = null) {
         this.socket = null
-        this.roomCode = null
         this.messageHandler = messageHandler // Callback for handling incoming messages
 
-        this.connectionStatus = 'disconnected' //  'connected', 'disconnected', 'error'
         this.statusCallback = null
-        this.reconnectAttempts = 0
         this.maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS
         this.reconnectTimeout = null
         this.authTimeout = null
-        this.userColor = null
-        this.userId = null
-        this.isAuthenticating = false // Track if we're in password authentication flow
         this.isReconnecting = false // Track if this is a reconnection (not initial connection)
 
         // Track pending acknowledgments for object operations
@@ -44,7 +33,7 @@ export class WebSocketManager {
     }
     
     isConnected(): boolean {
-        return this.connectionStatus === 'connected'
+        return selectors.getNetworkStatus() === 'connected'
     }
 
     setStatusCallback(callback: StatusCallback): void {
@@ -52,17 +41,13 @@ export class WebSocketManager {
     }
 
     updateStatus(status: string): void {
-        this.connectionStatus = status
+        actions.setNetworkStatus(status as NetworkStatus)
         if (this.statusCallback) {
             this.statusCallback(status)
         }
-
-        actions.setNetworkStatus(status as NetworkStatus)
     }
 
     async connect(roomCode: string): Promise<void> {
-        this.roomCode = roomCode
-
         // Update state with roomCode
         actions.setRoomCode(roomCode)
 
@@ -85,7 +70,7 @@ export class WebSocketManager {
 
             // Now open WebSocket - cookie will be sent automatically
             console.log('[WebSocket] Opening WebSocket connection...')
-            this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${roomCode}`)
+            this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${roomCode}`)  // Use parameter, not this.roomCode
             console.log('[WebSocket] WebSocket object created, readyState:', this.socket.readyState)
 
             this.socket.onopen = () => {
@@ -170,22 +155,25 @@ export class WebSocketManager {
         }
 
         // Don't auto-reconnect if we're in the middle of password authentication
-        if (this.isAuthenticating) {
+        if (selectors.getIsAuthenticating()) {
             console.log('[WebSocket] Skipping auto-reconnect - password authentication in progress')
             return
         }
 
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++
+        const reconnectAttempts = selectors.getReconnectAttempts()
+        if (reconnectAttempts < this.maxReconnectAttempts) {
+            actions.incrementReconnectAttempts()
 
             // Set reconnecting flag so we can auto-rejoin the room after authentication
             this.isReconnecting = true
 
             // Retry with 2-second delay
             this.reconnectTimeout = setTimeout(() => {
-                console.log('[WebSocket] Attempting reconnection (attempt', this.reconnectAttempts, ')')
-                if (this.roomCode) {
-                    this.connect(this.roomCode)
+                const currentAttempts = selectors.getReconnectAttempts()
+                console.log('[WebSocket] Attempting reconnection (attempt', currentAttempts, ')')
+                const roomCode = selectors.getRoomCode()
+                if (roomCode) {
+                    this.connect(roomCode)
                 }
             }, 2000)
         } else {
@@ -265,16 +253,15 @@ export class WebSocketManager {
             this.authTimeout = null
         }
 
-        // Store user ID (session handled via HTTP cookie)
-        this.userId = msg.userId ?? null
-
         // Update state with userId
-        actions.setUserId(this.userId)
+        const userId = msg.userId ?? null
+        actions.setUserId(userId)
 
         // If this is a reconnection, automatically send joinRoom message
         // Backend will check if room is already verified for this session
-        if (this.isReconnecting && this.roomCode) {
-            console.log('[WebSocket] Reconnection authenticated, auto-rejoining room:', this.roomCode)
+        const roomCode = selectors.getRoomCode()
+        if (this.isReconnecting && roomCode) {
+            console.log('[WebSocket] Reconnection authenticated, auto-rejoining room:', roomCode)
             this.send({
                 type: 'joinRoom',
                 password: null, // No password on reconnect - backend will check session verification
@@ -284,18 +271,19 @@ export class WebSocketManager {
 
         // Notify message handler
         if (this.messageHandler) {
-            this.messageHandler({ type: 'network:authenticated', userId: this.userId ?? undefined })
+            this.messageHandler({ type: 'network:authenticated', userId: userId ?? undefined })
         }
     }
 
     handleRoomJoined(msg: NetworkMessage): void {
-        this.userColor = (msg as unknown as { color?: string }).color ?? null
+        const userColor = (msg as unknown as { color?: string }).color ?? null
+        actions.setUserColor(userColor)
         this.updateStatus('connected')
-        this.reconnectAttempts = 0
+        actions.resetReconnectAttempts()
 
         // Notify message handler that room was joined successfully
         if (this.messageHandler) {
-            this.messageHandler({ type: 'network:room_joined', color: (msg as unknown as { color?: string }).color })
+            this.messageHandler({ type: 'network:room_joined', color: userColor ?? undefined })
         }
     }
 
@@ -339,7 +327,8 @@ export class WebSocketManager {
 
     handleCursor(cursor: NetworkMessage): void {
         // Filter out cursors from same userId (prevents same-user multi-tab cursors)
-        if (cursor.userId === this.userId) {
+        const userId = selectors.getUserId()
+        if (cursor.userId === userId) {
             return
         }
 
@@ -439,7 +428,7 @@ export class WebSocketManager {
         this.send({
             type: 'objectAdded',
             object: object.toJSON(),
-            userId: this.userId,
+            userId: selectors.getUserId(),
         })
     }
 
@@ -470,7 +459,7 @@ export class WebSocketManager {
             this.send({
                 type: 'objectAdded',
                 object: object.toJSON(),
-                userId: this.userId,
+                userId: selectors.getUserId(),
             })
         })
     }
@@ -479,14 +468,14 @@ export class WebSocketManager {
         this.send({
             type: 'objectUpdated',
             object: object.toJSON(),
-            userId: this.userId,
+            userId: selectors.getUserId(),
         })
     }
     broadcastObjectDeleted(object: DrawingObject): void {
         this.send({
             type: 'objectDeleted',
             objectId: object.id,
-            userId: this.userId,
+            userId: selectors.getUserId(),
         })
     }
     broadcastCursor(cursor: CursorData): void {
@@ -523,14 +512,14 @@ export class WebSocketManager {
             this.socket = null
         }
 
-        // Clear data
-        this.reconnectAttempts = this.maxReconnectAttempts // Prevent reconnect
+        // Clear data - prevent reconnect by setting max attempts
+        actions.setReconnectAttempts(this.maxReconnectAttempts)
         this.updateStatus('disconnected')
     }
 
     disconnectForAuth(): void {
         // Set flag to prevent auto-reconnect during password authentication
-        this.isAuthenticating = true
+        actions.setIsAuthenticating(true)
 
         // Clear all timers
         if (this.authTimeout) {

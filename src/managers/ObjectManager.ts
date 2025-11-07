@@ -4,13 +4,14 @@ import { SelectionManager } from './SelectionManager'
 import { ObjectStore } from './ObjectStore'
 import { LocalStorageManager } from '../storage/LocalStorageManager'
 import { AddObjectOperation, DeleteObjectOperation } from './operations'
-import type { WebSocketManager } from '../network/WebSocketManager'
+import type { INetworkManager } from '../interfaces/INetworkManager'
 import type { DrawingObject } from '../objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../types/common'
 import type { MigrationResult } from '../types/network'
+import type { IObjectManager } from '../interfaces/IObjectManager'
 
-export class ObjectManager {
-    networkManager: WebSocketManager | null
+export class ObjectManager implements IObjectManager {
+    networkManager: INetworkManager | null
     userId: string | null
     nextZIndex: number
     isLocalMode: boolean
@@ -20,7 +21,7 @@ export class ObjectManager {
     selectionManager: SelectionManager
     localStorageManager: LocalStorageManager
 
-    constructor(networkManager: WebSocketManager | null) {
+    constructor(networkManager: INetworkManager | null) {
         this.networkManager = networkManager
         this.userId = null // Will be set by network manager
         this.nextZIndex = 0 // Track next available zIndex
@@ -91,11 +92,11 @@ export class ObjectManager {
     /**
      * Attach network manager after initialization (for local-first mode)
      * Migrates local objects to networked mode and broadcasts to server
-     * @param {WebSocketManager} networkManager - The network manager to attach
+     * @param {INetworkManager} networkManager - The network manager to attach
      * @param {string} newUserId - The server-assigned userId to replace local userId
      * @returns {Promise} Promise that resolves with migration results {succeeded, failed}
      */
-    attachNetworkManager(networkManager: WebSocketManager, newUserId: string): Promise<MigrationResult> {
+    attachNetworkManager(networkManager: INetworkManager, newUserId: string): Promise<MigrationResult> {
         console.log('[ObjectManager] Attaching network manager, migrating from local to networked mode')
 
         const oldUserId = this.userId
@@ -132,7 +133,7 @@ export class ObjectManager {
      * Migrate local objects to network with server confirmation
      * Returns results of migration for error handling
      */
-    async migrateLocalObjectsToNetwork(objects: DrawingObject[], networkManager: WebSocketManager): Promise<MigrationResult> {
+    async migrateLocalObjectsToNetwork(objects: DrawingObject[], networkManager: INetworkManager): Promise<MigrationResult> {
         if (!objects || objects.length === 0) {
             console.log('[ObjectManager] No objects to migrate')
             return { succeeded: [], failed: [] }

@@ -3,6 +3,7 @@ import { Tool } from './Tool'
 import { SELECTION_COLOR, FONT_SIZE_MULTIPLIER, TEXT_BLUR_DELAY, TEXT_FOCUS_DELAY } from '../constants'
 import type { Point } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
+import { selectors } from '../stores/AppState'
 
 export class TextTool extends Tool {
     isEditing: boolean
@@ -42,8 +43,8 @@ export class TextTool extends Tool {
         const canvasRect = this.engine.canvas.getBoundingClientRect()
         this.inputElement.style.left = `${canvasRect.left + viewportPos.x}px`
         this.inputElement.style.top = `${canvasRect.top + viewportPos.y}px`
-        this.inputElement.style.fontSize = `${this.engine.currentWidth * FONT_SIZE_MULTIPLIER}px`
-        this.inputElement.style.color = this.engine.currentColor
+        this.inputElement.style.fontSize = `${selectors.getBrushSize() * FONT_SIZE_MULTIPLIER}px`
+        this.inputElement.style.color = selectors.getColor()
         this.inputElement.style.background = 'rgba(255, 255, 255, 0.9)'
         this.inputElement.style.border = `2px solid ${SELECTION_COLOR}`
         this.inputElement.style.outline = 'none'
@@ -103,8 +104,8 @@ export class TextTool extends Tool {
                 x: this.Position.x,
                 y: this.Position.y,
                 text,
-                color: this.engine.currentColor,
-                fontSize: this.engine.currentWidth * FONT_SIZE_MULTIPLIER,
+                color: selectors.getColor(),
+                fontSize: selectors.getBrushSize() * FONT_SIZE_MULTIPLIER,
             }, 0)
 
             this.engine.objectManager.addObject(textObj)

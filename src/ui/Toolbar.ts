@@ -10,12 +10,34 @@ export class Toolbar {
     unsubscribers: (() => void)[]
     colors: string[]
 
+    // Store bound event handlers for cleanup
+    boundToolButtonHandlers: Map<Element, () => void>
+    boundColorPickerHandler: ((e: Event) => void) | null
+    boundSwatchHandlers: Map<Element, { click: () => void; dblclick: () => void }>
+    boundColorMenuHandler: ((e: Event) => void) | null
+    boundColorGridHandler: ((e: Event) => void) | null
+    boundDocumentClickHandler: ((e: Event) => void) | null
+    boundBrushSizeHandler: ((e: Event) => void) | null
+    boundUndoHandler: (() => void) | null
+    boundRedoHandler: (() => void) | null
+
     constructor(engine: DrawingEngine) {
         this.engine = engine
         this.activeSwatch = null
         this.activeSwatchForMenu = null
         this.unsubscribers = [] // Track subscriptions for cleanup
         this.colors = COLOR_PALETTE
+
+        // Initialize handler storage
+        this.boundToolButtonHandlers = new Map()
+        this.boundColorPickerHandler = null
+        this.boundSwatchHandlers = new Map()
+        this.boundColorMenuHandler = null
+        this.boundColorGridHandler = null
+        this.boundDocumentClickHandler = null
+        this.boundBrushSizeHandler = null
+        this.boundUndoHandler = null
+        this.boundRedoHandler = null
 
         // init
         this.setupEventListeners()
@@ -58,85 +80,102 @@ export class Toolbar {
     }
 
     setupEventListeners(): void {
+        // Tool buttons
         document.querySelectorAll('.tool-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            const handler = () => {
                 const tool = ((btn as HTMLElement).dataset).tool
                 if (tool) actions.setTool(tool as Tool)
-            })
+            }
+            btn.addEventListener('click', handler)
+            this.boundToolButtonHandlers.set(btn, handler)
         })
 
         // Color Picker
         const colorPicker = document.getElementById('colorPicker')
         if (colorPicker) {
-            colorPicker.addEventListener('change', e => {
+            this.boundColorPickerHandler = (e: Event) => {
                 this.selectColor((e.target as HTMLInputElement).value)
-            })
+            }
+            colorPicker.addEventListener('change', this.boundColorPickerHandler)
         }
 
         // Color swatches - single click selects, double click opens menu
         document.querySelectorAll('.swatch').forEach(swatch => {
-            swatch.addEventListener('click', () => {
+            const clickHandler = () => {
                 const swatchColor = ((swatch as HTMLElement).dataset).color
                 const swatchSizeStr = ((swatch as HTMLElement).dataset).size
                 const swatchSize = swatchSizeStr ? parseInt(swatchSizeStr) : (appState.get('ui.brushSize') as number)
                 if (swatchColor) this.selectColor(swatchColor)
                 this.selectBrushSize(swatchSize)
-            })
+            }
 
-            swatch.addEventListener('dblclick', () => {
+            const dblclickHandler = () => {
                 this.openMenu(swatch as HTMLElement)
-            })
+            }
+
+            swatch.addEventListener('click', clickHandler)
+            swatch.addEventListener('dblclick', dblclickHandler)
+            this.boundSwatchHandlers.set(swatch, { click: clickHandler, dblclick: dblclickHandler })
         })
 
         // Color menu
         const colorMenu = document.getElementById('colorMenu')
         const colorGrid = document.getElementById('colorGrid')
         if (colorMenu) {
-            colorMenu.addEventListener('click', e => {
+            this.boundColorMenuHandler = (e: Event) => {
                 e.stopPropagation()
-            })
+            }
+            colorMenu.addEventListener('click', this.boundColorMenuHandler)
         }
+
         // Select color square changes color and closes menu
         if (colorGrid) {
-            colorGrid.addEventListener('click', e => {
+            this.boundColorGridHandler = (e: Event) => {
                 if ((e.target as Element).classList.contains('color-option')) {
                     const color = ((e.target as HTMLElement).dataset).color
                     if (color) this.selectColor(color)
                     this.closeMenu()
                 }
-            })
+            }
+            colorGrid.addEventListener('click', this.boundColorGridHandler)
         }
+
         // Close menu when clicking outside
-        document.addEventListener('click', e => {
+        this.boundDocumentClickHandler = (e: Event) => {
             if (!(e.target as Element).closest('.color-picker-container')) {
                 this.closeMenu()
             }
-        })
+        }
+        document.addEventListener('click', this.boundDocumentClickHandler)
 
         // Brush Size
         const brushSize = document.getElementById('brushSize')
         if (brushSize) {
-            brushSize.addEventListener('input', e => {
+            this.boundBrushSizeHandler = (e: Event) => {
                 this.selectBrushSize(parseInt((e.target as HTMLInputElement).value))
-            })
+            }
+            brushSize.addEventListener('input', this.boundBrushSizeHandler)
         }
 
         // Undo/Redo - direct calls to engine
         const undoBtn = document.getElementById('undoBtn')
         if (undoBtn) {
-            undoBtn.addEventListener('click', () => {
+            this.boundUndoHandler = () => {
                 if (this.engine) {
                     this.engine.undo()
                 }
-            })
+            }
+            undoBtn.addEventListener('click', this.boundUndoHandler)
         }
+
         const redoBtn = document.getElementById('redoBtn')
         if (redoBtn) {
-            redoBtn.addEventListener('click', () => {
+            this.boundRedoHandler = () => {
                 if (this.engine) {
                     this.engine.redo()
                 }
-            })
+            }
+            redoBtn.addEventListener('click', this.boundRedoHandler)
         }
     }
 
@@ -315,5 +354,78 @@ export class Toolbar {
         // Clean up all subscriptions
         this.unsubscribers.forEach(unsub => unsub())
         this.unsubscribers = []
+
+        // Remove tool button listeners
+        this.boundToolButtonHandlers.forEach((handler, btn) => {
+            btn.removeEventListener('click', handler)
+        })
+        this.boundToolButtonHandlers.clear()
+
+        // Remove color picker listener
+        if (this.boundColorPickerHandler) {
+            const colorPicker = document.getElementById('colorPicker')
+            if (colorPicker) {
+                colorPicker.removeEventListener('change', this.boundColorPickerHandler)
+            }
+            this.boundColorPickerHandler = null
+        }
+
+        // Remove swatch listeners
+        this.boundSwatchHandlers.forEach((handlers, swatch) => {
+            swatch.removeEventListener('click', handlers.click)
+            swatch.removeEventListener('dblclick', handlers.dblclick)
+        })
+        this.boundSwatchHandlers.clear()
+
+        // Remove color menu listener
+        if (this.boundColorMenuHandler) {
+            const colorMenu = document.getElementById('colorMenu')
+            if (colorMenu) {
+                colorMenu.removeEventListener('click', this.boundColorMenuHandler)
+            }
+            this.boundColorMenuHandler = null
+        }
+
+        // Remove color grid listener
+        if (this.boundColorGridHandler) {
+            const colorGrid = document.getElementById('colorGrid')
+            if (colorGrid) {
+                colorGrid.removeEventListener('click', this.boundColorGridHandler)
+            }
+            this.boundColorGridHandler = null
+        }
+
+        // Remove document click listener
+        if (this.boundDocumentClickHandler) {
+            document.removeEventListener('click', this.boundDocumentClickHandler)
+            this.boundDocumentClickHandler = null
+        }
+
+        // Remove brush size listener
+        if (this.boundBrushSizeHandler) {
+            const brushSize = document.getElementById('brushSize')
+            if (brushSize) {
+                brushSize.removeEventListener('input', this.boundBrushSizeHandler)
+            }
+            this.boundBrushSizeHandler = null
+        }
+
+        // Remove undo button listener
+        if (this.boundUndoHandler) {
+            const undoBtn = document.getElementById('undoBtn')
+            if (undoBtn) {
+                undoBtn.removeEventListener('click', this.boundUndoHandler)
+            }
+            this.boundUndoHandler = null
+        }
+
+        // Remove redo button listener
+        if (this.boundRedoHandler) {
+            const redoBtn = document.getElementById('redoBtn')
+            if (redoBtn) {
+                redoBtn.removeEventListener('click', this.boundRedoHandler)
+            }
+            this.boundRedoHandler = null
+        }
     }
 }

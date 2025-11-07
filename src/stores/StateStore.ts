@@ -18,10 +18,12 @@ type Listener = (value: StateValue) => void
 
 export class StateStore<T extends Record<string, unknown> = Record<string, unknown>> {
     state: T
+    initialState: T
     listeners: Map<string, Set<Listener>>
     devMode: boolean
 
     constructor(initialState: T = {} as T) {
+        this.initialState = this._deepClone(initialState)
         this.state = this._deepClone(initialState)
         this.listeners = new Map() // path -> Set of callbacks
         this.devMode = (import.meta as any).env?.DEV
@@ -154,9 +156,10 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
         }
     }
 
-    // used for cleanup
+    // Used for cleanup - clears all listeners and resets state to initial values
     clear(): void {
         this.listeners.clear()
+        this.state = this._deepClone(this.initialState)
     }
 
     /**

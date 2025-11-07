@@ -6,7 +6,7 @@
  * Provides event-driven interface for UI updates
  */
 import { WebSocketManager } from './WebSocketManager'
-import { actions } from '../stores/AppState'
+import { actions, selectors } from '../stores/AppState'
 import { ErrorHandler } from '../utils/ErrorHandler'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { NotificationManager } from '../types/ui'
@@ -105,7 +105,7 @@ export class SessionManager {
                             return
                         }
 
-                        const userId = this.networkManager.userId
+                        const userId = selectors.getUserId()
                         if (!userId) {
                             reject(new Error('User ID not available'))
                             return
@@ -225,11 +225,11 @@ export class SessionManager {
                         }
 
                         // Clear authentication flag if it was set
-                        if (this.networkManager.isAuthenticating) {
-                            this.networkManager.isAuthenticating = false
+                        if (selectors.getIsAuthenticating()) {
+                            actions.setIsAuthenticating(false)
                         }
 
-                        const userId = this.networkManager.userId
+                        const userId = selectors.getUserId()
                         if (!userId) {
                             reject(new Error('User ID not available'))
                             return
@@ -277,7 +277,7 @@ export class SessionManager {
 
                         if (message.code === 'PASSWORD_REQUIRED') {
                             console.log('[SessionManager] Password required for room')
-                            this.networkManager.isAuthenticating = true
+                            actions.setIsAuthenticating(true)
                             const enteredPassword = await this.dialogManager.showPasswordDialog(roomCode)
 
                             if (enteredPassword) {
@@ -292,7 +292,7 @@ export class SessionManager {
                                 return // Don't resolve/reject - wait for response
                             } else {
                                 // User cancelled
-                                this.networkManager.isAuthenticating = false
+                                actions.setIsAuthenticating(false)
                                 reject(new Error('Password required'))
                                 return
                             }
@@ -324,13 +324,13 @@ export class SessionManager {
                                     return // Don't resolve/reject - wait for response
                                 } else {
                                     // User cancelled retry
-                                    this.networkManager.isAuthenticating = false
+                                    actions.setIsAuthenticating(false)
                                     reject(new Error('Password authentication cancelled'))
                                     return
                                 }
                             } else {
                                 // Max attempts exceeded
-                                this.networkManager.isAuthenticating = false
+                                actions.setIsAuthenticating(false)
                                 this.notificationManager.showError('Maximum password attempts exceeded')
                                 reject(new Error('Maximum password attempts exceeded'))
                                 return

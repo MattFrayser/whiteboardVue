@@ -51,15 +51,45 @@ export class DialogManager {
             const enterBtn = dialog.querySelector('.join-btn')
             const cancelBtn = dialog.querySelector('.stay-local-btn')
 
+            // Store listener references for cleanup
+            const handleEscapeKey = (e: KeyboardEvent) => {
+                if (e.key === 'Escape' && this.currentDialog === dialog) {
+                    handleCancel()
+                }
+            }
+
+            const handleOverlayClick = (e: Event) => {
+                if (e.target === dialog) {
+                    handleCancel()
+                }
+            }
+
+            const handleEnterKey = (e: Event) => {
+                if ((e as KeyboardEvent).key === 'Enter') {
+                    handleEnter()
+                }
+            }
+
+            // Cleanup function
+            const cleanup = () => {
+                document.removeEventListener('keydown', handleEscapeKey)
+                dialog.removeEventListener('click', handleOverlayClick)
+                passwordInput.removeEventListener('keypress', handleEnterKey)
+                enterBtn?.removeEventListener('click', handleEnter)
+                cancelBtn?.removeEventListener('click', handleCancel)
+            }
+
             // Handle Enter button
             const handleEnter = () => {
                 const password = passwordInput.value.trim()
+                cleanup()
                 this.close()
                 resolve(password || null)
             }
 
             // Handle Cancel button
             const handleCancel = () => {
+                cleanup()
                 this.close()
                 resolve(null)
             }
@@ -67,27 +97,9 @@ export class DialogManager {
             // Add event listeners
             enterBtn?.addEventListener('click', handleEnter)
             cancelBtn?.addEventListener('click', handleCancel)
-
-            // Handle Enter key
-            passwordInput.addEventListener('keypress', (e) => {
-                if ((e as KeyboardEvent).key === 'Enter') {
-                    handleEnter()
-                }
-            })
-
-            // Handle Escape key
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && this.currentDialog === dialog) {
-                    handleCancel()
-                }
-            })
-
-            // Close on overlay click
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    handleCancel()
-                }
-            })
+            passwordInput.addEventListener('keypress', handleEnterKey)
+            document.addEventListener('keydown', handleEscapeKey)
+            dialog.addEventListener('click', handleOverlayClick)
 
             // Focus the input
             setTimeout(() => (passwordInput as HTMLElement).focus(), DIALOG_FOCUS_DELAY)
@@ -129,8 +141,30 @@ export class DialogManager {
             const joinBtn = dialog.querySelector('.join-btn')
             const stayLocalBtn = dialog.querySelector('.stay-local-btn')
 
+            // Store listener references for cleanup
+            const handleEscapeKey = (e: KeyboardEvent) => {
+                if (e.key === 'Escape' && this.currentDialog === dialog) {
+                    handleCancel()
+                }
+            }
+
+            const handleOverlayClick = (e: Event) => {
+                if (e.target === dialog) {
+                    handleCancel()
+                }
+            }
+
+            // Cleanup function
+            const cleanup = () => {
+                document.removeEventListener('keydown', handleEscapeKey)
+                dialog.removeEventListener('click', handleOverlayClick)
+                joinBtn?.removeEventListener('click', handleJoin)
+                stayLocalBtn?.removeEventListener('click', handleCancel)
+            }
+
             // Handle Join button
             const handleJoin = async () => {
+                cleanup()
                 this.close()
                 if (onJoin) {
                     await onJoin()
@@ -140,6 +174,7 @@ export class DialogManager {
 
             // Handle Stay Local button
             const handleCancel = () => {
+                cleanup()
                 this.close()
                 // Remove room code from URL
                 window.history.replaceState({}, '', window.location.pathname)
@@ -152,20 +187,8 @@ export class DialogManager {
             // Add event listeners
             joinBtn?.addEventListener('click', handleJoin)
             stayLocalBtn?.addEventListener('click', handleCancel)
-
-            // Handle Escape key
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && this.currentDialog === dialog) {
-                    handleCancel()
-                }
-            })
-
-            // Close on overlay click
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    handleCancel()
-                }
-            })
+            document.addEventListener('keydown', handleEscapeKey)
+            dialog.addEventListener('click', handleOverlayClick)
 
             // Focus the join button
             setTimeout(() => (joinBtn as HTMLElement).focus(), DIALOG_FOCUS_DELAY)
@@ -221,14 +244,44 @@ export class DialogManager {
             const confirmBtn = dialog.querySelector(`.${confirmClass}`)
             const cancelBtn = dialog.querySelector('.stay-local-btn')
 
+            // Store listener references for cleanup
+            const handleEnterKey = (e: KeyboardEvent) => {
+                if (e.key === 'Enter' && this.currentDialog === dialog) {
+                    handleConfirm()
+                }
+            }
+
+            const handleEscapeKey = (e: KeyboardEvent) => {
+                if (e.key === 'Escape' && this.currentDialog === dialog) {
+                    handleCancel()
+                }
+            }
+
+            const handleOverlayClick = (e: Event) => {
+                if (e.target === dialog) {
+                    handleCancel()
+                }
+            }
+
+            // Cleanup function
+            const cleanup = () => {
+                document.removeEventListener('keydown', handleEnterKey)
+                document.removeEventListener('keydown', handleEscapeKey)
+                dialog.removeEventListener('click', handleOverlayClick)
+                confirmBtn?.removeEventListener('click', handleConfirm)
+                cancelBtn?.removeEventListener('click', handleCancel)
+            }
+
             // Handle Confirm button
             const handleConfirm = () => {
+                cleanup()
                 this.close()
                 resolve(true)
             }
 
             // Handle Cancel button
             const handleCancel = () => {
+                cleanup()
                 this.close()
                 resolve(false)
             }
@@ -236,27 +289,9 @@ export class DialogManager {
             // Add event listeners
             confirmBtn?.addEventListener('click', handleConfirm)
             cancelBtn?.addEventListener('click', handleCancel)
-
-            // Handle Enter key (confirm)
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && this.currentDialog === dialog) {
-                    handleConfirm()
-                }
-            })
-
-            // Handle Escape key (cancel)
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && this.currentDialog === dialog) {
-                    handleCancel()
-                }
-            })
-
-            // Close on overlay click
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    handleCancel()
-                }
-            })
+            document.addEventListener('keydown', handleEnterKey)
+            document.addEventListener('keydown', handleEscapeKey)
+            dialog.addEventListener('click', handleOverlayClick)
 
             // Focus the confirm button
             setTimeout(() => (confirmBtn as HTMLElement).focus(), DIALOG_FOCUS_DELAY)

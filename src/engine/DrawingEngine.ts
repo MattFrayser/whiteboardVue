@@ -1,5 +1,4 @@
 import type { RemoteCursor, Bounds } from '../types'
-import { DEFAULT_COLOR } from '../constants'
 import { CircleTool } from '../tools/CircleTool'
 import { DrawTool } from '../tools/DrawTool'
 import { EraserTool } from '../tools/EraserTool'
@@ -7,19 +6,19 @@ import { LineTool } from '../tools/LineTool'
 import { RectangleTool } from '../tools/RectangleTool'
 import { SelectTool } from '../tools/SelectTool'
 import { TextTool } from '../tools/TextTool'
-import type { Tool } from '../tools/Tool'
 import { Coordinates } from './Coordinates'
 import { InputHandler } from './InputHandler'
-import { ObjectManager } from '../managers/ObjectManager'
+import type { IObjectManager } from '../interfaces/IObjectManager'
 import { ErrorHandler, ErrorCategory } from '../utils/ErrorHandler'
-import type { WebSocketManager } from '../network/WebSocketManager'
+import type { INetworkManager } from '../interfaces/INetworkManager'
 import type { NetworkMessage, MigrationResult } from '../types/network'
+import { selectors, actions } from '../stores/AppState'
 
 export class DrawingEngine {
     canvas: HTMLCanvasElement
     ctx: CanvasRenderingContext2D
-    networkManager: WebSocketManager | null
-    objectManager: ObjectManager
+    networkManager: INetworkManager | null
+    objectManager: IObjectManager
     coordinates: Coordinates
     needsRedraw: boolean
     tools: {
@@ -31,14 +30,14 @@ export class DrawingEngine {
         line: LineTool
         text: TextTool
     }
-    currentTool: Tool
-    currentColor: string
-    currentWidth: number
-    remoteCursors: Map<string, RemoteCursor>
     boundResize: () => void
     inputHandler: InputHandler
 
-    constructor(canvas: HTMLCanvasElement, networkManager: WebSocketManager | null = null) {
+    constructor(
+        canvas: HTMLCanvasElement,
+        objectManager: IObjectManager,
+        networkManager: INetworkManager | null = null
+    ) {
         this.canvas = canvas
         const ctx = canvas.getContext('2d')
         if (!ctx) {
@@ -46,8 +45,7 @@ export class DrawingEngine {
         }
         this.ctx = ctx
         this.networkManager = networkManager
-
-        this.objectManager = new ObjectManager(networkManager)
+        this.objectManager = objectManager
         this.coordinates = new Coordinates()
         this.needsRedraw = true
 
@@ -60,12 +58,6 @@ export class DrawingEngine {
             line: new LineTool(this),
             text: new TextTool(this),
         }
-
-        this.currentTool = this.tools.draw
-        this.currentColor = DEFAULT_COLOR
-        this.currentWidth = 5
-
-        this.remoteCursors = new Map()
 
         // Window resize handler
         this.boundResize = () => this.resize()
@@ -96,7 +88,7 @@ export class DrawingEngine {
      * Transitions from local mode to networked mode
      */
     attachNetworkManager(
-        networkManager: WebSocketManager,
+        networkManager: INetworkManager,
         newUserId: string
     ): Promise<MigrationResult> {
         console.log('[DrawingEngine] Attaching network manager, transitioning to networked mode')
@@ -169,7 +161,7 @@ export class DrawingEngine {
                     break
                 case 'network:userDisconnected':
                     if (message.userId) {
-                        this.remoteCursors.delete(message.userId)
+                        actions.removeRemoteCursor(message.userId)
                         this.markDirty()
                         this.render()
                     }
@@ -199,11 +191,12 @@ export class DrawingEngine {
         }
 
         const { userId, x, y, color, tool } = message
-        const oldCursor = this.remoteCursors.get(userId)
+        const remoteCursors = selectors.getRemoteCursors()
+        const oldCursor = remoteCursors[userId]
         if (oldCursor) {
             this.markDirty()
         }
-        this.remoteCursors.set(userId, {
+        actions.addRemoteCursor(userId, {
             userId,
             x,
             y,
@@ -235,17 +228,21 @@ export class DrawingEngine {
     }
 
     setTool(toolName: keyof typeof this.tools): void {
-        if (this.currentTool) {
-            this.currentTool.deactivate()
+        // Get current tool from AppState
+        const currentToolName = selectors.getTool()
+        const currentTool = this.tools[currentToolName as keyof typeof this.tools]
+
+        if (currentTool) {
+            currentTool.deactivate()
         }
 
         // Clear selection when switching away from select tool
-        if (this.currentTool === this.tools.select) {
+        if (currentTool === this.tools.select) {
             this.objectManager.clearSelection()
         }
 
-        this.currentTool = this.tools[toolName]
-        this.currentTool.activate()
+        const newTool = this.tools[toolName]
+        newTool.activate()
 
         this.render()
     }
@@ -315,14 +312,17 @@ export class DrawingEngine {
             // Render objects (with viewport culling via quadtree)
             this.objectManager.render(this.ctx, viewport)
 
-            // Render current tool preview
-            if (this.currentTool && this.currentTool.renderPreview) {
-                this.currentTool.renderPreview(this.ctx)
+            // Render current tool preview - query from AppState
+            const currentToolName = selectors.getTool()
+            const currentTool = this.tools[currentToolName as keyof typeof this.tools]
+            if (currentTool && currentTool.renderPreview) {
+                currentTool.renderPreview(this.ctx)
             }
 
-            // Render remote cursors
-            if (this.remoteCursors) {
-                this.remoteCursors.forEach(cursor => {
+            // Render remote cursors - query from AppState
+            const remoteCursors = selectors.getRemoteCursors()
+            if (remoteCursors) {
+                Object.values(remoteCursors).forEach(cursor => {
                     this.renderRemoteCursor(this.ctx, cursor)
                 })
             }
@@ -382,7 +382,6 @@ export class DrawingEngine {
         ;(this.objectManager as unknown) = null
         ;(this.coordinates as unknown) = null
         ;(this.tools as unknown) = null
-        ;(this.currentTool as unknown) = null
         ;(this.inputHandler as unknown) = null
     }
 }

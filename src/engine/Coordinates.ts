@@ -1,20 +1,45 @@
 import type { Point } from '../types'
+import { selectors, actions } from '../stores/AppState'
 
 export class Coordinates {
-    offsetX: number
-    offsetY: number
-    scale: number
+    // Transient pan interaction state (not in AppState)
     isPanning: boolean
     panStart: Point | null
     panOffsetStart: Point | null
 
     constructor() {
-        this.offsetX = 0
-        this.offsetY = 0
-        this.scale = 1
         this.isPanning = false
         this.panStart = null
         this.panOffsetStart = null
+    }
+
+    // Query viewport transform from AppState
+    get offsetX(): number {
+        return selectors.getViewportOffsetX()
+    }
+
+    get offsetY(): number {
+        return selectors.getViewportOffsetY()
+    }
+
+    get scale(): number {
+        return selectors.getViewportScale()
+    }
+
+    // Update viewport transform in AppState
+    set offsetX(value: number) {
+        const viewport = selectors.getViewport()
+        actions.setViewportTransform(value, viewport.offsetY, viewport.scale)
+    }
+
+    set offsetY(value: number) {
+        const viewport = selectors.getViewport()
+        actions.setViewportTransform(viewport.offsetX, value, viewport.scale)
+    }
+
+    set scale(value: number) {
+        const viewport = selectors.getViewport()
+        actions.setViewportTransform(viewport.offsetX, viewport.offsetY, value)
     }
 
     worldToViewport(point: Point): Point {
@@ -39,9 +64,10 @@ export class Coordinates {
     }
 
     pan(point: Point): void {
-        if (this.isPanning && this.panStart) {
-            this.offsetX = this.panOffsetStart!.x + (point.x - this.panStart.x)
-            this.offsetY = this.panOffsetStart!.y + (point.y - this.panStart.y)
+        if (this.isPanning && this.panStart && this.panOffsetStart) {
+            const newOffsetX = this.panOffsetStart.x + (point.x - this.panStart.x)
+            const newOffsetY = this.panOffsetStart.y + (point.y - this.panStart.y)
+            actions.setViewportOffset(newOffsetX, newOffsetY)
         }
     }
 
@@ -55,18 +81,32 @@ export class Coordinates {
         const scaleFactor = 1.1
         const worldPoint = this.viewportToWorld(point, canvas)
 
+        let newScale = this.scale
         if (delta < 0) {
-            this.scale *= scaleFactor
+            newScale *= scaleFactor
         } else {
-            this.scale /= scaleFactor
+            newScale /= scaleFactor
         }
 
         // Clamp scale
-        this.scale = Math.max(0.1, Math.min(10, this.scale))
+        newScale = Math.max(0.1, Math.min(10, newScale))
 
-        // Adjust offset to zoom towards mouse position
-        const newWorldPoint = this.viewportToWorld(point, canvas)
-        this.offsetX += (newWorldPoint.x - worldPoint.x) * this.scale
-        this.offsetY += (newWorldPoint.y - worldPoint.y) * this.scale
+        // Temporarily set scale to calculate new world point
+        const viewport = selectors.getViewport()
+        const tempOffsetX = viewport.offsetX
+        const tempOffsetY = viewport.offsetY
+
+        // Calculate new offset to zoom towards mouse position
+        const rect = canvas.getBoundingClientRect()
+        const newWorldPoint = {
+            x: (point.x - rect.left - tempOffsetX) / newScale,
+            y: (point.y - rect.top - tempOffsetY) / newScale,
+        }
+
+        const newOffsetX = tempOffsetX + (newWorldPoint.x - worldPoint.x) * newScale
+        const newOffsetY = tempOffsetY + (newWorldPoint.y - worldPoint.y) * newScale
+
+        // Batch update all viewport properties at once
+        actions.setViewportTransform(newOffsetX, newOffsetY, newScale)
     }
 }

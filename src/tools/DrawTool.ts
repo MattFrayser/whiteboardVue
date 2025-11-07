@@ -3,6 +3,7 @@ import { simplifyStroke } from '../utils/simplify'
 import { Tool } from './Tool'
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
+import { selectors } from '../stores/AppState'
 
 export class DrawTool extends Tool {
     currentStroke: Stroke | null
@@ -24,8 +25,8 @@ export class DrawTool extends Tool {
             x: worldPos.x,
             y: worldPos.y,
             points: [worldPos],
-            color: this.engine.currentColor,
-            width: this.engine.currentWidth,
+            color: selectors.getColor(),
+            width: selectors.getBrushSize(),
         }, 0)
         this.lastBounds = null
     }

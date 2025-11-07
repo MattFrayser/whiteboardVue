@@ -2,6 +2,7 @@ import { Rectangle } from '../objects/Rectangle'
 import { Tool } from './Tool'
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
+import { selectors } from '../stores/AppState'
 
 export class RectangleTool extends Tool {
     startPoint: Point | null
@@ -26,11 +27,11 @@ export class RectangleTool extends Tool {
             y1: worldPos.y,
             x2: worldPos.x,
             y2: worldPos.y,
-            color: this.engine.currentColor,
-            width: this.engine.currentWidth,
+            color: selectors.getColor(),
+            width: selectors.getBrushSize(),
         }, 0)
         if (e.shiftKey) {
-            (this.currentRect.data as { fill?: string }).fill = this.engine.currentColor
+            (this.currentRect.data as { fill?: string }).fill = selectors.getColor()
         }
         this.lastBounds = null
     }

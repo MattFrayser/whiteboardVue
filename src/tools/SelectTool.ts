@@ -4,6 +4,7 @@ import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH, CURSORS } fr
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { DrawingObject } from '../objects/DrawingObject'
+import { selectors } from '../stores/AppState'
 
 export class SelectTool extends Tool {
     dragStart: Point | null
@@ -25,6 +26,9 @@ export class SelectTool extends Tool {
     // Store old bounds for quadtree updates
     draggedObjectsBounds: Map<DrawingObject, Bounds>
 
+    // Store bound handler for cleanup
+    boundMouseMoveHandler: ((e: MouseEvent) => void) | null
+
     constructor(engine: DrawingEngine) {
         super(engine)
         this.dragStart = null
@@ -44,12 +48,14 @@ export class SelectTool extends Tool {
         this.selectionEnd = null
 
         this.draggedObjectsBounds = new Map()
+        this.boundMouseMoveHandler = null
 
         this.setupMouseMoveListener()
     }
 
     setupMouseMoveListener(): void {
-        this.engine.canvas.addEventListener('mousemove', (e: MouseEvent) => {
+        // Store bound handler for cleanup
+        this.boundMouseMoveHandler = (e: MouseEvent) => {
             if (!this.isActive()) {
                 return
             }
@@ -60,11 +66,24 @@ export class SelectTool extends Tool {
             )
 
             this.updateCursor(worldPos)
-        })
+        }
+
+        this.engine.canvas.addEventListener('mousemove', this.boundMouseMoveHandler)
+    }
+
+    override deactivate(): void {
+        super.deactivate()
+
+        // Remove mousemove listener when tool is deactivated
+        if (this.boundMouseMoveHandler) {
+            this.engine.canvas.removeEventListener('mousemove', this.boundMouseMoveHandler)
+            this.boundMouseMoveHandler = null
+        }
     }
 
     isActive(): boolean {
-        return this.engine.currentTool === this
+        const toolName = selectors.getTool()
+        return this.engine.tools[toolName as keyof typeof this.engine.tools] === this
     }
 
     updateCursor(worldPos: Point): void {

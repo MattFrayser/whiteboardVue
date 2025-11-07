@@ -1,6 +1,5 @@
 /**
  * Color constants used throughout the application
- * Centralizes all color values to enable easy theming and consistency
  */
 
 // Primary UI Colors

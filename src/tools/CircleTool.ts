@@ -2,6 +2,7 @@ import { Circle } from '../objects/Circle'
 import { Tool } from './Tool'
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
+import { selectors } from '../stores/AppState'
 
 export class CircleTool extends Tool {
     startPoint: Point | null
@@ -26,11 +27,11 @@ export class CircleTool extends Tool {
             y1: worldPos.y,
             x2: worldPos.x,
             y2: worldPos.y,
-            color: this.engine.currentColor,
-            width: this.engine.currentWidth,
+            color: selectors.getColor(),
+            width: selectors.getBrushSize(),
         }, 0)
         if (e.shiftKey) {
-            (this.currentCircle.data as { fill?: string }).fill = this.engine.currentColor
+            (this.currentCircle.data as { fill?: string }).fill = selectors.getColor()
         }
         this.lastBounds = null
     }

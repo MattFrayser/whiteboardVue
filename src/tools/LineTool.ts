@@ -2,6 +2,7 @@ import { Line } from '../objects/Line'
 import { Tool } from './Tool'
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
+import { selectors } from '../stores/AppState'
 
 export class LineTool extends Tool {
     startPoint: Point | null
@@ -26,8 +27,8 @@ export class LineTool extends Tool {
             y1: worldPos.y,
             x2: worldPos.x,
             y2: worldPos.y,
-            color: this.engine.currentColor,
-            width: this.engine.currentWidth,
+            color: selectors.getColor(),
+            width: selectors.getBrushSize(),
         }, 0)
         this.lastBounds = null
     }

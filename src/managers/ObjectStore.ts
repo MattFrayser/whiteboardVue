@@ -311,6 +311,11 @@ export class ObjectStore {
             }
         }
 
+        // Clear old quadtree before recreating (helps garbage collection)
+        if (this.quadtree) {
+            this.quadtree.clear()
+        }
+
         // Recreate quadtree with new/same bounds
         this.quadtree = new Quadtree(bounds, 10, 8)
 
