@@ -1,31 +1,44 @@
 import type { RemoteCursor, Bounds } from '../types'
-import { ToolRegistry } from '../tools'
+import { DEFAULT_COLOR } from '../constants'
+import { CircleTool } from '../tools/CircleTool'
+import { DrawTool } from '../tools/DrawTool'
+import { EraserTool } from '../tools/EraserTool'
+import { LineTool } from '../tools/LineTool'
+import { RectangleTool } from '../tools/RectangleTool'
+import { SelectTool } from '../tools/SelectTool'
+import { TextTool } from '../tools/TextTool'
 import type { Tool } from '../tools/Tool'
 import { Coordinates } from './Coordinates'
 import { InputHandler } from './InputHandler'
-import type { IObjectManager } from '../interfaces/IObjectManager'
+import { ObjectManager } from '../managers/ObjectManager'
 import { ErrorHandler, ErrorCategory } from '../utils/ErrorHandler'
-import type { INetworkManager } from '../interfaces/INetworkManager'
+import type { WebSocketManager } from '../network/WebSocketManager'
 import type { NetworkMessage, MigrationResult } from '../types/network'
-import { selectors, actions } from '../stores/AppState'
 
 export class DrawingEngine {
     canvas: HTMLCanvasElement
     ctx: CanvasRenderingContext2D
-    networkManager: INetworkManager | null
-    objectManager: IObjectManager
+    networkManager: WebSocketManager | null
+    objectManager: ObjectManager
     coordinates: Coordinates
     needsRedraw: boolean
-    tools: Record<string, Tool>
+    tools: {
+        draw: DrawTool
+        rectangle: RectangleTool
+        circle: CircleTool
+        select: SelectTool
+        eraser: EraserTool
+        line: LineTool
+        text: TextTool
+    }
+    currentTool: Tool
+    currentColor: string
+    currentWidth: number
+    remoteCursors: Map<string, RemoteCursor>
     boundResize: () => void
     inputHandler: InputHandler
-    private eventListeners: Map<string, Set<(...args: any[]) => void>>
 
-    constructor(
-        canvas: HTMLCanvasElement,
-        objectManager: IObjectManager,
-        networkManager: INetworkManager | null = null
-    ) {
+    constructor(canvas: HTMLCanvasElement, networkManager: WebSocketManager | null = null) {
         this.canvas = canvas
         const ctx = canvas.getContext('2d')
         if (!ctx) {
@@ -33,13 +46,26 @@ export class DrawingEngine {
         }
         this.ctx = ctx
         this.networkManager = networkManager
-        this.objectManager = objectManager
+
+        this.objectManager = new ObjectManager(networkManager)
         this.coordinates = new Coordinates()
         this.needsRedraw = true
-        this.eventListeners = new Map()
 
-        // Create all registered tools using ToolRegistry
-        this.tools = ToolRegistry.createAll(this)
+        this.tools = {
+            draw: new DrawTool(this),
+            rectangle: new RectangleTool(this),
+            circle: new CircleTool(this),
+            select: new SelectTool(this),
+            eraser: new EraserTool(this),
+            line: new LineTool(this),
+            text: new TextTool(this),
+        }
+
+        this.currentTool = this.tools.draw
+        this.currentColor = DEFAULT_COLOR
+        this.currentWidth = 5
+
+        this.remoteCursors = new Map()
 
         // Window resize handler
         this.boundResize = () => this.resize()
@@ -70,7 +96,7 @@ export class DrawingEngine {
      * Transitions from local mode to networked mode
      */
     attachNetworkManager(
-        networkManager: INetworkManager,
+        networkManager: WebSocketManager,
         newUserId: string
     ): Promise<MigrationResult> {
         console.log('[DrawingEngine] Attaching network manager, transitioning to networked mode')
@@ -143,7 +169,7 @@ export class DrawingEngine {
                     break
                 case 'network:userDisconnected':
                     if (message.userId) {
-                        actions.removeRemoteCursor(message.userId)
+                        this.remoteCursors.delete(message.userId)
                         this.markDirty()
                         this.render()
                     }
@@ -173,12 +199,11 @@ export class DrawingEngine {
         }
 
         const { userId, x, y, color, tool } = message
-        const remoteCursors = selectors.getRemoteCursors()
-        const oldCursor = remoteCursors[userId]
+        const oldCursor = this.remoteCursors.get(userId)
         if (oldCursor) {
             this.markDirty()
         }
-        actions.addRemoteCursor(userId, {
+        this.remoteCursors.set(userId, {
             userId,
             x,
             y,
@@ -209,24 +234,18 @@ export class DrawingEngine {
         }
     }
 
-    setTool(toolName: string): void {
-        // Get current tool from AppState
-        const currentToolName = selectors.getTool()
-        const currentTool = this.tools[currentToolName]
-
-        if (currentTool) {
-            currentTool.deactivate()
+    setTool(toolName: keyof typeof this.tools): void {
+        if (this.currentTool) {
+            this.currentTool.deactivate()
         }
 
         // Clear selection when switching away from select tool
-        if (currentToolName === 'select') {
+        if (this.currentTool === this.tools.select) {
             this.objectManager.clearSelection()
         }
 
-        const newTool = this.tools[toolName]
-        if (newTool) {
-            newTool.activate()
-        }
+        this.currentTool = this.tools[toolName]
+        this.currentTool.activate()
 
         this.render()
     }
@@ -296,17 +315,14 @@ export class DrawingEngine {
             // Render objects (with viewport culling via quadtree)
             this.objectManager.render(this.ctx, viewport)
 
-            // Render current tool preview - query from AppState
-            const currentToolName = selectors.getTool()
-            const currentTool = this.tools[currentToolName]
-            if (currentTool && currentTool.renderPreview) {
-                currentTool.renderPreview(this.ctx)
+            // Render current tool preview
+            if (this.currentTool && this.currentTool.renderPreview) {
+                this.currentTool.renderPreview(this.ctx)
             }
 
-            // Render remote cursors - query from AppState
-            const remoteCursors = selectors.getRemoteCursors()
-            if (remoteCursors) {
-                Object.values(remoteCursors).forEach(cursor => {
+            // Render remote cursors
+            if (this.remoteCursors) {
+                this.remoteCursors.forEach(cursor => {
                     this.renderRemoteCursor(this.ctx, cursor)
                 })
             }
@@ -342,59 +358,6 @@ export class DrawingEngine {
         this.render()
     }
 
-    /**
-     * Event System - Decouple components from direct dependencies
-     */
-
-    /**
-     * Listen to an event
-     * @param event Event name
-     * @param handler Event handler function
-     * @returns Unsubscribe function
-     */
-    on(event: string, handler: (...args: any[]) => void): () => void {
-        if (!this.eventListeners.has(event)) {
-            this.eventListeners.set(event, new Set())
-        }
-        this.eventListeners.get(event)!.add(handler)
-
-        // Return unsubscribe function
-        return () => this.off(event, handler)
-    }
-
-    /**
-     * Remove an event listener
-     * @param event Event name
-     * @param handler Event handler function
-     */
-    off(event: string, handler: (...args: any[]) => void): void {
-        const handlers = this.eventListeners.get(event)
-        if (handlers) {
-            handlers.delete(handler)
-        }
-    }
-
-    /**
-     * Emit an event
-     * @param event Event name
-     * @param args Event arguments
-     */
-    emit(event: string, ...args: any[]): void {
-        const handlers = this.eventListeners.get(event)
-        if (handlers) {
-            handlers.forEach(handler => {
-                try {
-                    handler(...args)
-                } catch (error) {
-                    ErrorHandler.handle(error as Error, ErrorCategory.SILENT, {
-                        context: 'DrawingEngine',
-                        metadata: { event },
-                    })
-                }
-            })
-        }
-    }
-
     destroy(): void {
         // Cleanup input handler
         if (this.inputHandler) {
@@ -415,15 +378,11 @@ export class DrawingEngine {
             })
         }
 
-        // Clear event listeners
-        if (this.eventListeners) {
-            this.eventListeners.clear()
-        }
-
         // Clear references
         ;(this.objectManager as unknown) = null
         ;(this.coordinates as unknown) = null
         ;(this.tools as unknown) = null
+        ;(this.currentTool as unknown) = null
         ;(this.inputHandler as unknown) = null
     }
 }

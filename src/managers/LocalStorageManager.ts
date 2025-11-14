@@ -3,8 +3,9 @@
  * Handles persistence of local objects to browser localStorage
  * Enables local-first mode where users can draw before creating a session
  */
-
 import { ErrorHandler, ErrorCode } from '../utils/ErrorHandler'
+import type { DrawingObjectData, Point } from '../types/common'
+import { clampCoordinate, clampBrushSize, validateColor } from '../utils/validation'
 
 const STORAGE_KEY = 'whiteboard_local_objects'
 const DEBOUNCE_MS = 500 // Save after 500ms of inactivity
@@ -16,10 +17,50 @@ interface SerializableObject {
 export class LocalStorageManager {
     saveTimeout: ReturnType<typeof setTimeout> | null
     enabled: boolean
+    isLocal: boolean
 
     constructor() {
         this.saveTimeout = null
         this.enabled = true
+        this.isLocal = isLocal
+    }
+
+    setLocalMode(isLocal: boolean): void {
+        this.isLocal = isLocal
+    }
+
+   /**
+     * Validate and sanitize object data loaded from localStorage
+     * For offline mode where no backend validation exists
+     */
+    private sanitizeObjectData(data: DrawingObjectData): DrawingObjectData {
+        // Validate coordinates
+        if (typeof data.x === 'number') {
+            data.x = clampCoordinate(data.x)
+        }
+        if (typeof data.y === 'number') {
+            data.y = clampCoordinate(data.y)
+        }
+
+        // Validate color (for strokes, shapes with color property)
+        if (typeof data.color === 'string') {
+            data.color = validateColor(data.color)
+        }
+
+        // Validate width (for strokes)
+        if (typeof data.width === 'number') {
+            data.width = clampBrushSize(data.width)
+        }
+
+        // Validate points array (for strokes)
+        if (Array.isArray(data.points)) {
+            data.points = data.points.map((point: Point) => ({
+                x: clampCoordinate(point.x),
+                y: clampCoordinate(point.y)
+            }))
+        }
+
+        return data
     }
 
     /**
@@ -27,7 +68,7 @@ export class LocalStorageManager {
      * @param {Array} objects - Array of serializable objects
      */
     saveObjects(objects: SerializableObject[]): void {
-        if (!this.enabled) return
+        if (!this.enabled || !this.isLocal) return
 
         // Debounce saves to avoid excessive localStorage writes
         if (this.saveTimeout) {
@@ -37,7 +78,6 @@ export class LocalStorageManager {
             try {
                 const serialized = objects.map(obj => obj.toJSON())
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized))
-                console.log(`[LocalStorage] Saved ${objects.length} objects`)
             } catch (error) {
                 // Disable if quota exceeded
                 if (error instanceof Error && error.name === 'QuotaExceededError') {
@@ -62,28 +102,42 @@ export class LocalStorageManager {
      * Load objects from localStorage
      * @returns {Array} Array of object data (not instantiated objects)
      */
-    loadObjects(): unknown[] {
-        if (!this.enabled) return []
+    loadObjects(): { objects: DrawingObjectData[], maxZIndex: number } {
+        if (!this.enabled) {
+            return { objects: [], maxZIndex: 0 }
+        }
 
         try {
             const data = localStorage.getItem(STORAGE_KEY)
             if (!data) {
-                console.log('[LocalStorage] No saved objects found')
-                return []
+                return { objects: [], maxZIndex: 0 }
             }
 
-            const objects = JSON.parse(data) as unknown[]
-            console.log(`[LocalStorage] Loaded ${objects.length} objects`)
-            return objects
+            const objects = JSON.parse(data) as DrawingObjectData[]
+
+            if (objects.length === 0) {
+                return { objects: [], maxZIndex: 0 }
+            }
+
+            const sanitizeObjects = objects.map(obj => this.sanitizeObjectData(obj))
+
+            let maxZIndex = 0
+            sanitizeObjects.forEach((obj: DrawingObjectData) => {
+                if (obj.zIndex !== undefined && obj.zIndex !== null && typeof obj.zIndex === 'number') {
+                    maxZIndex = Math.max(maxZIndex, obj.zIndex + 1)
+                }
+            })
+
+            return { objects: sanitizeObjects, maxZIndex }
         } catch (error) {
             ErrorHandler.storage(error as Error, {
                 context: 'LocalStorageManager',
                 code: ErrorCode.LOAD_FAILED
             })
-            return []
+            return { objects: [], maxZIndex: 0 }
         }
     }
-
+ 
     /**
      * Clear all saved objects from localStorage
      * Called when transitioning from local mode to networked mode

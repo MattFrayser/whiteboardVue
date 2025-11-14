@@ -1,19 +1,14 @@
 import './style.css'
-import './tools' // Register all tools with ToolRegistry
-import './objects' // Register all object types with ObjectRegistry
 import { DrawingEngine } from './engine/DrawingEngine'
-import { ObjectManager } from './managers/ObjectManager'
-import { CursorManager } from './managers/CursorManager'
 import { Toolbar } from './ui/Toolbar'
 import { InviteManager } from './ui/InviteManager'
 import { NotificationManager } from './ui/NotificationManager'
 import { DialogManager } from './ui/DialogManager'
 import { ConnectionStatusIndicator } from './ui/ConnectionStatusIndicator'
 import { SessionManager } from './network/SessionManager'
-import { VisibilitySync } from './managers/VisibilitySync'
+import { VisibilitySync } from './sync/VisibilitySync'
 import { appState, actions } from './stores/AppState'
 import { ErrorHandler } from './utils/ErrorHandler'
-import { getCursorForTool } from './utils/getCursorForTool'
 
 // Generate temporary local userId for local-first mode
 // This will be replaced with server-assigned userId when session is created
@@ -28,18 +23,8 @@ console.log('[App] Starting in local mode with temporary userId:', localUserId)
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
 if (!canvas) throw new Error('Canvas element not found')
 
-// Create ObjectManager first (with no network manager for local mode)
-const objectManager = new ObjectManager(null)
-
-// Create DrawingEngine with injected ObjectManager (null = local mode for network)
-const engine = new DrawingEngine(canvas, objectManager, null)
+const engine = new DrawingEngine(canvas, null) // null = local mode
 const toolbar = new Toolbar(engine)
-
-// Initialize CursorManager (single source of truth for cursor state)
-const cursorManager = new CursorManager(canvas)
-
-// Set initial cursor based on default tool
-actions.setCursor(getCursorForTool('draw'))
 
 // Initialize UI components
 const notificationManager = new NotificationManager()
@@ -50,7 +35,7 @@ const connectionStatus = new ConnectionStatusIndicator()
 ErrorHandler.init(notificationManager as any, dialogManager as any)
 
 // Set temporary local userId
-objectManager.setUserId(localUserId)
+engine.objectManager.setUserId(localUserId)
 actions.setUserId(localUserId)
 
 // Initialize InviteManager first (without SessionManager)
@@ -68,10 +53,17 @@ inviteManager.setSessionManager(sessionManager)
 // Initialize VisibilitySync (auto-sync when user returns to tab)
 const visibilitySync = new VisibilitySync(sessionManager)
 
-// Subscribe to tool changes to activate/deactivate tools
-// (Color and brushSize are queried on-demand, no sync needed)
-const unsubscribeToolChange = appState.subscribe('ui.tool', (tool) => {
-    engine.setTool(tool as string)
+// Sync AppState UI changes to engine
+appState.subscribe('ui.tool', (tool) => {
+    engine.setTool(tool as 'draw' | 'rectangle' | 'circle' | 'select' | 'eraser' | 'line' | 'text')
+})
+
+appState.subscribe('ui.color', (color) => {
+    engine.currentColor = color as string
+})
+
+appState.subscribe('ui.brushSize', (size) => {
+    engine.currentWidth = size as number
 })
 
 // Start engine
@@ -96,20 +88,12 @@ if (roomCodeFromURL) {
 
 // Clean up on exit
 window.addEventListener('beforeunload', () => {
-    // Unsubscribe from state changes
-    unsubscribeToolChange()
-
-    // Destroy all components
     engine.destroy()
     toolbar.destroy()
-    cursorManager.destroy()
     notificationManager.destroy()
     dialogManager.destroy()
     connectionStatus.destroy()
     sessionManager.destroy()
     visibilitySync.destroy()
-    inviteManager.destroy()
-
-    // Clean up remaining state subscriptions
-    appState.clear()
+    appState.clear() // Clean up state subscriptions
 })
