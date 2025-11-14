@@ -1,4 +1,5 @@
 import type { DrawingObjectData } from '../types'
+import type { DrawingObject } from '../objects/DrawingObject'
 
 /**
  * Manages copy/paste/cut operations for objects
@@ -10,11 +11,11 @@ export class ClipboardManager {
         this.clipboard = []
     }
 
-    copy(objects: any[]): void {
+    copy(objects: DrawingObject[]): void {
         if (objects.length === 0) {
             return
         }
-        this.clipboard = objects.map(obj => obj.toJSON())
+        this.clipboard = objects.map(obj => obj.toJSON().data)
     }  
 
     getClipboard(): DrawingObjectData[] {

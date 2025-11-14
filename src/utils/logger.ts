@@ -50,7 +50,7 @@ class Logger {
         return level >= this.currentLevel
     }
 
-    private formatMessage(level: string, component: string, message: string, data?: any): string {
+    private formatMessage(level: string, component: string, message: string, data?: unknown): string {
         const timestamp = new Date().toISOString()
         let formatted = `[${timestamp}] ${level} [${component}] ${message}`
         if (data !== undefined) {
@@ -59,25 +59,25 @@ class Logger {
         return formatted
     }
 
-    debug(component: string, message: string, data?: any): void {
+    debug(component: string, message: string, data?: unknown): void {
         if (this.shouldLog(LogLevel.DEBUG)) {
             console.log(this.formatMessage('DEBUG', component, message, data))
         }
     }
 
-    info(component: string, message: string, data?: any): void {
+    info(component: string, message: string, data?: unknown): void {
         if (this.shouldLog(LogLevel.INFO)) {
             console.info(this.formatMessage('INFO', component, message, data))
         }
     }
 
-    warn(component: string, message: string, data?: any): void {
+    warn(component: string, message: string, data?: unknown): void {
         if (this.shouldLog(LogLevel.WARN)) {
             console.warn(this.formatMessage('WARN', component, message, data))
         }
     }
 
-    error(component: string, message: string, error?: Error | any): void {
+    error(component: string, message: string, error?: Error | unknown): void {
         if (this.shouldLog(LogLevel.ERROR)) {
             const errorData = error instanceof Error
                 ? { message: error.message, stack: error.stack }
@@ -91,10 +91,10 @@ class Logger {
      */
     scope(component: string) {
         return {
-            debug: (message: string, data?: any) => this.debug(component, message, data),
-            info: (message: string, data?: any) => this.info(component, message, data),
-            warn: (message: string, data?: any) => this.warn(component, message, data),
-            error: (msg: string, error?: Error | any) => this.error(component, msg, error)
+            debug: (message: string, data?: unknown) => this.debug(component, message, data),
+            info: (message: string, data?: unknown) => this.info(component, message, data),
+            warn: (message: string, data?: unknown) => this.warn(component, message, data),
+            error: (msg: string, error?: Error | unknown) => this.error(component, msg, error)
         }
     }
 }

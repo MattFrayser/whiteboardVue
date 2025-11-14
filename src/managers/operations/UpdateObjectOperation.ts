@@ -12,9 +12,9 @@ export class UpdateObjectOperation implements Operation {
     readonly userId: string
     readonly timestamp: number
 
-    private objectId: string
-    private beforeData: DrawingObjectData
-    private afterData: DrawingObjectData
+    readonly objectId: string
+    readonly beforeData: DrawingObjectData
+    readonly afterData: DrawingObjectData
 
     constructor(objectId: string, beforeData: DrawingObjectData, afterData: DrawingObjectData, userId: string) {
         this.id = `update_${objectId}_${Date.now()}`

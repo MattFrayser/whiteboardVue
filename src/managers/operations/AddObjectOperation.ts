@@ -12,7 +12,7 @@ export class AddObjectOperation implements Operation {
     readonly userId: string
     readonly timestamp: number
 
-    private objectData: NestedObjectData
+    readonly objectData: NestedObjectData
 
     constructor(object: DrawingObject, userId: string) {
         this.id = `add_${object.id}_${Date.now()}`

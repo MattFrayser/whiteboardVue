@@ -31,7 +31,7 @@ const dialogManager = new DialogManager()
 const connectionStatus = new ConnectionStatusIndicator()
 
 // Initialize ErrorHandler with UI managers
-ErrorHandler.init(notificationManager as any, dialogManager as any)
+ErrorHandler.init(notificationManager, dialogManager)
 
 // Set temporary local userId
 engine.objectManager.setUserId(localUserId)
@@ -40,10 +40,10 @@ actions.setUserId(localUserId)
 // Initialize InviteManager first (without SessionManager)
 const urlParams = new URLSearchParams(window.location.search)
 const roomCodeFromURL = urlParams.get('room')
-const inviteManager = new InviteManager(roomCodeFromURL, notificationManager as any)
+const inviteManager = new InviteManager(roomCodeFromURL, notificationManager)
 
 // Initialize SessionManager (manages network connections)
-const sessionManager = new SessionManager(engine, notificationManager as any, dialogManager as any, inviteManager)
+const sessionManager = new SessionManager(engine, notificationManager, dialogManager, inviteManager)
 sessionManager.setLocalUserId(localUserId)
 
 // Now connect SessionManager to InviteManager (circular dependency resolved)
@@ -70,7 +70,7 @@ engine.start()
 
 // Show join room prompt if URL contains room code
 if (roomCodeFromURL) {
-    (dialogManager as any).showJoinRoomDialog(roomCodeFromURL, async () => {
+    dialogManager.showJoinRoomDialog(roomCodeFromURL, async () => {
         try {
             await sessionManager.joinSession(roomCodeFromURL)
         } catch (error) {

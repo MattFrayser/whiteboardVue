@@ -3,7 +3,8 @@ import { HistoryManager } from './HistoryManager'
 import { SelectionManager } from './SelectionManager'
 import { ObjectStore } from './ObjectStore'
 import { LocalStorageManager } from './LocalStorageManager'
-import { AddObjectOperation, DeleteObjectOperation } from './operations'
+import { AddObjectOperation, DeleteObjectOperation, UpdateObjectOperation, MoveObjectsOperation } from './operations'
+import type { Operation } from './operations/Operation'
 import type { WebSocketManager } from '../network/WebSocketManager'
 import type { DrawingObject } from '../objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../types/common'
@@ -432,7 +433,7 @@ export class ObjectManager {
      * @param operation - The operation whose effect to broadcast
      * @param isUndo - true if undoing, false if redoing
      */
-    private broadcastOperationEffect(operation: any, isUndo: boolean): void {
+    private broadcastOperationEffect(operation: Operation, isUndo: boolean): void {
         if (!this.networkManager || !this.networkManager.isConnected()) {
             return
         }
@@ -440,12 +441,13 @@ export class ObjectManager {
         switch (operation.type) {
             case 'add': {
                 // Add operation: undo = delete, redo = add
-                const obj = this.objectStore.getObjectById(operation.objectData.id)
+                const addOp = operation as AddObjectOperation
+                const obj = this.objectStore.getObjectById(addOp.objectData.id)
                 if (isUndo) {
                     // Object was deleted by undo
-                    if (operation.objectData) {
+                    if (addOp.objectData) {
                         // Create temp object to broadcast deletion
-                        const tempObj = this.objectStore.createObjectFromData(operation.objectData)
+                        const tempObj = this.objectStore.createObjectFromData(addOp.objectData)
                         if (tempObj) {
                             this.networkManager.broadcastObjectDeleted(tempObj)
                         }
@@ -460,7 +462,8 @@ export class ObjectManager {
             }
             case 'delete': {
                 // Delete operation: undo = add, redo = delete
-                const obj = this.objectStore.getObjectById(operation.objectData.id)
+                const deleteOp = operation as DeleteObjectOperation
+                const obj = this.objectStore.getObjectById(deleteOp.objectData.id)
                 if (isUndo) {
                     // Object was added back by undo
                     if (obj) {
@@ -468,8 +471,8 @@ export class ObjectManager {
                     }
                 } else {
                     // Object was deleted by redo
-                    if (operation.objectData) {
-                        const tempObj = this.objectStore.createObjectFromData(operation.objectData)
+                    if (deleteOp.objectData) {
+                        const tempObj = this.objectStore.createObjectFromData(deleteOp.objectData)
                         if (tempObj) {
                             this.networkManager.broadcastObjectDeleted(tempObj)
                         }
@@ -479,7 +482,8 @@ export class ObjectManager {
             }
             case 'update': {
                 // Update operation: both undo and redo are updates
-                const obj = this.objectStore.getObjectById(operation.objectId)
+                const updateOp = operation as UpdateObjectOperation
+                const obj = this.objectStore.getObjectById(updateOp.objectId)
                 if (obj) {
                     this.networkManager.broadcastObjectUpdated(obj)
                 }
@@ -488,7 +492,8 @@ export class ObjectManager {
             case 'move': {
                 // Move operation: both undo and redo are moves
                 // Broadcast all moved objects as updates
-                for (const objectId of operation.objectIds) {
+                const moveOp = operation as MoveObjectsOperation
+                for (const objectId of moveOp.objectIds) {
                     const obj = this.objectStore.getObjectById(objectId)
                     if (obj) {
                         this.networkManager.broadcastObjectUpdated(obj)

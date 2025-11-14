@@ -1,30 +1,32 @@
 import { appState, selectors } from '../stores/AppState'
 import { ErrorHandler } from '../utils/ErrorHandler'
+import type { NotificationManager } from './NotificationManager'
+import type { SessionManager } from '../network/SessionManager'
 
 export class InviteManager {
-    roomCode: any
-    notificationManager: any
-    sessionManager: any
-    button: any
-    passwordToggle: any
-    passwordInput: any
-    createSessionMenu: any
-    createSessionButton: any
+    roomCode: string | null
+    notificationManager: NotificationManager | null
+    sessionManager: SessionManager | null
+    button: HTMLButtonElement | null
+    passwordToggle: HTMLInputElement | null
+    passwordInput: HTMLInputElement | null
+    createSessionMenu: HTMLElement | null
+    createSessionButton: HTMLButtonElement | null
     unsubscribeNetworkStatus: (() => void) | null
     boundHandleButtonClick: (() => void) | null
     boundTogglePassword: (() => void) | null
     boundHandleCreateSession: (() => void) | null
     boundHandleOverlayClick: ((e: MouseEvent) => void) | null
 
-    constructor(roomCode: string | null, notificationManager: any = null, sessionManager: any = null) {
+    constructor(roomCode: string | null, notificationManager: NotificationManager | null = null, sessionManager: SessionManager | null = null) {
         this.roomCode = roomCode // null in local mode, string when networked
         this.notificationManager = notificationManager
         this.sessionManager = sessionManager
         this.button = document.querySelector('.invite-link button')
-        this.passwordToggle = document.getElementById('password-toggle')
-        this.passwordInput = document.getElementById('password-input')
+        this.passwordToggle = document.getElementById('password-toggle') as HTMLInputElement | null
+        this.passwordInput = document.getElementById('password-input') as HTMLInputElement | null
         this.createSessionMenu = document.querySelector('.createSession-overlay')
-        this.createSessionButton = this.createSessionMenu.querySelector('button')
+        this.createSessionButton = this.createSessionMenu?.querySelector('button') ?? null
 
         // Initialize bound handlers
         this.unsubscribeNetworkStatus = null
@@ -46,7 +48,7 @@ export class InviteManager {
      * Set session manager (called after SessionManager is created)
      * @param {SessionManager} sessionManager - The session manager instance
      */
-    setSessionManager(sessionManager: any) {
+    setSessionManager(sessionManager: SessionManager) {
         this.sessionManager = sessionManager
     }
 
@@ -61,16 +63,18 @@ export class InviteManager {
             }
         }
 
-        this.button.addEventListener('click', this.boundHandleButtonClick)
-        this.passwordToggle.addEventListener('change', this.boundTogglePassword)
-        this.createSessionButton.addEventListener('click', this.boundHandleCreateSession)
-        this.createSessionMenu.addEventListener('click', this.boundHandleOverlayClick)
+        this.button?.addEventListener('click', this.boundHandleButtonClick)
+        this.passwordToggle?.addEventListener('change', this.boundTogglePassword)
+        this.createSessionButton?.addEventListener('click', this.boundHandleCreateSession)
+        this.createSessionMenu?.addEventListener('click', this.boundHandleOverlayClick)
     }
 
     /**
      * Update UI based on network status (local vs networked)
      */
     updateUI() {
+        if (!this.button) return
+
         const status = selectors.getNetworkStatus()
 
         if (status === 'local') {
@@ -114,7 +118,7 @@ export class InviteManager {
     async handleCreateSession() {
         // Collect settings from modal
         const settings = {
-            password: this.passwordToggle.checked ? this.passwordInput.value : null,
+            password: this.passwordToggle?.checked ? this.passwordInput?.value || undefined : undefined,
         }
 
         console.log('[InviteManager] Collected settings:', settings)
@@ -155,12 +159,14 @@ export class InviteManager {
     }
 
     togglePassword() {
+        if (!this.passwordToggle || !this.passwordInput) return
+
         if (this.passwordToggle.checked) {
-            this.passwordInput.disabled = false;
-            this.passwordInput.focus();
+            this.passwordInput.disabled = false
+            this.passwordInput.focus()
         } else {
-            this.passwordInput.disabled = true;
-            this.passwordInput.value = '';
+            this.passwordInput.disabled = true
+            this.passwordInput.value = ''
         }
     }
 
@@ -178,11 +184,13 @@ export class InviteManager {
     }
 
     showSettings() {
+        if (!this.createSessionMenu) return
         this.createSessionMenu.style.display = 'block'
         this.createSessionMenu.classList.add('show')
     }
 
     hideSettings() {
+        if (!this.createSessionMenu) return
         this.createSessionMenu.style.display = 'none'
         this.createSessionMenu.classList.remove('show')
     }
@@ -198,19 +206,19 @@ export class InviteManager {
         }
 
         // Remove event listeners
-        if (this.boundHandleButtonClick) {
+        if (this.boundHandleButtonClick && this.button) {
             this.button.removeEventListener('click', this.boundHandleButtonClick)
             this.boundHandleButtonClick = null
         }
-        if (this.boundTogglePassword) {
+        if (this.boundTogglePassword && this.passwordToggle) {
             this.passwordToggle.removeEventListener('change', this.boundTogglePassword)
             this.boundTogglePassword = null
         }
-        if (this.boundHandleCreateSession) {
+        if (this.boundHandleCreateSession && this.createSessionButton) {
             this.createSessionButton.removeEventListener('click', this.boundHandleCreateSession)
             this.boundHandleCreateSession = null
         }
-        if (this.boundHandleOverlayClick) {
+        if (this.boundHandleOverlayClick && this.createSessionMenu) {
             this.createSessionMenu.removeEventListener('click', this.boundHandleOverlayClick)
             this.boundHandleOverlayClick = null
         }

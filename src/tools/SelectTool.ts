@@ -1,7 +1,7 @@
 import { Tool } from './Tool'
 import { MoveObjectsOperation, UpdateObjectOperation } from '../managers/operations'
 import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH, CURSORS, RESIZE_HANDLE_CLICK_SIZE, MIN_SELECTION_PADDING, BASE_SELECTION_PADDING } from '../constants'
-import type { Point, Bounds } from '../types'
+import type { Point, Bounds, DrawingObjectData } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { DrawingObject } from '../objects/DrawingObject'
 import { selectors, actions } from '../stores/AppState'
@@ -17,7 +17,7 @@ export class SelectTool extends Tool {
     resizeObject: DrawingObject | null
     resizeFixedPoint: Point | null
     resizeInitialBounds: Bounds | null
-    resizeInitialData: any | null // Store initial data for resize undo
+    resizeInitialData: DrawingObjectData | null // Store initial data for resize undo
 
     isSelecting: boolean
     selectionStart: Point | null

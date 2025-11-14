@@ -26,7 +26,7 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
         this.initialState = this._deepClone(initialState)
         this.state = this._deepClone(initialState)
         this.listeners = new Map() // path -> Set of callbacks
-        this.devMode = (import.meta as any).env?.DEV
+        this.devMode = import.meta.env?.DEV as boolean
 
         // Dev tools: log all state changes
         if (this.devMode) {
@@ -42,7 +42,12 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
         if (!path) return this.state
 
         const keys = path.split('.')
-        return keys.reduce((obj: any, key: string) => obj?.[key], this.state)
+        return keys.reduce((obj: StateValue, key: string) => {
+            if (obj && typeof obj === 'object' && key in obj) {
+                return (obj as Record<string, unknown>)[key]
+            }
+            return undefined
+        }, this.state as StateValue)
     }
 
     set(path: string, value: StateValue): void {
@@ -57,15 +62,15 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
         if (path.includes('.')) {
             const keys = path.split('.')
             const lastKey = keys.pop()
-            const target = keys.reduce((obj: any, key: string) => {
+            const target = keys.reduce((obj: Record<string, unknown>, key: string) => {
                 if (!obj[key]) obj[key] = {}
-                return obj[key]
-            }, this.state as any)
+                return obj[key] as Record<string, unknown>
+            }, this.state as Record<string, unknown>)
             if (lastKey) {
                 target[lastKey] = value
             }
         } else {
-            (this.state as any)[path] = value
+            (this.state as Record<string, unknown>)[path] = value
         }
 
         // Log in dev mode
@@ -90,15 +95,15 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
                 if (path.includes('.')) {
                     const keys = path.split('.')
                     const lastKey = keys.pop()
-                    const target = keys.reduce((obj: any, key: string) => {
+                    const target = keys.reduce((obj: Record<string, unknown>, key: string) => {
                         if (!obj[key]) obj[key] = {}
-                        return obj[key]
-                    }, this.state as any)
+                        return obj[key] as Record<string, unknown>
+                    }, this.state as Record<string, unknown>)
                     if (lastKey) {
                         target[lastKey] = value
                     }
                 } else {
-                    (this.state as any)[path] = value
+                    (this.state as Record<string, unknown>)[path] = value
                 }
 
                 changes.push({ path, oldValue, value })
@@ -211,7 +216,7 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
     _setupDevTools(): void {
         // Expose store to window for debugging
         if (typeof window !== 'undefined') {
-            (window as any).__WHITEBOARD_STORE__ = this
+            ;(window as typeof window & { __WHITEBOARD_STORE__: StateStore<T> }).__WHITEBOARD_STORE__ = this
             console.log('[StateStore] Dev mode enabled. Access store via window.__WHITEBOARD_STORE__')
         }
     }
@@ -240,14 +245,16 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
         if (a == null || b == null) return false
         if (typeof a !== 'object' || typeof b !== 'object') return false
 
-        const keysA = Object.keys(a)
-        const keysB = Object.keys(b)
+        const objA = a as Record<string, unknown>
+        const objB = b as Record<string, unknown>
+        const keysA = Object.keys(objA)
+        const keysB = Object.keys(objB)
 
         if (keysA.length !== keysB.length) return false
 
         for (const key of keysA) {
             if (!keysB.includes(key)) return false
-            if (!this._deepEqual((a as any)[key], (b as any)[key])) return false
+            if (!this._deepEqual(objA[key], objB[key])) return false
         }
 
         return true
@@ -263,9 +270,10 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
         if (obj instanceof Array) return obj.map(item => this._deepClone(item)) as V
 
         const cloned: Record<string, unknown> = {}
+        const objRecord = obj as Record<string, unknown>
         for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                cloned[key] = this._deepClone((obj as any)[key])
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                cloned[key] = this._deepClone(objRecord[key])
             }
         }
         return cloned as V

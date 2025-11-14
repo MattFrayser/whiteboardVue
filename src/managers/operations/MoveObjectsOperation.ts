@@ -12,9 +12,9 @@ export class MoveObjectsOperation implements Operation {
     readonly userId: string
     readonly timestamp: number
 
-    private objectIds: string[]
-    private dx: number
-    private dy: number
+    readonly objectIds: string[]
+    readonly dx: number
+    readonly dy: number
 
     constructor(objectIds: string[], dx: number, dy: number, userId: string) {
         this.id = `move_${objectIds.join('_')}_${Date.now()}`

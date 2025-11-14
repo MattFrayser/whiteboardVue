@@ -172,9 +172,9 @@ export class InputHandler {
 
             // SelectTool has dynamic cursor based on hover position
             if (currentTool && toolName === 'select' && worldPos) {
-                if ('updateCursor' in currentTool) {
+                if ('updateCursor' in currentTool && typeof currentTool.updateCursor === 'function') {
                     // Let SelectTool handle its own cursor (via actions.setCursor)
-                    (currentTool as any).updateCursor(worldPos)
+                    currentTool.updateCursor(worldPos)
                 }
             } else {
                 // Set cursor based on current tool via state
@@ -186,7 +186,8 @@ export class InputHandler {
     private handleKeyDown(e: KeyboardEvent): void {
         try {
             // Tool Shortcuts
-            const shortcuts: Record<string, string> = {
+            type ToolName = 'draw' | 'rectangle' | 'circle' | 'select' | 'eraser' | 'line' | 'text'
+            const shortcuts: Record<string, ToolName> = {
                 S: 'select',
                 D: 'draw',
                 R: 'rectangle',
@@ -196,8 +197,9 @@ export class InputHandler {
                 E: 'eraser',
             }
 
-            if (shortcuts[e.key]) {
-                this.engine.setTool(shortcuts[e.key] as any)
+            const selectedTool = shortcuts[e.key]
+            if (selectedTool) {
+                this.engine.setTool(selectedTool)
                 this.updateCursor()
             }
 

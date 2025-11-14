@@ -5,11 +5,18 @@
  * Supports multiple types (success, error, warning, info) with auto-dismiss
  * Handles notification queueing when multiple notifications are triggered
  */
+
+interface NotificationQueueItem {
+    message: string
+    type: string
+    duration: number
+}
+
 export class NotificationManager {
-    notification: any
-    queue: any[]
+    notification: HTMLElement | null
+    queue: NotificationQueueItem[]
     isShowing: boolean
-    currentTimeout: any
+    currentTimeout: ReturnType<typeof setTimeout> | null
 
     constructor() {
         // Get or create notification element
@@ -109,10 +116,15 @@ export class NotificationManager {
         }
 
         // Get next notification from queue
-        const { message, type, duration } = this.queue.shift()
+        const notification = this.queue.shift()
+        if (!notification) return
+
+        const { message, type, duration } = notification
         this.isShowing = true
 
         // Update notification element
+        if (!this.notification) return
+
         this.notification.textContent = message
         this.notification.className = `invite-notification ${type}`
         this.notification.classList.add('show')
@@ -124,7 +136,7 @@ export class NotificationManager {
 
         // Auto-dismiss after duration
         this.currentTimeout = setTimeout(() => {
-            this.notification.classList.remove('show')
+            this.notification?.classList.remove('show')
 
             // Wait for fade-out animation to complete before processing next
             setTimeout(() => {

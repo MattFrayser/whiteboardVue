@@ -12,7 +12,7 @@ export class DeleteObjectOperation implements Operation {
     readonly userId: string
     readonly timestamp: number
 
-    private objectData: NestedObjectData
+    readonly objectData: NestedObjectData
 
     constructor(object: DrawingObject, userId: string) {
         this.id = `delete_${object.id}_${Date.now()}`
