@@ -62,11 +62,9 @@ export class DrawTool extends Tool {
             }
 
             // Mark final bounds as dirty
-            // const _finalBounds = this.currentStroke.getBounds()
             this.engine.markDirty()
 
             this.engine.objectManager.addObject(this.currentStroke)
-            this.engine.emit('historyChanged')
         }
         this.currentStroke = null
         this.isDrawing = false

@@ -6,6 +6,7 @@ import { Stroke } from '../objects/Stroke'
 import { Text } from '../objects/Text'
 import { DrawingObject } from '../objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../types/common'
+import { QUADTREE_MIN_SIZE, QUADTREE_PADDING_MULTIPLIER } from '../constants'
 
 // Type definitions for object data formats
 export type NestedObjectData = { id: string; type: string; data: DrawingObjectData; zIndex: number }
@@ -297,9 +298,9 @@ export class ObjectStore {
                 maxY = Math.max(maxY, objBounds.y + objBounds.height)
             })
 
-            // Add 20% padding and ensure minimum size
-            const width = Math.max(20000, (maxX - minX) * 1.2)
-            const height = Math.max(20000, (maxY - minY) * 1.2)
+            // Add padding and ensure minimum size
+            const width = Math.max(QUADTREE_MIN_SIZE, (maxX - minX) * QUADTREE_PADDING_MULTIPLIER)
+            const height = Math.max(QUADTREE_MIN_SIZE, (maxY - minY) * QUADTREE_PADDING_MULTIPLIER)
             const centerX = (minX + maxX) / 2
             const centerY = (minY + maxY) / 2
 

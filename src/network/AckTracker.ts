@@ -35,7 +35,7 @@ export class AckTracker {
     track(
         objectId: string,
         resolve: (value: { objectId: string; success: boolean }) => void,
-        reject: (error: Error) => void
+        reject: (reason?: unknown) => void
     ): ReturnType<typeof setTimeout> {
         // Create timeout to reject if no response within ackTimeout
         const timeoutId = setTimeout(() => {

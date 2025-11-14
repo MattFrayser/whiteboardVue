@@ -81,7 +81,6 @@ export abstract class BaseShapeTool extends Tool {
             if (this.isShapeValid(this.currentShape)) {
                 this.engine.markDirty()
                 this.engine.objectManager.addObject(this.currentShape)
-                this.engine.emit('historyChanged')
             }
 
             // Reset state

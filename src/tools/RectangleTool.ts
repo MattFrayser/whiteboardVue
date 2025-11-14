@@ -3,6 +3,7 @@ import { BaseShapeTool } from './BaseShapeTool'
 import type { Point } from '../types'
 import type { DrawingObject } from '../objects/DrawingObject'
 import { selectors } from '../stores/AppState'
+import { MIN_SHAPE_SIZE } from '../constants'
 
 /**
  * Rectangle drawing tool
@@ -32,6 +33,6 @@ export class RectangleTool extends BaseShapeTool {
 
     protected isShapeValid(shape: DrawingObject): boolean {
         const bounds = shape.getBounds()
-        return bounds.width > 1 && bounds.height > 1
+        return bounds.width > MIN_SHAPE_SIZE && bounds.height > MIN_SHAPE_SIZE
     }
 }

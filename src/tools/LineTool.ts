@@ -2,6 +2,7 @@ import { Line } from '../objects/Line'
 import { BaseShapeTool } from './BaseShapeTool'
 import type { Point } from '../types'
 import type { DrawingObject } from '../objects/DrawingObject'
+import { MIN_SHAPE_SIZE } from '../constants'
 
 /**
  * Line drawing tool
@@ -28,6 +29,6 @@ export class LineTool extends BaseShapeTool {
             Math.pow(shape.data.x2! - shape.data.x1!, 2) +
                 Math.pow(shape.data.y2! - shape.data.y1!, 2)
         )
-        return length > 1
+        return length > MIN_SHAPE_SIZE
     }
 }

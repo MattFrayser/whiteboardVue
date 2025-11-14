@@ -1,10 +1,6 @@
 import { DrawingObject } from './DrawingObject'
-import { DEFAULT_COLOR } from '../constants'
-import type { Point, Bounds, DrawingObjectData } from '../types'
-
-interface ResizeHandle extends Point {
-    cursor: string
-}
+import { DEFAULT_COLOR, MIN_FONT_SIZE } from '../constants'
+import type { Point, Bounds, DrawingObjectData, ResizeHandle } from '../types'
 
 export class Text extends DrawingObject {
     textWidth: number = 0
@@ -85,7 +81,7 @@ export class Text extends DrawingObject {
         const oldBounds = this.getBounds()
         const scale = newBounds.height / oldBounds.height
 
-        this.data.fontSize = Math.max(8, Math.round((this.data.fontSize || 16) * scale))
+        this.data.fontSize = Math.max(MIN_FONT_SIZE, Math.round((this.data.fontSize || 16) * scale))
         this.measureBounds()
 
         this.data.x = newBounds.x

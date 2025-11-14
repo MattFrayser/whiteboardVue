@@ -22,7 +22,7 @@ export class LocalStorageManager {
     constructor() {
         this.saveTimeout = null
         this.enabled = true
-        this.isLocal = isLocal
+        this.isLocal = false
     }
 
     setLocalMode(isLocal: boolean): void {
@@ -30,7 +30,6 @@ export class LocalStorageManager {
     }
 
    /**
-     * Validate and sanitize object data loaded from localStorage
      * For offline mode where no backend validation exists
      */
     private sanitizeObjectData(data: DrawingObjectData): DrawingObjectData {
@@ -139,7 +138,6 @@ export class LocalStorageManager {
     }
  
     /**
-     * Clear all saved objects from localStorage
      * Called when transitioning from local mode to networked mode
      */
     clear(): void {

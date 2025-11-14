@@ -74,6 +74,24 @@ export interface NotificationManager {
 }
 
 // ============================================================================
+// Dialog Manager Types
+// ============================================================================
+
+export interface DialogManager {
+    showPasswordDialog(roomCode: string, errorMessage?: string | null): Promise<string | null>
+    showJoinRoomDialog(roomCode: string, onJoin?: (() => void | Promise<void>) | null, onCancel?: (() => void) | null): Promise<boolean>
+    showConfirmDialog(config?: {
+        title?: string
+        message?: string
+        confirmText?: string
+        cancelText?: string
+        confirmClass?: string
+    }): Promise<boolean>
+    close(): void
+    destroy(): void
+}
+
+// ============================================================================
 // Connection Status Types
 // ============================================================================
 
@@ -91,4 +109,11 @@ export interface InviteManagerConfig {
     roomCode: string
     notificationManager: NotificationManager
     sessionManager: unknown // Will be typed properly in network.ts
+}
+
+export interface InviteManager {
+    setRoomCode(roomCode: string): void
+    setSessionManager(sessionManager: unknown): void
+    updateUI(): void
+    destroy(): void
 }

@@ -1,5 +1,5 @@
 import type { DrawingObject } from './DrawingObject'
-import type { DrawingObjectData } from '../types/common'
+import type { DrawingObjectData } from '../types'
 
 /**
  * Object constructor signature

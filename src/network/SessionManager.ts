@@ -11,19 +11,10 @@ import { ErrorHandler } from '../utils/ErrorHandler'
 import { generateSecureRoomCode } from '../utils/crypto'
 import { createLogger } from '../utils/logger'
 import type { DrawingEngine } from '../engine/DrawingEngine'
-import type { NotificationManager } from '../types/ui'
+import type { NotificationManager, DialogManager, InviteManager } from '../types/ui'
 import type { NetworkMessage } from '../types/network'
 
 const log = createLogger('SessionManager')
-
-// Temporary interface until we properly type DialogManager and InviteManager
-interface DialogManager {
-    showPasswordDialog(roomCode: string, errorMessage?: string | null): Promise<string | null>
-}
-
-interface InviteManager {
-    setRoomCode(roomCode: string): void
-}
 
 export class SessionManager {
     engine: DrawingEngine

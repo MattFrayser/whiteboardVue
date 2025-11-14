@@ -27,7 +27,7 @@ export class Toolbar {
         this.engine = engine
         this.activeSwatch = null
         this.activeSwatchForMenu = null
-        this.unsubscribers = [] // Track subscriptions for cleanup
+        this.unsubscribers = [] // subscriptions for cleanup
         this.colors = COLOR_PALETTE
 
         // Initialize handler storage
@@ -74,14 +74,6 @@ export class Toolbar {
         })
         this.unsubscribers.push(unsubHistory)
 
-        // Listen to engine events (decoupled from tools)
-        // Note: HistoryManager already updates AppState, which triggers the subscription above
-        // This event listener is here for explicitness and potential future use
-        const unsubEngineHistory = this.engine.on('historyChanged', () => {
-            // History state is already managed by HistoryManager → AppState → subscription
-            // This is a no-op but demonstrates the decoupling pattern
-        })
-        this.unsubscribers.push(unsubEngineHistory)
     }
 
     setupEventListeners(): void {
@@ -329,22 +321,21 @@ export class Toolbar {
             }
         })
 
-        // Update cursor via state (CursorManager will handle DOM update)
         actions.setCursor(getCursorForTool(tool as Tool))
     }
 
     destroy(): void {
-        // Clean up all subscriptions
+
         this.unsubscribers.forEach(unsub => unsub())
         this.unsubscribers = []
 
-        // Remove tool button listeners
+        // tool button listeners
         this.boundToolButtonHandlers.forEach((handler, btn) => {
             btn.removeEventListener('click', handler)
         })
         this.boundToolButtonHandlers.clear()
 
-        // Remove color picker listener
+        //  color picker listener
         if (this.boundColorPickerHandler) {
             const colorPicker = document.getElementById('colorPicker')
             if (colorPicker) {
@@ -353,14 +344,14 @@ export class Toolbar {
             this.boundColorPickerHandler = null
         }
 
-        // Remove swatch listeners
+        // swatch listeners
         this.boundSwatchHandlers.forEach((handlers, swatch) => {
             swatch.removeEventListener('click', handlers.click)
             swatch.removeEventListener('dblclick', handlers.dblclick)
         })
         this.boundSwatchHandlers.clear()
 
-        // Remove color menu listener
+        // color menu listener
         if (this.boundColorMenuHandler) {
             const colorMenu = document.getElementById('colorMenu')
             if (colorMenu) {
@@ -369,7 +360,7 @@ export class Toolbar {
             this.boundColorMenuHandler = null
         }
 
-        // Remove color grid listener
+        // color grid listener
         if (this.boundColorGridHandler) {
             const colorGrid = document.getElementById('colorGrid')
             if (colorGrid) {
@@ -378,13 +369,13 @@ export class Toolbar {
             this.boundColorGridHandler = null
         }
 
-        // Remove document click listener
+        // document click listener
         if (this.boundDocumentClickHandler) {
             document.removeEventListener('click', this.boundDocumentClickHandler)
             this.boundDocumentClickHandler = null
         }
 
-        // Remove brush size listener
+        // brush size listener
         if (this.boundBrushSizeHandler) {
             const brushSize = document.getElementById('brushSize')
             if (brushSize) {
@@ -393,7 +384,7 @@ export class Toolbar {
             this.boundBrushSizeHandler = null
         }
 
-        // Remove undo button listener
+        // undo button listener
         if (this.boundUndoHandler) {
             const undoBtn = document.getElementById('undoBtn')
             if (undoBtn) {
@@ -402,7 +393,7 @@ export class Toolbar {
             this.boundUndoHandler = null
         }
 
-        // Remove redo button listener
+        // redo button listener
         if (this.boundRedoHandler) {
             const redoBtn = document.getElementById('redoBtn')
             if (redoBtn) {

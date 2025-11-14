@@ -60,7 +60,7 @@ export class InputHandler {
             if (e.button === 0) {
                 // Get current tool from AppState
                 const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName]
+                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
                 if (currentTool) {
                     currentTool._safeOnMouseDown(worldPos, e)
                 }
@@ -105,7 +105,7 @@ export class InputHandler {
             // left click
             if (e.buttons === 1) {
                 const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName]
+                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
                 if (currentTool) {
                     currentTool._safeOnMouseMove(worldPos, e)
                 }
@@ -133,7 +133,7 @@ export class InputHandler {
 
             if (e.button === 0) {
                 const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName]
+                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
                 if (currentTool) {
                     currentTool._safeOnMouseUp(worldPos, e)
                 }
@@ -168,7 +168,7 @@ export class InputHandler {
         } else {
             // Get current tool from AppState
             const toolName = selectors.getTool()
-            const currentTool = this.engine.tools[toolName]
+            const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
 
             // SelectTool has dynamic cursor based on hover position
             if (currentTool && toolName === 'select' && worldPos) {

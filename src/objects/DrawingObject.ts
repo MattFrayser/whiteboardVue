@@ -1,9 +1,5 @@
-import type { Point, Bounds, DrawingObjectData } from '../types'
+import type { Point, Bounds, DrawingObjectData, ResizeHandle } from '../types'
 import { SELECTION_COLOR, SELECTION_HANDLE_BG } from '../constants'
-
-interface ResizeHandle extends Point {
-    cursor: string
-}
 
 export class DrawingObject {
     id: string

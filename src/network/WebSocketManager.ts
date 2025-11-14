@@ -1,43 +1,38 @@
-import { actions, selectors, type NetworkStatus } from '../stores/AppState'
+import { actions, selectors } from '../stores/AppState'
 import { MAX_RECONNECT_ATTEMPTS, ACK_TIMEOUT } from '../constants'
-import { ErrorHandler, ErrorCode } from '../utils/ErrorHandler'
-import type { MessageHandler, StatusCallback, PendingAck, CursorData, NetworkMessage } from '../types/network'
+import { ErrorHandler } from '../utils/ErrorHandler'
+import type { MessageHandler, StatusCallback, CursorData, NetworkMessage } from '../types/network'
 import type { DrawingObject } from '../objects/DrawingObject'
-import type { INetworkManager } from '../interfaces/INetworkManager'
 import { WebSocketConnection } from './WebSocketConnection'
 import { ReconnectionManager } from './ReconnectionManager'
-import { MessageRouter } from './MessageRouter'
 import { AckTracker } from './AckTracker'
-import { BroadcastService } from './BroadcastService'
 
-export class WebSocketManager implements INetworkManager {
+export class WebSocketManager {
     private connection: WebSocketConnection
     private reconnectionManager: ReconnectionManager
-    private messageRouter: MessageRouter
     private ackTracker: AckTracker
-    private broadcastService: BroadcastService
+    private handlers: Map<string, (msg: NetworkMessage) => void>
     messageHandler: MessageHandler | null
 
     constructor(messageHandler: MessageHandler | null = null) {
         this.connection = new WebSocketConnection()
         this.reconnectionManager = new ReconnectionManager(MAX_RECONNECT_ATTEMPTS)
-        this.messageRouter = new MessageRouter()
         this.ackTracker = new AckTracker(ACK_TIMEOUT)
-        this.broadcastService = new BroadcastService(this.connection, this.ackTracker)
+        this.handlers = new Map()
         this.messageHandler = messageHandler // Callback for handling incoming messages
 
-        // Register message handlers with router
-        this.messageRouter.registerHandler('authenticated', (msg) => this.handleAuthenticated(msg))
-        this.messageRouter.registerHandler('room_joined', (msg) => this.handleRoomJoined(msg))
-        this.messageRouter.registerHandler('sync', (msg) => this.handleSync(msg))
-        this.messageRouter.registerHandler('objectAdded', (msg) => this.handleObjectAdded(msg))
-        this.messageRouter.registerHandler('objectUpdated', (msg) => this.handleObjectUpdated(msg))
-        this.messageRouter.registerHandler('objectDeleted', (msg) => this.handleObjectDeleted(msg))
-        this.messageRouter.registerHandler('cursor', (msg) => this.handleCursor(msg))
-        this.messageRouter.registerHandler('userDisconnected', (msg) => this.handleUserDisconnect(msg))
-        this.messageRouter.registerHandler('objectAdded_ack', (msg) => this.handleObjectAddedAck(msg))
-        this.messageRouter.registerHandler('objectAdded_error', (msg) => this.handleObjectAddedError(msg))
-        this.messageRouter.registerHandler('error', (msg) => this.handleError(msg))
+        // Register message handlers
+        this.handlers.set('authenticated', (msg) => this.handleAuthenticated(msg))
+        this.handlers.set('room_joined', (msg) => this.handleRoomJoined(msg))
+        this.handlers.set('sync', (msg) => this.handleSync(msg))
+        this.handlers.set('objectAdded', (msg) => this.handleObjectAdded(msg))
+        this.handlers.set('objectUpdated', (msg) => this.handleObjectUpdated(msg))
+        this.handlers.set('objectDeleted', (msg) => this.handleObjectDeleted(msg))
+        this.handlers.set('cursor', (msg) => this.handleCursor(msg))
+        this.handlers.set('userDisconnected', (msg) => this.handleUserDisconnect(msg))
+        this.handlers.set('objectAdded_ack', (msg) => this.handleObjectAddedAck(msg))
+        this.handlers.set('objectAdded_error', (msg) => this.handleObjectAddedError(msg))
+        this.handlers.set('error', (msg) => this.handleError(msg))
 
         // Wire up connection callbacks
         this.connection.onMessage((msg) => this.handleMessage(msg))
@@ -115,7 +110,13 @@ export class WebSocketManager implements INetworkManager {
     }
 
     handleMessage(msg: NetworkMessage): void {
-        this.messageRouter.routeMessage(msg)
+        const handler = this.handlers.get(msg.type)
+
+        if (handler) {
+            handler(msg)
+        } else {
+            console.warn('[WebSocket] Unknown message type:', msg.type, msg)
+        }
     }
     
 
@@ -135,7 +136,6 @@ export class WebSocketManager implements INetworkManager {
         // Backend will check if room is already verified for this session
         const roomCode = selectors.getRoomCode()
         if (this.isReconnecting && roomCode) {
-            console.log('[WebSocket] Reconnection authenticated, auto-rejoining room:', roomCode)
             this.send({
                 type: 'joinRoom',
                 password: null, // No password on reconnect - backend will check session verification
@@ -280,23 +280,57 @@ export class WebSocketManager implements INetworkManager {
     }
 
     broadcastObjectAdded(object: DrawingObject): void {
-        this.broadcastService.broadcastObjectAdded(object)
+        this.connection.send({
+            type: 'objectAdded',
+            object: object.toJSON(),
+        })
     }
 
-    broadcastObjectAddedWithConfirmation(object: DrawingObject): Promise<{ objectId: string; success: boolean }> {
-        return this.broadcastService.broadcastObjectAddedWithConfirmation(object)
+    broadcastObjectAddedWithConfirmation(
+        object: DrawingObject
+    ): Promise<{ objectId: string; success: boolean }> {
+        return new Promise((resolve, reject) => {
+            // Check if connected
+            if (!this.connection.isConnected()) {
+                reject(new Error('Not connected to server'))
+                return
+            }
+
+            const objectId = object.id
+
+            // Track the acknowledgment with timeout
+            this.ackTracker.track(objectId, resolve, reject)
+
+            // Send the message
+            this.connection.send({
+                type: 'objectAdded',
+                object: object.toJSON(),
+            })
+        })
     }
 
     broadcastObjectUpdated(object: DrawingObject): void {
-        this.broadcastService.broadcastObjectUpdated(object)
+        this.connection.send({
+            type: 'objectUpdated',
+            object: object.toJSON(),
+        })
     }
 
     broadcastObjectDeleted(object: DrawingObject): void {
-        this.broadcastService.broadcastObjectDeleted(object)
+        this.connection.send({
+            type: 'objectDeleted',
+            objectId: object.id,
+        })
     }
 
     broadcastCursor(cursor: CursorData): void {
-        this.broadcastService.broadcastCursor(cursor)
+        this.connection.send({
+            type: 'cursor',
+            x: cursor.x,
+            y: cursor.y,
+            tool: cursor.tool,
+            color: cursor.color,
+        })
     }
 
     disconnect(): void {

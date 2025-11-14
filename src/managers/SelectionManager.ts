@@ -1,7 +1,7 @@
 import { appState, actions } from '../stores/AppState'
 import { MoveObjectsOperation } from './operations'
 import type { DrawingObject } from '../objects/DrawingObject'
-import type { Bounds } from '../types/common'
+import type { Bounds } from '../types'
 import type { ObjectManager } from './ObjectManager'
 import type { ObjectStore } from './ObjectStore'
 import type { HistoryManager } from './HistoryManager'

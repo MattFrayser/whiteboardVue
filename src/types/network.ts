@@ -31,6 +31,112 @@ export interface NetworkMessage {
 }
 
 // ============================================================================
+// WebSocket Protocol Message Types
+// ============================================================================
+
+export type ServerMessageType =
+    | 'session_created'
+    | 'session_joined'
+    | 'user_joined'
+    | 'user_left'
+    | 'drawing_data'
+    | 'object_added'
+    | 'object_updated'
+    | 'object_deleted'
+    | 'cursor_move'
+    | 'error'
+    | 'ping'
+    | 'pong'
+
+export type ClientMessageType =
+    | 'create_session'
+    | 'join_session'
+    | 'add_object'
+    | 'update_object'
+    | 'delete_object'
+    | 'cursor_move'
+    | 'pong'
+
+export interface BaseMessage {
+    type: string
+    timestamp?: number
+}
+
+export interface SessionCreatedMessage extends BaseMessage {
+    type: 'session_created'
+    sessionId: string
+    userId: string
+}
+
+export interface SessionJoinedMessage extends BaseMessage {
+    type: 'session_joined'
+    sessionId: string
+    userId: string
+    objects: import('./common').DrawingObjectData[]
+}
+
+export interface UserJoinedMessage extends BaseMessage {
+    type: 'user_joined'
+    userId: string
+}
+
+export interface UserLeftMessage extends BaseMessage {
+    type: 'user_left'
+    userId: string
+}
+
+export interface ObjectAddedMessage extends BaseMessage {
+    type: 'object_added'
+    object: import('./common').DrawingObjectData
+}
+
+export interface ObjectUpdatedMessage extends BaseMessage {
+    type: 'object_updated'
+    object: import('./common').DrawingObjectData
+}
+
+export interface ObjectDeletedMessage extends BaseMessage {
+    type: 'object_deleted'
+    objectId: string
+}
+
+export interface CursorMoveMessage extends BaseMessage {
+    type: 'cursor_move'
+    userId: string
+    x: number
+    y: number
+    color: string
+    tool: string
+}
+
+export interface ErrorMessage extends BaseMessage {
+    type: 'error'
+    error: string
+    code?: string
+}
+
+export interface PingMessage extends BaseMessage {
+    type: 'ping'
+}
+
+export interface PongMessage extends BaseMessage {
+    type: 'pong'
+}
+
+export type ServerMessage =
+    | SessionCreatedMessage
+    | SessionJoinedMessage
+    | UserJoinedMessage
+    | UserLeftMessage
+    | ObjectAddedMessage
+    | ObjectUpdatedMessage
+    | ObjectDeletedMessage
+    | CursorMoveMessage
+    | ErrorMessage
+    | PingMessage
+    | PongMessage
+
+// ============================================================================
 // WebSocket Manager Types
 // ============================================================================
 

@@ -1,5 +1,5 @@
 import { DrawingObject } from './DrawingObject'
-import { DEFAULT_COLOR } from '../constants'
+import { DEFAULT_COLOR, LINE_CLICK_TOLERANCE } from '../constants'
 import type { Point, Bounds, DrawingObjectData } from '../types'
 
 export class Line extends DrawingObject {
@@ -24,7 +24,7 @@ export class Line extends DrawingObject {
             { x: this.data.x2!, y: this.data.y2! }
         )
 
-        return distance <= (this.data.width || 2) + 5
+        return distance <= (this.data.width || 2) + LINE_CLICK_TOLERANCE
     }
 
     pointToLineDistance(point: Point, lineStart: Point, lineEnd: Point): number {

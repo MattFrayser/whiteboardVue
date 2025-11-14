@@ -9,6 +9,7 @@
 import { StateStore } from './StateStore'
 import { DEFAULT_COLOR } from '../constants'
 import { clampBrushSize, validateColor } from '../utils/validation'
+import { RemoteCursor } from '../types'
 
 // Type definitions for the application state
 // Tool is now dynamic based on ToolRegistry - any registered tool name is valid
@@ -26,15 +27,6 @@ export interface SelectionBounds {
     y: number
     width: number
     height: number
-}
-
-export interface RemoteCursor {
-    userId: string
-    x: number
-    y: number
-    color: string
-    tool: string
-    lastUpdate: number
 }
 
 export interface Viewport {

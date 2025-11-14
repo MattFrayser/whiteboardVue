@@ -6,7 +6,6 @@ import { NotificationManager } from './ui/NotificationManager'
 import { DialogManager } from './ui/DialogManager'
 import { ConnectionStatusIndicator } from './ui/ConnectionStatusIndicator'
 import { SessionManager } from './network/SessionManager'
-import { VisibilitySync } from './sync/VisibilitySync'
 import { appState, actions } from './stores/AppState'
 import { ErrorHandler } from './utils/ErrorHandler'
 
@@ -50,8 +49,8 @@ sessionManager.setLocalUserId(localUserId)
 // Now connect SessionManager to InviteManager (circular dependency resolved)
 inviteManager.setSessionManager(sessionManager)
 
-// Initialize VisibilitySync (auto-sync when user returns to tab)
-const visibilitySync = new VisibilitySync(sessionManager)
+// TODO: Initialize VisibilitySync (auto-sync when user returns to tab)
+// const visibilitySync = new VisibilitySync(sessionManager)
 
 // Sync AppState UI changes to engine
 appState.subscribe('ui.tool', (tool) => {
@@ -94,6 +93,6 @@ window.addEventListener('beforeunload', () => {
     dialogManager.destroy()
     connectionStatus.destroy()
     sessionManager.destroy()
-    visibilitySync.destroy()
+    // visibilitySync.destroy()
     appState.clear() // Clean up state subscriptions
 })

@@ -2,6 +2,7 @@ import { Tool } from './Tool'
 import type { Point } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { DrawingObject } from '../objects/DrawingObject'
+import { ERASER_FADE_STEP, ERASER_SIZE, ERASER_TRAIL_WIDTH, ERASER_TRAIL_COLOR, ERASER_TRAIL_OPACITY } from '../constants'
 
 export class EraserTool extends Tool {
     isErasing: boolean
@@ -73,7 +74,7 @@ export class EraserTool extends Tool {
 
     startFadeAnimation(): void {
         const fadeStep = () => {
-            this.fadeOpacity -= 0.08 // Fade speed
+            this.fadeOpacity -= ERASER_FADE_STEP // Fade speed
 
             if (this.fadeOpacity <= 0) {
                 // Animation complete
@@ -95,7 +96,7 @@ export class EraserTool extends Tool {
 
     eraseAt(point: Point): void {
         const objects = [...this.engine.objectManager.getAllObjects()]
-        const eraserSize = 1
+        const eraserSize = ERASER_SIZE
 
         objects.forEach(obj => {
             if (this.erasedObjects.has(obj)) {
@@ -123,13 +124,13 @@ export class EraserTool extends Tool {
 
         // Eraser Trail (show during erasing or fading)
         if ((this.isErasing || this.isFading) && this.eraserTrail.length > 0) {
-            ctx.strokeStyle = '#888888'
-            ctx.lineWidth = 10
+            ctx.strokeStyle = ERASER_TRAIL_COLOR
+            ctx.lineWidth = ERASER_TRAIL_WIDTH
             ctx.lineCap = 'round'
             ctx.lineJoin = 'round'
 
             // Apply fade opacity when fading, otherwise use base opacity
-            ctx.globalAlpha = this.isFading ? this.fadeOpacity * 0.5 : 0.5
+            ctx.globalAlpha = this.isFading ? this.fadeOpacity * ERASER_TRAIL_OPACITY : ERASER_TRAIL_OPACITY
 
             // Draw smooth curves using quadratic curves
             if (this.eraserTrail.length < 3) {

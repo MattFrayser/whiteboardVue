@@ -1,6 +1,6 @@
 import { Tool } from './Tool'
 import { MoveObjectsOperation, UpdateObjectOperation } from '../managers/operations'
-import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH, CURSORS } from '../constants'
+import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH, CURSORS, RESIZE_HANDLE_CLICK_SIZE, MIN_SELECTION_PADDING, BASE_SELECTION_PADDING } from '../constants'
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { DrawingObject } from '../objects/DrawingObject'
@@ -214,7 +214,7 @@ export class SelectTool extends Tool {
      */
     getSelectionPadding(): number {
         const scale = this.engine.coordinates.scale
-        return Math.max(10, Math.ceil((12 + 4) / scale))
+        return Math.max(MIN_SELECTION_PADDING, Math.ceil(BASE_SELECTION_PADDING / scale))
     }
 
     override onMouseMove(worldPos: Point): void {
@@ -341,7 +341,6 @@ export class SelectTool extends Tool {
                 this.engine.markDirty()
             })
 
-            this.engine.emit('historyChanged')
             this.engine.render() // Ensure moved/resized objects are visible
         }
 
@@ -374,7 +373,7 @@ export class SelectTool extends Tool {
     getHandleAt(point: Point, obj: DrawingObject): number {
         const handles = obj.getResizeHandles()
 
-        const clickableSize = 20 / this.engine.coordinates.scale // Larger clickable area
+        const clickableSize = RESIZE_HANDLE_CLICK_SIZE / this.engine.coordinates.scale // Larger clickable area
         const halfSize = clickableSize / 2
 
         for (let i = 0; i < handles.length; i++) {

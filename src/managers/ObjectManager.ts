@@ -2,7 +2,7 @@ import { ClipboardManager } from './ClipboardManager'
 import { HistoryManager } from './HistoryManager'
 import { SelectionManager } from './SelectionManager'
 import { ObjectStore } from './ObjectStore'
-import { LocalStorageManager } from '../storage/LocalStorageManager'
+import { LocalStorageManager } from './LocalStorageManager'
 import { AddObjectOperation, DeleteObjectOperation } from './operations'
 import type { WebSocketManager } from '../network/WebSocketManager'
 import type { DrawingObject } from '../objects/DrawingObject'
@@ -61,17 +61,13 @@ export class ObjectManager {
      * Load objects from localStorage (local-first mode)
      */
     loadFromLocalStorage(): void {
-        const savedObjects = this.localStorageManager.loadObjects() as DrawingObjectData[]
+        const { objects: savedObjects, maxZIndex } = this.localStorageManager.loadObjects()
         if (savedObjects.length > 0) {
             console.log(`[ObjectManager] Loading ${savedObjects.length} objects from localStorage`)
             this.objectStore.loadRemoteObjects(savedObjects)
 
-            // Update nextZIndex to be higher than any loaded object
-            savedObjects.forEach((obj: DrawingObjectData) => {
-                if (obj.zIndex !== undefined && obj.zIndex !== null && typeof obj.zIndex === 'number') {
-                    this.nextZIndex = Math.max(this.nextZIndex, obj.zIndex + 1)
-                }
-            })
+            // Update nextZIndex from loaded objects
+            this.nextZIndex = Math.max(this.nextZIndex, maxZIndex)
 
             // Note: Don't update history here - userId isn't set yet
             // History will be updated in setUserId() after objects' userId is updated

@@ -3,6 +3,7 @@ import { BaseShapeTool } from './BaseShapeTool'
 import type { Point } from '../types'
 import type { DrawingObject } from '../objects/DrawingObject'
 import { selectors } from '../stores/AppState'
+import { MIN_SHAPE_SIZE } from '../constants'
 
 /**
  * Circle drawing tool
@@ -36,6 +37,6 @@ export class CircleTool extends BaseShapeTool {
             Math.pow(shape.data.x2! - shape.data.x1!, 2) +
                 Math.pow(shape.data.y2! - shape.data.y1!, 2)
         )
-        return radius > 1
+        return radius > MIN_SHAPE_SIZE
     }
 }
