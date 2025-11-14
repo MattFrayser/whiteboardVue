@@ -3,9 +3,10 @@
  * Includes API endpoints, retry limits, and network timeouts
  */
 
-// API Endpoints
-export const API_BASE_URL = 'http://localhost:8080'
-export const WS_BASE_URL = 'ws://localhost:8080'
+// API Endpoints - use Vite's import.meta.env (not process.env for browser)
+// Vite automatically loads .env files and exposes variables prefixed with VITE_
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || ''
 
 // Connection Retry Limits
 export const MAX_RECONNECT_ATTEMPTS = 3

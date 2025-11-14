@@ -66,9 +66,7 @@ export class DrawTool extends Tool {
             this.engine.markDirty()
 
             this.engine.objectManager.addObject(this.currentStroke)
-            if ((this.engine as any).toolbar) {
-                (this.engine as any).toolbar.updateUndoRedoButtons()
-            }
+            this.engine.emit('historyChanged')
         }
         this.currentStroke = null
         this.isDrawing = false

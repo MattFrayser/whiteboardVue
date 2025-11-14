@@ -1,9 +1,5 @@
 import { Quadtree } from '../utils/Quadtree'
-import { Circle } from '../objects/Circle'
-import { Line } from '../objects/Line'
-import { Rectangle } from '../objects/Rectangle'
-import { Stroke } from '../objects/Stroke'
-import { Text } from '../objects/Text'
+import { ObjectRegistry } from '../objects'
 import { DrawingObject } from '../objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../types/common'
 
@@ -215,23 +211,8 @@ export class ObjectStore {
             zIndex = typeof zIndexValue === 'number' ? zIndexValue : 0
         }
 
-        switch (objectType) {
-            case 'stroke':
-                obj = new Stroke(objectId, objectData, zIndex)
-                break
-            case 'rectangle':
-                obj = new Rectangle(objectId, objectData, zIndex)
-                break
-            case 'circle':
-                obj = new Circle(objectId, objectData, zIndex)
-                break
-            case 'line':
-                obj = new Line(objectId, objectData, zIndex)
-                break
-            case 'text':
-                obj = new Text(objectId, objectData, zIndex)
-                break
-        }
+        // Use ObjectRegistry to create object (eliminates switch statement)
+        obj = ObjectRegistry.create(objectType, objectId, objectData, zIndex)
 
         // Preserve userId from remote data
         if (obj && objectData.userId) {

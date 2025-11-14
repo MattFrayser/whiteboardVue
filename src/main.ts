@@ -1,15 +1,19 @@
 import './style.css'
+import './tools' // Register all tools with ToolRegistry
+import './objects' // Register all object types with ObjectRegistry
 import { DrawingEngine } from './engine/DrawingEngine'
 import { ObjectManager } from './managers/ObjectManager'
+import { CursorManager } from './managers/CursorManager'
 import { Toolbar } from './ui/Toolbar'
 import { InviteManager } from './ui/InviteManager'
 import { NotificationManager } from './ui/NotificationManager'
 import { DialogManager } from './ui/DialogManager'
 import { ConnectionStatusIndicator } from './ui/ConnectionStatusIndicator'
 import { SessionManager } from './network/SessionManager'
-import { VisibilitySync } from './sync/VisibilitySync'
+import { VisibilitySync } from './managers/VisibilitySync'
 import { appState, actions } from './stores/AppState'
 import { ErrorHandler } from './utils/ErrorHandler'
+import { getCursorForTool } from './utils/getCursorForTool'
 
 // Generate temporary local userId for local-first mode
 // This will be replaced with server-assigned userId when session is created
@@ -30,6 +34,12 @@ const objectManager = new ObjectManager(null)
 // Create DrawingEngine with injected ObjectManager (null = local mode for network)
 const engine = new DrawingEngine(canvas, objectManager, null)
 const toolbar = new Toolbar(engine)
+
+// Initialize CursorManager (single source of truth for cursor state)
+const cursorManager = new CursorManager(canvas)
+
+// Set initial cursor based on default tool
+actions.setCursor(getCursorForTool('draw'))
 
 // Initialize UI components
 const notificationManager = new NotificationManager()
@@ -61,7 +71,7 @@ const visibilitySync = new VisibilitySync(sessionManager)
 // Subscribe to tool changes to activate/deactivate tools
 // (Color and brushSize are queried on-demand, no sync needed)
 const unsubscribeToolChange = appState.subscribe('ui.tool', (tool) => {
-    engine.setTool(tool as 'draw' | 'rectangle' | 'circle' | 'select' | 'eraser' | 'line' | 'text')
+    engine.setTool(tool as string)
 })
 
 // Start engine
@@ -92,6 +102,7 @@ window.addEventListener('beforeunload', () => {
     // Destroy all components
     engine.destroy()
     toolbar.destroy()
+    cursorManager.destroy()
     notificationManager.destroy()
     dialogManager.destroy()
     connectionStatus.destroy()

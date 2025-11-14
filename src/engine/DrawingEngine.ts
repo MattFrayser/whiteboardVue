@@ -1,11 +1,6 @@
 import type { RemoteCursor, Bounds } from '../types'
-import { CircleTool } from '../tools/CircleTool'
-import { DrawTool } from '../tools/DrawTool'
-import { EraserTool } from '../tools/EraserTool'
-import { LineTool } from '../tools/LineTool'
-import { RectangleTool } from '../tools/RectangleTool'
-import { SelectTool } from '../tools/SelectTool'
-import { TextTool } from '../tools/TextTool'
+import { ToolRegistry } from '../tools'
+import type { Tool } from '../tools/Tool'
 import { Coordinates } from './Coordinates'
 import { InputHandler } from './InputHandler'
 import type { IObjectManager } from '../interfaces/IObjectManager'
@@ -21,17 +16,10 @@ export class DrawingEngine {
     objectManager: IObjectManager
     coordinates: Coordinates
     needsRedraw: boolean
-    tools: {
-        draw: DrawTool
-        rectangle: RectangleTool
-        circle: CircleTool
-        select: SelectTool
-        eraser: EraserTool
-        line: LineTool
-        text: TextTool
-    }
+    tools: Record<string, Tool>
     boundResize: () => void
     inputHandler: InputHandler
+    private eventListeners: Map<string, Set<(...args: any[]) => void>>
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -48,16 +36,10 @@ export class DrawingEngine {
         this.objectManager = objectManager
         this.coordinates = new Coordinates()
         this.needsRedraw = true
+        this.eventListeners = new Map()
 
-        this.tools = {
-            draw: new DrawTool(this),
-            rectangle: new RectangleTool(this),
-            circle: new CircleTool(this),
-            select: new SelectTool(this),
-            eraser: new EraserTool(this),
-            line: new LineTool(this),
-            text: new TextTool(this),
-        }
+        // Create all registered tools using ToolRegistry
+        this.tools = ToolRegistry.createAll(this)
 
         // Window resize handler
         this.boundResize = () => this.resize()
@@ -227,22 +209,24 @@ export class DrawingEngine {
         }
     }
 
-    setTool(toolName: keyof typeof this.tools): void {
+    setTool(toolName: string): void {
         // Get current tool from AppState
         const currentToolName = selectors.getTool()
-        const currentTool = this.tools[currentToolName as keyof typeof this.tools]
+        const currentTool = this.tools[currentToolName]
 
         if (currentTool) {
             currentTool.deactivate()
         }
 
         // Clear selection when switching away from select tool
-        if (currentTool === this.tools.select) {
+        if (currentToolName === 'select') {
             this.objectManager.clearSelection()
         }
 
         const newTool = this.tools[toolName]
-        newTool.activate()
+        if (newTool) {
+            newTool.activate()
+        }
 
         this.render()
     }
@@ -314,7 +298,7 @@ export class DrawingEngine {
 
             // Render current tool preview - query from AppState
             const currentToolName = selectors.getTool()
-            const currentTool = this.tools[currentToolName as keyof typeof this.tools]
+            const currentTool = this.tools[currentToolName]
             if (currentTool && currentTool.renderPreview) {
                 currentTool.renderPreview(this.ctx)
             }
@@ -358,6 +342,59 @@ export class DrawingEngine {
         this.render()
     }
 
+    /**
+     * Event System - Decouple components from direct dependencies
+     */
+
+    /**
+     * Listen to an event
+     * @param event Event name
+     * @param handler Event handler function
+     * @returns Unsubscribe function
+     */
+    on(event: string, handler: (...args: any[]) => void): () => void {
+        if (!this.eventListeners.has(event)) {
+            this.eventListeners.set(event, new Set())
+        }
+        this.eventListeners.get(event)!.add(handler)
+
+        // Return unsubscribe function
+        return () => this.off(event, handler)
+    }
+
+    /**
+     * Remove an event listener
+     * @param event Event name
+     * @param handler Event handler function
+     */
+    off(event: string, handler: (...args: any[]) => void): void {
+        const handlers = this.eventListeners.get(event)
+        if (handlers) {
+            handlers.delete(handler)
+        }
+    }
+
+    /**
+     * Emit an event
+     * @param event Event name
+     * @param args Event arguments
+     */
+    emit(event: string, ...args: any[]): void {
+        const handlers = this.eventListeners.get(event)
+        if (handlers) {
+            handlers.forEach(handler => {
+                try {
+                    handler(...args)
+                } catch (error) {
+                    ErrorHandler.handle(error as Error, ErrorCategory.SILENT, {
+                        context: 'DrawingEngine',
+                        metadata: { event },
+                    })
+                }
+            })
+        }
+    }
+
     destroy(): void {
         // Cleanup input handler
         if (this.inputHandler) {
@@ -376,6 +413,11 @@ export class DrawingEngine {
                     tool.deactivate()
                 }
             })
+        }
+
+        // Clear event listeners
+        if (this.eventListeners) {
+            this.eventListeners.clear()
         }
 
         // Clear references

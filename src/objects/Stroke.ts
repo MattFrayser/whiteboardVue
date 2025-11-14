@@ -1,9 +1,24 @@
 import { DrawingObject } from './DrawingObject'
 import { DEFAULT_COLOR } from '../constants'
 import type { Bounds, DrawingObjectData } from '../types'
+import { clampCoordinate, clampBrushSize, validateColor } from '../utils/validation'
 
 export class Stroke extends DrawingObject {
     constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
+        // Defensive validation to prevent crashes from NaN/Infinity in render loop
+        if (data.color) {
+            data.color = validateColor(data.color)
+        }
+        if (typeof data.width === 'number') {
+            data.width = clampBrushSize(data.width)
+        }
+        if (Array.isArray(data.points)) {
+            data.points = data.points.map(point => ({
+                x: clampCoordinate(point.x),
+                y: clampCoordinate(point.y)
+            }))
+        }
+
         super(id, 'stroke', data, zIndex)
     }
 

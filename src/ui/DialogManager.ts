@@ -7,6 +7,7 @@
  */
 
 import { DIALOG_FOCUS_DELAY } from '../constants'
+import { sanitizeRoomCode } from '../utils/validation'
 
 export class DialogManager {
     currentDialog: HTMLElement | null
@@ -23,33 +24,67 @@ export class DialogManager {
      */
     showPasswordDialog(roomCode: string, errorMessage: string | null = null): Promise<string | null> {
         return new Promise((resolve) => {
+            // Sanitize room code to prevent XSS (defense-in-depth)
+            const safeRoomCode = sanitizeRoomCode(roomCode)
+
             // Close any existing dialog
             this.close()
 
-            // Create dialog element
+            // Create dialog element - using safe DOM construction to prevent XSS
             const dialog = document.createElement('div')
             dialog.className = 'join-room-dialog-overlay'
-            dialog.innerHTML = `
-                <div class="join-room-dialog">
-                    <h2>Password Required</h2>
-                    <p>Room <strong>${roomCode}</strong> is password-protected.</p>
-                    ${errorMessage ? `<p class="error-message" style="color: #ff6b6b; font-weight: 500;">${errorMessage}</p>` : ''}
-                    <input type="password" id="room-password" placeholder="Enter password" autocomplete="off" />
-                    <div class="join-room-actions">
-                        <button class="join-room-btn join-btn">Enter</button>
-                        <button class="join-room-btn stay-local-btn">Cancel</button>
-                    </div>
-                </div>
-            `
+
+            const dialogContent = document.createElement('div')
+            dialogContent.className = 'join-room-dialog'
+
+            const heading = document.createElement('h2')
+            heading.textContent = 'Password Required'
+
+            const roomParagraph = document.createElement('p')
+            roomParagraph.innerHTML = 'Room <strong></strong> is password-protected.'
+            roomParagraph.querySelector('strong')!.textContent = safeRoomCode  // Safe: sanitized + textContent prevents XSS
+
+            dialogContent.appendChild(heading)
+            dialogContent.appendChild(roomParagraph)
+
+            if (errorMessage) {
+                const errorParagraph = document.createElement('p')
+                errorParagraph.className = 'error-message'
+                errorParagraph.style.color = '#ff6b6b'
+                errorParagraph.style.fontWeight = '500'
+                errorParagraph.textContent = errorMessage  // Safe: textContent prevents XSS
+                dialogContent.appendChild(errorParagraph)
+            }
+
+            const passwordInput = document.createElement('input')
+            passwordInput.type = 'password'
+            passwordInput.id = 'room-password'
+            passwordInput.placeholder = 'Enter password'
+            passwordInput.autocomplete = 'off'
+
+            const actionsDiv = document.createElement('div')
+            actionsDiv.className = 'join-room-actions'
+
+            const enterBtn = document.createElement('button')
+            enterBtn.className = 'join-room-btn join-btn'
+            enterBtn.textContent = 'Enter'
+
+            const cancelBtn = document.createElement('button')
+            cancelBtn.className = 'join-room-btn stay-local-btn'
+            cancelBtn.textContent = 'Cancel'
+
+            actionsDiv.appendChild(enterBtn)
+            actionsDiv.appendChild(cancelBtn)
+
+            dialogContent.appendChild(passwordInput)
+            dialogContent.appendChild(actionsDiv)
+            dialog.appendChild(dialogContent)
 
             // Add to page
             document.body.appendChild(dialog)
             this.currentDialog = dialog
 
-            // Get elements
-            const passwordInput = dialog.querySelector('#room-password') as HTMLInputElement
-            const enterBtn = dialog.querySelector('.join-btn')
-            const cancelBtn = dialog.querySelector('.stay-local-btn')
+            // Elements already created above - no need to query
 
             // Store listener references for cleanup
             const handleEscapeKey = (e: KeyboardEvent) => {
@@ -115,31 +150,54 @@ export class DialogManager {
      */
     showJoinRoomDialog(roomCode: string, onJoin: (() => void | Promise<void>) | null = null, onCancel: (() => void) | null = null): Promise<boolean> {
         return new Promise((resolve) => {
+            // Sanitize room code to prevent XSS (defense-in-depth)
+            const safeRoomCode = sanitizeRoomCode(roomCode)
+
             // Close any existing dialog
             this.close()
 
-            // Create dialog element
+            // Create dialog element - using safe DOM construction to prevent XSS
             const dialog = document.createElement('div')
             dialog.className = 'join-room-dialog-overlay'
-            dialog.innerHTML = `
-                <div class="join-room-dialog">
-                    <h2>Join Room?</h2>
-                    <p>You've been invited to join room <strong>${roomCode}</strong></p>
-                    <p>Would you like to join this collaborative session?</p>
-                    <div class="join-room-actions">
-                        <button class="join-room-btn join-btn">Join Room</button>
-                        <button class="join-room-btn stay-local-btn">Stay Local</button>
-                    </div>
-                </div>
-            `
+
+            const dialogContent = document.createElement('div')
+            dialogContent.className = 'join-room-dialog'
+
+            const heading = document.createElement('h2')
+            heading.textContent = 'Join Room?'
+
+            const roomParagraph = document.createElement('p')
+            roomParagraph.innerHTML = 'You\'ve been invited to join room <strong></strong>'
+            roomParagraph.querySelector('strong')!.textContent = safeRoomCode  // Safe: sanitized + textContent prevents XSS
+
+            const confirmParagraph = document.createElement('p')
+            confirmParagraph.textContent = 'Would you like to join this collaborative session?'
+
+            const actionsDiv = document.createElement('div')
+            actionsDiv.className = 'join-room-actions'
+
+            const joinBtn = document.createElement('button')
+            joinBtn.className = 'join-room-btn join-btn'
+            joinBtn.textContent = 'Join Room'
+
+            const stayLocalBtn = document.createElement('button')
+            stayLocalBtn.className = 'join-room-btn stay-local-btn'
+            stayLocalBtn.textContent = 'Stay Local'
+
+            actionsDiv.appendChild(joinBtn)
+            actionsDiv.appendChild(stayLocalBtn)
+
+            dialogContent.appendChild(heading)
+            dialogContent.appendChild(roomParagraph)
+            dialogContent.appendChild(confirmParagraph)
+            dialogContent.appendChild(actionsDiv)
+            dialog.appendChild(dialogContent)
 
             // Add to page
             document.body.appendChild(dialog)
             this.currentDialog = dialog
 
-            // Get buttons
-            const joinBtn = dialog.querySelector('.join-btn')
-            const stayLocalBtn = dialog.querySelector('.stay-local-btn')
+            // Elements already created above - no need to query
 
             // Store listener references for cleanup
             const handleEscapeKey = (e: KeyboardEvent) => {
@@ -222,27 +280,43 @@ export class DialogManager {
             // Close any existing dialog
             this.close()
 
-            // Create dialog element
+            // Create dialog element - using safe DOM construction to prevent XSS
             const dialog = document.createElement('div')
             dialog.className = 'join-room-dialog-overlay'
-            dialog.innerHTML = `
-                <div class="join-room-dialog">
-                    <h2>${title}</h2>
-                    <p>${message}</p>
-                    <div class="join-room-actions">
-                        <button class="join-room-btn ${confirmClass}">${confirmText}</button>
-                        <button class="join-room-btn stay-local-btn">${cancelText}</button>
-                    </div>
-                </div>
-            `
+
+            const dialogContent = document.createElement('div')
+            dialogContent.className = 'join-room-dialog'
+
+            const heading = document.createElement('h2')
+            heading.textContent = title  // Safe: textContent prevents XSS
+
+            const messageParagraph = document.createElement('p')
+            messageParagraph.textContent = message  // Safe: textContent prevents XSS
+
+            const actionsDiv = document.createElement('div')
+            actionsDiv.className = 'join-room-actions'
+
+            const confirmBtn = document.createElement('button')
+            confirmBtn.className = `join-room-btn ${confirmClass}`
+            confirmBtn.textContent = confirmText  // Safe: textContent prevents XSS
+
+            const cancelBtn = document.createElement('button')
+            cancelBtn.className = 'join-room-btn stay-local-btn'
+            cancelBtn.textContent = cancelText  // Safe: textContent prevents XSS
+
+            actionsDiv.appendChild(confirmBtn)
+            actionsDiv.appendChild(cancelBtn)
+
+            dialogContent.appendChild(heading)
+            dialogContent.appendChild(messageParagraph)
+            dialogContent.appendChild(actionsDiv)
+            dialog.appendChild(dialogContent)
 
             // Add to page
             document.body.appendChild(dialog)
             this.currentDialog = dialog
 
-            // Get buttons
-            const confirmBtn = dialog.querySelector(`.${confirmClass}`)
-            const cancelBtn = dialog.querySelector('.stay-local-btn')
+            // Elements already created above - no need to query
 
             // Store listener references for cleanup
             const handleEnterKey = (e: KeyboardEvent) => {

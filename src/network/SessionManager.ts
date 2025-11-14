@@ -8,9 +8,13 @@
 import { WebSocketManager } from './WebSocketManager'
 import { actions, selectors } from '../stores/AppState'
 import { ErrorHandler } from '../utils/ErrorHandler'
+import { generateSecureRoomCode } from '../utils/crypto'
+import { createLogger } from '../utils/logger'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { NotificationManager } from '../types/ui'
 import type { NetworkMessage } from '../types/network'
+
+const log = createLogger('SessionManager')
 
 // Temporary interface until we properly type DialogManager and InviteManager
 interface DialogManager {
@@ -59,9 +63,9 @@ export class SessionManager {
      */
     async createSession(settings: { password?: string } = {}): Promise<{ roomCode: string; userId: string }> {
         try {
-            // Generate room code
-            const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-            console.log('[SessionManager] Generated room code:', roomCode)
+            // Generate cryptographically secure room code
+            const roomCode = generateSecureRoomCode(6)
+            log.debug('Generated room code', { roomCode })
 
             // Update state to connecting
             actions.setNetworkState('connecting', roomCode, this.localUserId ?? undefined)

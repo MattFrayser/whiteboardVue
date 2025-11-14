@@ -1,8 +1,9 @@
 import { ErrorHandler } from '../utils/ErrorHandler'
-import { CURSORS, CURSOR_THROTTLE_MS } from '../constants'
+import { CURSOR_THROTTLE_MS } from '../constants'
 import type { Point } from '../types'
 import type { DrawingEngine } from './DrawingEngine'
-import { selectors } from '../stores/AppState'
+import { selectors, actions } from '../stores/AppState'
+import { getCursorForTool } from '../utils/getCursorForTool'
 
 /**
  * Handles mouse and keyboard input for the drawing engine
@@ -59,8 +60,10 @@ export class InputHandler {
             if (e.button === 0) {
                 // Get current tool from AppState
                 const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
-                currentTool._safeOnMouseDown(worldPos, e)
+                const currentTool = this.engine.tools[toolName]
+                if (currentTool) {
+                    currentTool._safeOnMouseDown(worldPos, e)
+                }
             } else if (e.button === 2) {
                 this.engine.coordinates.startPan({ x: e.clientX, y: e.clientY })
                 this.rightMouseDown = true
@@ -102,8 +105,10 @@ export class InputHandler {
             // left click
             if (e.buttons === 1) {
                 const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
-                currentTool._safeOnMouseMove(worldPos, e)
+                const currentTool = this.engine.tools[toolName]
+                if (currentTool) {
+                    currentTool._safeOnMouseMove(worldPos, e)
+                }
             // right click
             } else if (e.buttons === 2) {
                 e.preventDefault()
@@ -128,8 +133,10 @@ export class InputHandler {
 
             if (e.button === 0) {
                 const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
-                currentTool._safeOnMouseUp(worldPos, e)
+                const currentTool = this.engine.tools[toolName]
+                if (currentTool) {
+                    currentTool._safeOnMouseUp(worldPos, e)
+                }
             } else if (e.button === 2) {
                 this.engine.coordinates.endPan()
                 this.rightMouseDown = false
@@ -156,42 +163,22 @@ export class InputHandler {
 
     private updateCursor(worldPos: Point | null = null): void {
         if (this.rightMouseDown) {
-            this.canvas.style.cursor = 'grabbing'
+            // Panning mode - show grabbing cursor
+            actions.setCursor('grabbing')
         } else {
             // Get current tool from AppState
             const toolName = selectors.getTool()
-            const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+            const currentTool = this.engine.tools[toolName]
 
-            // Restore tool-specific cursor
-            if (currentTool === this.engine.tools.select && worldPos) {
-                // SelectTool has dynamic cursor based on hover position
+            // SelectTool has dynamic cursor based on hover position
+            if (currentTool && toolName === 'select' && worldPos) {
                 if ('updateCursor' in currentTool) {
+                    // Let SelectTool handle its own cursor (via actions.setCursor)
                     (currentTool as any).updateCursor(worldPos)
                 }
             } else {
-
-                // Restore cursor based on tool
-                switch (toolName) {
-                    case 'rectangle':
-                    case 'circle':
-                    case 'line':
-                        this.canvas.style.cursor = 'crosshair'
-                        break
-                    case 'draw':
-                        this.canvas.style.cursor = CURSORS.DRAW
-                        break
-                    case 'eraser':
-                        this.canvas.style.cursor = CURSORS.ERASER
-                        break
-                    case 'select':
-                        this.canvas.style.cursor = CURSORS.SELECT
-                        break
-                    case 'text':
-                        this.canvas.style.cursor = 'text'
-                        break
-                    default:
-                        this.canvas.style.cursor = 'default'
-                }
+                // Set cursor based on current tool via state
+                actions.setCursor(getCursorForTool(toolName))
             }
         }
     }

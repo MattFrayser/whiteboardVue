@@ -1,5 +1,61 @@
-# Vue 3 + Vite
+# Whiteboard Frontend
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+A collaborative, anonymous whiteboard application built with vanilla TypeScript and Vite.
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## Features
+
+- Local-first architecture with localStorage persistence
+- Real-time collaboration via WebSockets
+- No user accounts required
+- Drawing tools: pen, shapes (rectangle, circle, line), text, eraser
+- Undo/redo with history management
+- Object selection and manipulation
+- Password-protected rooms (optional)
+- Permission controls (view-only, edit-own-only)
+
+## Tech Stack
+
+- **TypeScript** - Pure vanilla TypeScript (no frameworks)
+- **Vite** - Build tool and dev server
+- **Canvas API** - Rendering
+- **WebSockets** - Real-time collaboration
+- **Vitest** - Testing framework
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+## Architecture
+
+- `engine/` - Core rendering and input handling
+- `tools/` - Drawing tools (pen, shapes, text, etc.)
+- `objects/` - Drawing object definitions
+- `managers/` - State management (objects, history, selection, etc.)
+- `network/` - WebSocket and session management
+- `stores/` - Application state store
+- `ui/` - UI components (toolbar, notifications, dialogs)
+- `utils/` - Utility functions (quadtree, validation, errors)
+
+## Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+```
+VITE_API_URL=http://localhost:8080
+VITE_WS_URL=ws://localhost:8080
+```

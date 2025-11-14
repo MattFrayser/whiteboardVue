@@ -8,15 +8,12 @@
 
 import { StateStore } from './StateStore'
 import { DEFAULT_COLOR } from '../constants'
+import { clampBrushSize, validateColor } from '../utils/validation'
 
 // Type definitions for the application state
-export type Tool = 'draw' | 'rectangle' | 'circle' | 'line' | 'select' | 'eraser' | 'text'
+// Tool is now dynamic based on ToolRegistry - any registered tool name is valid
+export type Tool = string
 export type NetworkStatus = 'local' | 'connecting' | 'connected' | 'disconnected' | 'error'
-
-export interface DrawingObject {
-    id: string
-    [key: string]: unknown
-}
 
 export interface User {
     id: string
@@ -54,10 +51,6 @@ interface AppStateShape extends Record<string, unknown> {
         cursor: string
     }
     viewport: Viewport
-    objects: {
-        items: DrawingObject[]
-        version: number
-    }
     selection: {
         objectIds: string[]
         bounds: SelectionBounds | null
@@ -95,12 +88,6 @@ const initialState: AppStateShape = {
         offsetX: 0,             // Pan offset X
         offsetY: 0,             // Pan offset Y
         scale: 1,               // Zoom scale
-    },
-
-    // Objects: Drawing objects in the canvas
-    objects: {
-        items: [],              // Array of DrawingObject instances
-        version: 0,             // Incremented on each change (for sync)
     },
 
     // Selection: Currently selected objects
@@ -150,10 +137,6 @@ export const selectors = {
     getViewportOffsetY: () => appState.get('viewport.offsetY') as number,
     getViewportScale: () => appState.get('viewport.scale') as number,
 
-    // Object selectors
-    getObjects: () => appState.get('objects.items') as DrawingObject[],
-    getObjectsVersion: () => appState.get('objects.version') as number,
-
     // Selection selectors
     getSelectedObjectIds: () => appState.get('selection.objectIds') as string[],
     getSelectionBounds: () => appState.get('selection.bounds') as SelectionBounds | null,
@@ -182,8 +165,8 @@ export const selectors = {
 export const actions = {
     // UI actions
     setTool: (tool: Tool) => appState.set('ui.tool', tool),
-    setColor: (color: string) => appState.set('ui.color', color),
-    setBrushSize: (size: number) => appState.set('ui.brushSize', size),
+    setColor: (color: string) => appState.set('ui.color', validateColor(color)),
+    setBrushSize: (size: number) => appState.set('ui.brushSize', clampBrushSize(size)),
     setCursor: (cursor: string) => appState.set('ui.cursor', cursor),
 
     // Viewport actions
@@ -202,38 +185,6 @@ export const actions = {
         })
     },
     setViewportScale: (scale: number) => appState.set('viewport.scale', scale),
-
-    // Object actions
-    setObjects: (objects: DrawingObject[]) => {
-        appState.batch({
-            'objects.items': objects,
-            'objects.version': (appState.get('objects.version') as number) + 1,
-        })
-    },
-    addObject: (object: DrawingObject) => {
-        const current = appState.get('objects.items') as DrawingObject[]
-        appState.batch({
-            'objects.items': [...current, object],
-            'objects.version': (appState.get('objects.version') as number) + 1,
-        })
-    },
-    updateObject: (objectId: string, updates: Partial<DrawingObject>) => {
-        const current = appState.get('objects.items') as DrawingObject[]
-        const updated = current.map(obj =>
-            obj.id === objectId ? { ...obj, ...updates } : obj
-        )
-        appState.batch({
-            'objects.items': updated,
-            'objects.version': (appState.get('objects.version') as number) + 1,
-        })
-    },
-    deleteObject: (objectId: string) => {
-        const current = appState.get('objects.items') as DrawingObject[]
-        appState.batch({
-            'objects.items': current.filter(obj => obj.id !== objectId),
-            'objects.version': (appState.get('objects.version') as number) + 1,
-        })
-    },
 
     // Selection actions
     setSelection: (objectIds: string[]) => {

@@ -4,7 +4,7 @@ import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH, CURSORS } fr
 import type { Point, Bounds } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { DrawingObject } from '../objects/DrawingObject'
-import { selectors } from '../stores/AppState'
+import { selectors, actions } from '../stores/AppState'
 
 export class SelectTool extends Tool {
     dragStart: Point | null
@@ -102,7 +102,7 @@ export class SelectTool extends Tool {
                     const handles = obj.getResizeHandles()
                     const handle = handles[handleIndex]
                     if (handle) {
-                        this.engine.canvas.style.cursor = handle.cursor
+                        actions.setCursor(handle.cursor)
                     }
                     return // Don't check for objects below, we're over a handle
                 }
@@ -112,10 +112,10 @@ export class SelectTool extends Tool {
         // Hovering over an object
         const object = this.engine.objectManager.getObjectAt(worldPos)
         if (object) {
-            this.engine.canvas.style.cursor = 'move'
+            actions.setCursor('move')
         } else {
             // Use custom select cursor when not hovering over anything
-            this.engine.canvas.style.cursor = CURSORS.SELECT
+            actions.setCursor(CURSORS.SELECT)
         }
     }
 
@@ -234,7 +234,7 @@ export class SelectTool extends Tool {
             const handles = this.resizeObject.getResizeHandles()
             const handle = handles[this.resizeHandleIndex]
             if (handle) {
-                this.engine.canvas.style.cursor = handle.cursor
+                actions.setCursor(handle.cursor)
             }
             return
         }
@@ -253,7 +253,7 @@ export class SelectTool extends Tool {
             const newRect = this.getSelectionRect()
             if (newRect) this.engine.markDirty()
 
-            this.engine.canvas.style.cursor = 'crosshair'
+            actions.setCursor('crosshair')
             this.engine.render()
             return
         }
@@ -276,7 +276,7 @@ export class SelectTool extends Tool {
             })
 
             this.dragStart = worldPos
-            this.engine.canvas.style.cursor = 'move'
+            actions.setCursor('move')
             this.engine.render()
         }
     }
@@ -341,9 +341,7 @@ export class SelectTool extends Tool {
                 this.engine.markDirty()
             })
 
-            if ((this.engine as any).toolbar) {
-                (this.engine as any).toolbar.updateUndoRedoButtons()
-            }
+            this.engine.emit('historyChanged')
             this.engine.render() // Ensure moved/resized objects are visible
         }
 

@@ -2,7 +2,7 @@ import { appState, actions } from '../stores/AppState'
 import { MoveObjectsOperation } from './operations'
 import type { DrawingObject } from '../objects/DrawingObject'
 import type { Bounds } from '../types/common'
-import type { ObjectManager } from './ObjectManager'
+import type { IObjectLifecycle } from '../interfaces/IObjectLifecycle'
 import type { ObjectStore } from './ObjectStore'
 import type { HistoryManager } from './HistoryManager'
 
@@ -10,12 +10,12 @@ import type { HistoryManager } from './HistoryManager'
  * Manages object selection state and operations
  */
 export class SelectionManager {
-    objectManager: ObjectManager
+    private lifecycleManager: IObjectLifecycle
     objectStore: ObjectStore
     historyManager: HistoryManager
 
-    constructor(objectManager: ObjectManager, objectStore: ObjectStore, historyManager: HistoryManager) {
-        this.objectManager = objectManager
+    constructor(lifecycleManager: IObjectLifecycle, objectStore: ObjectStore, historyManager: HistoryManager) {
+        this.lifecycleManager = lifecycleManager
         this.objectStore = objectStore
         this.historyManager = historyManager
     }
@@ -64,9 +64,9 @@ export class SelectionManager {
         const toDelete = [...this.selectedObjects]
         this.clearSelection()
 
-        // Use objectManager.removeObject to trigger broadcasts
+        // Use lifecycleManager.removeObject to trigger broadcasts
         toDelete.forEach(obj => {
-            this.objectManager.removeObject(obj)
+            this.lifecycleManager.removeObject(obj)
         })
     }
 
@@ -125,7 +125,7 @@ export class SelectionManager {
         })
 
         // Record a single operation for all moved objects
-        const userId = this.objectManager.userId
+        const userId = this.lifecycleManager.userId
         if (userId) {
             const objectIds = this.selectedObjects.map(obj => obj.id)
             const operation = new MoveObjectsOperation(objectIds, dx, dy, userId)

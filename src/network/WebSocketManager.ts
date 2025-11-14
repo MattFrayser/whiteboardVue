@@ -1,152 +1,98 @@
 import { actions, selectors, type NetworkStatus } from '../stores/AppState'
-import { API_BASE_URL, WS_BASE_URL, MAX_RECONNECT_ATTEMPTS, AUTH_TIMEOUT, ACK_TIMEOUT } from '../constants'
+import { MAX_RECONNECT_ATTEMPTS, ACK_TIMEOUT } from '../constants'
 import { ErrorHandler, ErrorCode } from '../utils/ErrorHandler'
 import type { MessageHandler, StatusCallback, PendingAck, CursorData, NetworkMessage } from '../types/network'
 import type { DrawingObject } from '../objects/DrawingObject'
 import type { INetworkManager } from '../interfaces/INetworkManager'
+import { WebSocketConnection } from './WebSocketConnection'
+import { ReconnectionManager } from './ReconnectionManager'
+import { MessageRouter } from './MessageRouter'
+import { AckTracker } from './AckTracker'
+import { BroadcastService } from './BroadcastService'
 
 export class WebSocketManager implements INetworkManager {
-    socket: WebSocket | null
+    private connection: WebSocketConnection
+    private reconnectionManager: ReconnectionManager
+    private messageRouter: MessageRouter
+    private ackTracker: AckTracker
+    private broadcastService: BroadcastService
     messageHandler: MessageHandler | null
-    statusCallback: StatusCallback | null
-    maxReconnectAttempts: number
-    reconnectTimeout: ReturnType<typeof setTimeout> | null
-    authTimeout: ReturnType<typeof setTimeout> | null
-    isReconnecting: boolean  // Transient state during reconnection flow
-    pendingAcks: Map<string, PendingAck>
-    ackTimeout: number
 
     constructor(messageHandler: MessageHandler | null = null) {
-        this.socket = null
+        this.connection = new WebSocketConnection()
+        this.reconnectionManager = new ReconnectionManager(MAX_RECONNECT_ATTEMPTS)
+        this.messageRouter = new MessageRouter()
+        this.ackTracker = new AckTracker(ACK_TIMEOUT)
+        this.broadcastService = new BroadcastService(this.connection, this.ackTracker)
         this.messageHandler = messageHandler // Callback for handling incoming messages
 
-        this.statusCallback = null
-        this.maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS
-        this.reconnectTimeout = null
-        this.authTimeout = null
-        this.isReconnecting = false // Track if this is a reconnection (not initial connection)
+        // Register message handlers with router
+        this.messageRouter.registerHandler('authenticated', (msg) => this.handleAuthenticated(msg))
+        this.messageRouter.registerHandler('room_joined', (msg) => this.handleRoomJoined(msg))
+        this.messageRouter.registerHandler('sync', (msg) => this.handleSync(msg))
+        this.messageRouter.registerHandler('objectAdded', (msg) => this.handleObjectAdded(msg))
+        this.messageRouter.registerHandler('objectUpdated', (msg) => this.handleObjectUpdated(msg))
+        this.messageRouter.registerHandler('objectDeleted', (msg) => this.handleObjectDeleted(msg))
+        this.messageRouter.registerHandler('cursor', (msg) => this.handleCursor(msg))
+        this.messageRouter.registerHandler('userDisconnected', (msg) => this.handleUserDisconnect(msg))
+        this.messageRouter.registerHandler('objectAdded_ack', (msg) => this.handleObjectAddedAck(msg))
+        this.messageRouter.registerHandler('objectAdded_error', (msg) => this.handleObjectAddedError(msg))
+        this.messageRouter.registerHandler('error', (msg) => this.handleError(msg))
 
-        // Track pending acknowledgments for object operations
-        // Map: objectId -> {resolve, reject, timeoutId}
-        this.pendingAcks = new Map()
-        this.ackTimeout = ACK_TIMEOUT
+        // Wire up connection callbacks
+        this.connection.onMessage((msg) => this.handleMessage(msg))
+        this.connection.onDisconnect(() => this.handleDisconnect())
+
+        // Wire up reconnection callback
+        this.reconnectionManager.setReconnectCallback((roomCode) => this.connect(roomCode))
+    }
+
+    // Expose properties for backward compatibility with tests
+    get maxReconnectAttempts(): number {
+        return MAX_RECONNECT_ATTEMPTS
+    }
+
+    get reconnectTimeout(): ReturnType<typeof setTimeout> | null {
+        return this.reconnectionManager.getReconnectTimeout()
+    }
+
+    get isReconnecting(): boolean {
+        return this.reconnectionManager.reconnecting
+    }
+
+    set isReconnecting(value: boolean) {
+        this.reconnectionManager.reconnecting = value
+    }
+
+    get ackTimeout(): number {
+        return this.ackTracker.getAckTimeout()
+    }
+
+    // Expose ackTracker for tests (allows spying and verification)
+    getAckTracker(): AckTracker {
+        return this.ackTracker
     }
     
     isConnected(): boolean {
-        return selectors.getNetworkStatus() === 'connected'
+        return this.connection.isConnected()
     }
 
     setStatusCallback(callback: StatusCallback): void {
-        this.statusCallback = callback
+        this.connection.setStatusCallback(callback)
     }
 
     updateStatus(status: string): void {
-        actions.setNetworkStatus(status as NetworkStatus)
-        if (this.statusCallback) {
-            this.statusCallback(status)
-        }
+        this.connection.updateStatus(status)
     }
 
     async connect(roomCode: string): Promise<void> {
-        // Update state with roomCode
-        actions.setRoomCode(roomCode)
-
-        try {
-            // Establish session via HTTP first (ensures cookie is set reliably)
-            const sessionResponse = await fetch(`${API_BASE_URL}/api/session`, {
-                method: 'GET',
-                credentials: 'include', // Include cookies in request and store set-cookie response
-            })
-
-            if (!sessionResponse.ok) {
-                throw new Error(`Session establishment failed: ${sessionResponse.status}`)
-            }
-
-            const sessionData = await sessionResponse.json()
-            console.log('[WebSocket] Session established:', sessionData.userId)
-
-            // Debug: Check if cookie was set
-            console.log('[WebSocket] Cookies:', document.cookie)
-
-            // Now open WebSocket - cookie will be sent automatically
-            console.log('[WebSocket] Opening WebSocket connection...')
-            this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${roomCode}`)  // Use parameter, not this.roomCode
-            console.log('[WebSocket] WebSocket object created, readyState:', this.socket.readyState)
-
-            this.socket.onopen = () => {
-                console.log('[WebSocket] Connection opened successfully!')
-                // Send authenticate message - authentication will use HTTP cookie
-                const authMsg = {
-                    type: 'authenticate',
-                }
-                this.send(authMsg)
-
-                // Set authentication timeout
-                this.authTimeout = setTimeout(() => {
-                    ErrorHandler.network(new Error('Authentication timeout'), {
-                        context: 'WebSocketManager',
-                        code: ErrorCode.TIMEOUT,
-                        userMessage: 'Connection timed out while authenticating. Please try again.'
-                    })
-                    this.updateStatus('error')
-                    if (this.socket) {
-                        this.socket.close()
-                    }
-                }, AUTH_TIMEOUT)
-            }
-
-            this.socket.onmessage = (event: MessageEvent) => {
-                this.handleMessage(JSON.parse(event.data) as NetworkMessage)
-            }
-
-            this.socket.onerror = (error: Event) => {
-                ErrorHandler.network(new Error('WebSocket connection error'), {
-                    context: 'WebSocketManager',
-                    code: ErrorCode.CONNECTION_FAILED,
-                    metadata: {
-                        type: error.type,
-                        readyState: this.socket?.readyState
-                    }
-                })
-                this.updateStatus('error')
-            }
-
-            this.socket.onclose = (event: CloseEvent) => {
-                console.log('[WebSocket] Connection closed:', {
-                    code: event.code,
-                    reason: event.reason,
-                    wasClean: event.wasClean
-                })
-                this.handleDisconnect()
-            }
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : new Error(String(error))
-            ErrorHandler.network(err, {
-                context: 'WebSocketManager',
-                code: ErrorCode.CONNECTION_FAILED,
-                metadata: {
-                    name: err.name,
-                    message: err.message
-                }
-            })
-            this.handleDisconnect()
-        }
+        await this.connection.connect(roomCode)
     }
 
     handleDisconnect(): void {
-        // Clear auth timeout if active
-        if (this.authTimeout) {
-            clearTimeout(this.authTimeout)
-            this.authTimeout = null
-        }
+        // Clear auth timeout through connection
+        this.connection.clearAuthTimeout()
 
-        // Clear reconnect timeout if active
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout)
-            this.reconnectTimeout = null
-        }
-
-        this.socket = null
         this.updateStatus('disconnected')
 
         // Notify message handler
@@ -154,91 +100,22 @@ export class WebSocketManager implements INetworkManager {
             this.messageHandler({ type: 'network:disconnected' })
         }
 
-        // Don't auto-reconnect if we're in the middle of password authentication
-        if (selectors.getIsAuthenticating()) {
-            console.log('[WebSocket] Skipping auto-reconnect - password authentication in progress')
-            return
-        }
+        // Delegate reconnection logic to ReconnectionManager
+        const reconnected = this.reconnectionManager.handleDisconnect()
 
-        const reconnectAttempts = selectors.getReconnectAttempts()
-        if (reconnectAttempts < this.maxReconnectAttempts) {
-            actions.incrementReconnectAttempts()
-
-            // Set reconnecting flag so we can auto-rejoin the room after authentication
-            this.isReconnecting = true
-
-            // Retry with 2-second delay
-            this.reconnectTimeout = setTimeout(() => {
-                const currentAttempts = selectors.getReconnectAttempts()
-                console.log('[WebSocket] Attempting reconnection (attempt', currentAttempts, ')')
-                const roomCode = selectors.getRoomCode()
-                if (roomCode) {
-                    this.connect(roomCode)
-                }
-            }, 2000)
-        } else {
-            ErrorHandler.network(new Error('Max reconnection attempts exceeded'), {
-                context: 'WebSocketManager',
-                code: ErrorCode.CONNECTION_FAILED,
-                userMessage: 'Unable to reconnect to the session after multiple attempts. Please refresh the page.',
-                metadata: { attempts: this.maxReconnectAttempts }
-            })
+        // If max attempts exceeded, update status to error
+        if (!reconnected && selectors.getReconnectAttempts() >= MAX_RECONNECT_ATTEMPTS) {
             this.updateStatus('error')
         }
     }
 
 
     send(msg: Record<string, unknown>): void {
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify(msg))
-        } else {
-            console.warn(
-                '[WebSocket] Cannot send message - socket not open. ReadyState:',
-                this.socket?.readyState,
-                'Message:',
-                msg
-            )
-        }
+        this.connection.send(msg)
     }
 
     handleMessage(msg: NetworkMessage): void {
-        switch (msg.type) {
-            case 'authenticated':
-                this.handleAuthenticated(msg)
-                break
-            case 'room_joined':
-                this.handleRoomJoined(msg)
-                break
-            case 'sync':
-                this.handleSync(msg)
-                break
-            case 'objectAdded':
-                this.handleObjectAdded(msg)
-                break
-            case 'objectUpdated':
-                this.handleObjectUpdated(msg)
-                break
-            case 'objectDeleted':
-                this.handleObjectDeleted(msg)
-                break
-            case 'cursor':
-                this.handleCursor(msg)
-                break
-            case 'userDisconnected':
-                this.handleUserDisconnect(msg)
-                break
-            case 'objectAdded_ack':
-                this.handleObjectAddedAck(msg)
-                break
-            case 'objectAdded_error':
-                this.handleObjectAddedError(msg)
-                break
-            case 'error':
-                this.handleError(msg)
-                break
-            default:
-                console.warn('[WebSocket] Unknown message type:', msg.type, msg)
-        }
+        this.messageRouter.routeMessage(msg)
     }
     
 
@@ -248,10 +125,7 @@ export class WebSocketManager implements INetworkManager {
 
     handleAuthenticated(msg: NetworkMessage): void {
         // Clear auth timeout - authentication succeeded
-        if (this.authTimeout) {
-            clearTimeout(this.authTimeout)
-            this.authTimeout = null
-        }
+        this.connection.clearAuthTimeout()
 
         // Update state with userId
         const userId = msg.userId ?? null
@@ -279,7 +153,9 @@ export class WebSocketManager implements INetworkManager {
         const userColor = (msg as unknown as { color?: string }).color ?? null
         actions.setUserColor(userColor)
         this.updateStatus('connected')
-        actions.resetReconnectAttempts()
+
+        // Reset reconnection state through ReconnectionManager
+        this.reconnectionManager.resetReconnectionState()
 
         // Notify message handler that room was joined successfully
         if (this.messageHandler) {
@@ -380,20 +256,8 @@ export class WebSocketManager implements INetworkManager {
         const objectId = typeof msg === 'object' && msg !== null && 'objectId' in msg
             ? String((msg as { objectId: unknown }).objectId)
             : ''
-        const pending = this.pendingAcks.get(objectId)
 
-        if (pending) {
-            // Clear timeout
-            clearTimeout(pending.timeoutId)
-
-            // Remove from pending map
-            this.pendingAcks.delete(objectId)
-
-            // Resolve the promise
-            pending.resolve({ objectId, success: true })
-
-            console.log(`[WebSocket] Object ${objectId} confirmed by server`)
-        }
+        this.ackTracker.handleAck(objectId)
     }
 
     handleObjectAddedError(msg: NetworkMessage): void {
@@ -403,21 +267,12 @@ export class WebSocketManager implements INetworkManager {
         const error = typeof msg === 'object' && msg !== null && 'error' in msg
             ? String((msg as { error: unknown }).error)
             : 'Unknown error'
-        const pending = this.pendingAcks.get(objectId)
 
-        if (pending) {
-            // Clear timeout
-            clearTimeout(pending.timeoutId)
+        const handled = this.ackTracker.handleError(objectId, error)
 
-            // Remove from pending map
-            this.pendingAcks.delete(objectId)
-
-            // Reject the promise
-            const errorObj = new Error(error || 'Failed to add object')
-            pending.reject(errorObj)
-
+        if (handled) {
             // Silent error - object-level failures shouldn't spam users
-            ErrorHandler.silent(errorObj, {
+            ErrorHandler.silent(new Error(error || 'Failed to add object'), {
                 context: 'WebSocketManager',
                 metadata: { objectId, serverError: error }
             })
@@ -425,118 +280,41 @@ export class WebSocketManager implements INetworkManager {
     }
 
     broadcastObjectAdded(object: DrawingObject): void {
-        this.send({
-            type: 'objectAdded',
-            object: object.toJSON(),
-            userId: selectors.getUserId(),
-        })
+        this.broadcastService.broadcastObjectAdded(object)
     }
 
-    /**
-     * Broadcast object added with server confirmation
-     * Returns a Promise that resolves when server confirms, or rejects on error/timeout
-     */
     broadcastObjectAddedWithConfirmation(object: DrawingObject): Promise<{ objectId: string; success: boolean }> {
-        return new Promise((resolve, reject) => {
-            // Check if connected
-            if (!this.isConnected()) {
-                reject(new Error('Not connected to server'))
-                return
-            }
-
-            const objectId = object.id
-
-            // Create timeout to reject if no response within ackTimeout
-            const timeoutId = setTimeout(() => {
-                this.pendingAcks.delete(objectId)
-                reject(new Error(`Timeout waiting for server confirmation (${this.ackTimeout}ms)`))
-            }, this.ackTimeout)
-
-            // Store promise handlers
-            this.pendingAcks.set(objectId, { resolve, reject, timeoutId })
-
-            // Send the message
-            this.send({
-                type: 'objectAdded',
-                object: object.toJSON(),
-                userId: selectors.getUserId(),
-            })
-        })
+        return this.broadcastService.broadcastObjectAddedWithConfirmation(object)
     }
 
     broadcastObjectUpdated(object: DrawingObject): void {
-        this.send({
-            type: 'objectUpdated',
-            object: object.toJSON(),
-            userId: selectors.getUserId(),
-        })
+        this.broadcastService.broadcastObjectUpdated(object)
     }
+
     broadcastObjectDeleted(object: DrawingObject): void {
-        this.send({
-            type: 'objectDeleted',
-            objectId: object.id,
-            userId: selectors.getUserId(),
-        })
+        this.broadcastService.broadcastObjectDeleted(object)
     }
+
     broadcastCursor(cursor: CursorData): void {
-        this.send({
-            type: 'cursor',
-            x: cursor.x,
-            y: cursor.y,
-            tool: cursor.tool,
-            color: cursor.color,
-        })
+        this.broadcastService.broadcastCursor(cursor)
     }
 
     disconnect(): void {
-        // Clear all timers
-        if (this.authTimeout) {
-            clearTimeout(this.authTimeout)
-            this.authTimeout = null
-        }
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout)
-            this.reconnectTimeout = null
-        }
+        // Cancel reconnection
+        this.reconnectionManager.cancelReconnection()
 
         // Reject all pending acknowledgments
-        this.pendingAcks.forEach((pending) => {
-            clearTimeout(pending.timeoutId)
-            pending.reject(new Error('Connection closed'))
-        })
-        this.pendingAcks.clear()
+        this.ackTracker.clearAll('Connection closed')
 
-        // Close socket connection
-        if (this.socket) {
-            this.socket.close()
-            this.socket = null
-        }
-
-        // Clear data - prevent reconnect by setting max attempts
-        actions.setReconnectAttempts(this.maxReconnectAttempts)
-        this.updateStatus('disconnected')
+        // Disconnect through connection (clears auth timeout and closes socket)
+        this.connection.disconnect()
     }
 
     disconnectForAuth(): void {
-        // Set flag to prevent auto-reconnect during password authentication
-        actions.setIsAuthenticating(true)
+        // Cancel reconnection
+        this.reconnectionManager.cancelReconnection()
 
-        // Clear all timers
-        if (this.authTimeout) {
-            clearTimeout(this.authTimeout)
-            this.authTimeout = null
-        }
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout)
-            this.reconnectTimeout = null
-        }
-
-        // Close socket connection if it exists
-        if (this.socket) {
-            this.socket.close()
-            this.socket = null
-        }
-
-        this.updateStatus('disconnected')
+        // Disconnect for auth through connection (sets auth flag, clears timers, closes socket)
+        this.connection.disconnectForAuth()
     }
 }

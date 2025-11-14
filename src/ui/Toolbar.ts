@@ -1,7 +1,9 @@
 import { appState, actions } from '../stores/AppState'
-import { COLOR_PALETTE, CURSORS } from '../constants'
+import { COLOR_PALETTE } from '../constants'
 import type { Tool } from '../stores/AppState'
 import type { DrawingEngine } from '../engine/DrawingEngine'
+import { getCursorForTool } from '../utils/getCursorForTool'
+import { clampBrushSize, validateColor } from '../utils/validation'
 
 export class Toolbar {
     engine: DrawingEngine
@@ -52,12 +54,6 @@ export class Toolbar {
         })
         this.unsubscribers.push(unsubTool)
 
-        const unsubCursor = appState.subscribe('ui.cursor', () => {
-            const currentTool = appState.get('ui.tool') as string
-            this.updateToolButtons(currentTool)
-        })
-        this.unsubscribers.push(unsubCursor)
-
         const unsubColor = appState.subscribe('ui.color', (color) => {
             this.updateColorUI(color as string)
         })
@@ -77,6 +73,15 @@ export class Toolbar {
             if (redoBtn) redoBtn.disabled = !canRedo
         })
         this.unsubscribers.push(unsubHistory)
+
+        // Listen to engine events (decoupled from tools)
+        // Note: HistoryManager already updates AppState, which triggers the subscription above
+        // This event listener is here for explicitness and potential future use
+        const unsubEngineHistory = this.engine.on('historyChanged', () => {
+            // History state is already managed by HistoryManager → AppState → subscription
+            // This is a no-op but demonstrates the decoupling pattern
+        })
+        this.unsubscribers.push(unsubEngineHistory)
     }
 
     setupEventListeners(): void {
@@ -200,12 +205,15 @@ export class Toolbar {
     }
 
     selectBrushSize(size: number): void {
+        // Validate and clamp to prevent crashes from NaN/Infinity
+        const validSize = clampBrushSize(size)
+
         // Update state (will trigger UI update via subscription)
-        actions.setBrushSize(size)
+        actions.setBrushSize(validSize)
 
         // Store size on active swatch
         if (this.activeSwatch) {
-            (this.activeSwatch as HTMLElement).dataset.size = String(size)
+            (this.activeSwatch as HTMLElement).dataset.size = String(validSize)
         }
     }
 
@@ -229,8 +237,11 @@ export class Toolbar {
         }
     }
     selectColor(color: string): void {
+        // Validate color format to prevent rendering issues
+        const validColor = validateColor(color)
+
         // Update state (will trigger UI update via subscription)
-        actions.setColor(color)
+        actions.setColor(validColor)
     }
 
     updateColorUI(color: string): void {
@@ -318,36 +329,8 @@ export class Toolbar {
             }
         })
 
-        // Get canvas directly from DOM
-        const canvas = document.getElementById('canvas') as HTMLCanvasElement
-
-        if (!canvas) return
-
-        switch (tool) {
-            case 'rectangle':
-                canvas.style.cursor = 'crosshair'
-                break
-            case 'circle':
-                canvas.style.cursor = 'crosshair'
-                break
-            case 'line':
-                canvas.style.cursor = 'crosshair'
-                break
-            case 'draw':
-                canvas.style.cursor = CURSORS.DRAW
-                break
-            case 'eraser':
-                canvas.style.cursor = CURSORS.ERASER
-                break
-            case 'select':
-                canvas.style.cursor = CURSORS.SELECT
-                break
-            case 'text':
-                canvas.style.cursor = 'text'
-                break
-            default:
-                canvas.style.cursor = 'default'
-        }
+        // Update cursor via state (CursorManager will handle DOM update)
+        actions.setCursor(getCursorForTool(tool as Tool))
     }
 
     destroy(): void {
