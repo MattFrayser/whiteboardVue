@@ -4,7 +4,7 @@ import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH, CURSORS, RES
 import type { Point, Bounds, DrawingObjectData } from '../types'
 import type { DrawingEngine } from '../engine/DrawingEngine'
 import type { DrawingObject } from '../objects/DrawingObject'
-import { selectors, actions } from '../stores/AppState'
+import { actions } from '../stores/AppState'
 
 export class SelectTool extends Tool {
     dragStart: Point | null
@@ -82,8 +82,7 @@ export class SelectTool extends Tool {
     }
 
     isActive(): boolean {
-        const toolName = selectors.getTool()
-        return this.engine.tools[toolName as keyof typeof this.engine.tools] === this
+        return this.engine.getCurrentTool() === this
     }
 
     updateCursor(worldPos: Point): void {
@@ -220,15 +219,9 @@ export class SelectTool extends Tool {
     override onMouseMove(worldPos: Point): void {
         // Resize
         if (this.isResizing && this.resizeObject && this.resizeHandleIndex !== null && this.resizeFixedPoint && this.resizeInitialBounds) {
-            // Mark old bounds as dirty
-            this.engine.markDirty()
-
             this.resizeObject.resize(this.resizeHandleIndex, worldPos.x, worldPos.y, this.resizeFixedPoint, this.resizeInitialBounds)
 
-            // Mark new bounds as dirty
-            this.engine.markDirty()
-
-            this.engine.render()
+            this.engine.renderDirty()
 
             // Keep cursor during resize
             const handles = this.resizeObject.getResizeHandles()
@@ -241,20 +234,10 @@ export class SelectTool extends Tool {
 
         // Drag Selection
         if (this.isSelecting) {
-            // Mark old selection rectangle as dirty
-            if (this.selectionEnd) {
-                const oldRect = this.getSelectionRect()
-                if (oldRect) this.engine.markDirty()
-            }
-
             this.selectionEnd = worldPos
 
-            // Mark new selection rectangle as dirty
-            const newRect = this.getSelectionRect()
-            if (newRect) this.engine.markDirty()
-
             actions.setCursor('crosshair')
-            this.engine.render()
+            this.engine.renderDirty()
             return
         }
 
@@ -266,18 +249,14 @@ export class SelectTool extends Tool {
             // Update each object
             this.engine.objectManager.selectedObjects.forEach(obj => {
                 const oldBounds = obj.getBounds()
-                this.engine.markDirty()
-
                 obj.move(dx, dy)
-
                 const newBounds = obj.getBounds()
                 this.engine.objectManager.updateObjectInQuadtree(obj, oldBounds, newBounds)
-                this.engine.markDirty()
             })
 
             this.dragStart = worldPos
             actions.setCursor('move')
-            this.engine.render()
+            this.engine.renderDirty()
         }
     }
 
@@ -337,24 +316,17 @@ export class SelectTool extends Tool {
             }
 
             // Mark final positions as dirty
-            this.engine.objectManager.selectedObjects.forEach(() => {
-                this.engine.markDirty()
-            })
-
-            this.engine.render() // Ensure moved/resized objects are visible
+            this.engine.renderDirty() // Ensure moved/resized objects are visible
         }
 
         // Finish drag selection
         if (this.isSelecting) {
-            // Mark final selection rect as dirty
             const rect = this.getSelectionRect()
-            if (rect) this.engine.markDirty()
-
             if (rect) this.engine.objectManager.selectObjectsInRect(rect, e.shiftKey)
             this.isSelecting = false
             this.selectionStart = null
             this.selectionEnd = null
-            this.engine.render()
+            this.engine.renderDirty()
         }
 
         this.isDragging = false

@@ -12,6 +12,7 @@ import { Coordinates } from './Coordinates'
 import { InputHandler } from './InputHandler'
 import { ObjectManager } from '../managers/ObjectManager'
 import { ErrorHandler, ErrorCategory } from '../utils/ErrorHandler'
+import { selectors } from '../stores/AppState'
 import type { WebSocketManager } from '../network/WebSocketManager'
 import type { NetworkMessage, MigrationResult } from '../types/network'
 
@@ -128,8 +129,7 @@ export class DrawingEngine {
                     if (message.object) {
                         const addedObj = this.objectManager.addRemoteObject(message.object)
                         if (addedObj) {
-                            this.markDirty()
-                            this.render()
+                            this.renderDirty()
                         }
                     }
                     break
@@ -138,13 +138,11 @@ export class DrawingEngine {
                     if (message.object) {
                         const updatedObj = this.objectManager.getObjectById(message.object.id)
                         if (updatedObj) {
-                            this.markDirty()
                             this.objectManager.updateRemoteObject(
                                 message.object.id,
                                 message.object
                             )
-                            this.markDirty()
-                            this.render()
+                            this.renderDirty()
                         }
                     }
                     break
@@ -153,9 +151,8 @@ export class DrawingEngine {
                     if (message.objectId) {
                         const deletedObj = this.objectManager.getObjectById(message.objectId)
                         if (deletedObj) {
-                            this.markDirty()
                             this.objectManager.removeRemoteObject(message.objectId)
-                            this.render()
+                            this.renderDirty()
                         }
                     }
                     break
@@ -163,15 +160,13 @@ export class DrawingEngine {
                 case 'network:sync':
                     if (message.objects) {
                         this.objectManager.loadRemoteObjects(message.objects)
-                        this.markDirty()
-                        this.render()
+                        this.renderDirty()
                     }
                     break
                 case 'network:userDisconnected':
                     if (message.userId) {
                         this.remoteCursors.delete(message.userId)
-                        this.markDirty()
-                        this.render()
+                        this.renderDirty()
                     }
                     break
                 case 'network:remoteCursorMove':
@@ -199,10 +194,6 @@ export class DrawingEngine {
         }
 
         const { userId, x, y, color, tool } = message
-        const oldCursor = this.remoteCursors.get(userId)
-        if (oldCursor) {
-            this.markDirty()
-        }
         this.remoteCursors.set(userId, {
             userId,
             x,
@@ -211,21 +202,18 @@ export class DrawingEngine {
             tool,
             lastUpdate: Date.now(),
         })
-        this.markDirty()
-        this.render()
+        this.renderDirty()
     }
 
     // Public methods for Toolbar and InputHandler
     undo(): void {
         this.objectManager.undo()
-        this.markDirty()
-        this.render()
+        this.renderDirty()
     }
 
     redo(): void {
         this.objectManager.redo()
-        this.markDirty()
-        this.render()
+        this.renderDirty()
     }
 
     broadcastCursor(cursor: { x: number; y: number; color: string; tool: string }): void {
@@ -248,6 +236,15 @@ export class DrawingEngine {
         this.currentTool.activate()
 
         this.render()
+    }
+
+    /**
+     * Get the currently active tool instance based on AppState
+     * @returns The current tool instance, or null if tool name is invalid
+     */
+    getCurrentTool(): Tool | null {
+        const toolName = selectors.getTool()
+        return this.tools[toolName as keyof typeof this.tools] ?? null
     }
 
     resize(): void {
@@ -287,6 +284,15 @@ export class DrawingEngine {
     }
 
     /**
+     * Convenience method that marks dirty and renders in one call
+     * Use this instead of calling markDirty() + render() separately
+     */
+    renderDirty(): void {
+        this.markDirty()
+        this.render()
+    }
+
+    /**
      * Force render - bypasses needsRedraw check for critical updates
      * Use for network events where rendering must happen immediately
      */
@@ -315,15 +321,23 @@ export class DrawingEngine {
             // Render objects (with viewport culling via quadtree)
             this.objectManager.render(this.ctx, viewport)
 
-            // Render current tool preview
+            // Render current tool preview with error isolation
             if (this.currentTool && this.currentTool.renderPreview) {
-                this.currentTool.renderPreview(this.ctx)
+                try {
+                    this.currentTool.renderPreview(this.ctx)
+                } catch (error) {
+                    console.error('[DrawingEngine] Failed to render tool preview:', error)
+                }
             }
 
-            // Render remote cursors
+            // Render remote cursors with per-cursor error isolation
             if (this.remoteCursors) {
                 this.remoteCursors.forEach(cursor => {
-                    this.renderRemoteCursor(this.ctx, cursor)
+                    try {
+                        this.renderRemoteCursor(this.ctx, cursor)
+                    } catch (error) {
+                        console.error(`[DrawingEngine] Failed to render cursor for user ${cursor.userId}:`, error)
+                    }
                 })
             }
 
@@ -378,11 +392,7 @@ export class DrawingEngine {
             })
         }
 
-        // Clear references
-        ;(this.objectManager as unknown) = null
-        ;(this.coordinates as unknown) = null
-        ;(this.tools as unknown) = null
-        ;(this.currentTool as unknown) = null
-        ;(this.inputHandler as unknown) = null
+        // References will be garbage collected when the instance is destroyed
+        // No need for manual null assignments
     }
 }

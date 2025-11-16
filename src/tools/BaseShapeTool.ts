@@ -57,21 +57,14 @@ export abstract class BaseShapeTool extends Tool {
 
     override onMouseMove(worldPos: Point, _e: MouseEvent): void {
         if (this.currentShape) {
-            // Mark old bounds as dirty
-            if (this.lastBounds) {
-                this.engine.markDirty()
-            }
-
             // Update shape end point
             this.currentShape.data.x2 = worldPos.x
             this.currentShape.data.y2 = worldPos.y
 
-            // Mark new bounds as dirty
             const newBounds = this.currentShape.getBounds()
-            this.engine.markDirty()
             this.lastBounds = newBounds
 
-            this.engine.render()
+            this.engine.renderDirty()
         }
     }
 
@@ -79,7 +72,6 @@ export abstract class BaseShapeTool extends Tool {
         if (this.currentShape) {
             // Validate and add shape
             if (this.isShapeValid(this.currentShape)) {
-                this.engine.markDirty()
                 this.engine.objectManager.addObject(this.currentShape)
             }
 
@@ -87,7 +79,7 @@ export abstract class BaseShapeTool extends Tool {
             this.currentShape = null
             this.startPoint = null
             this.lastBounds = null
-            this.engine.render()
+            this.engine.renderDirty()
         }
     }
 

@@ -6,6 +6,7 @@
  * Provides event-driven interface for UI updates
  */
 import { WebSocketManager } from './WebSocketManager'
+import { PasswordAuthenticator } from './PasswordAuthenticator'
 import { actions, selectors } from '../stores/AppState'
 import { ErrorHandler } from '../utils/ErrorHandler'
 import { generateSecureRoomCode } from '../utils/crypto'
@@ -23,6 +24,7 @@ export class SessionManager {
     inviteManager: InviteManager | null
     networkManager: WebSocketManager | null
     localUserId: string | null
+    passwordAuth: PasswordAuthenticator
 
     constructor(
         engine: DrawingEngine,
@@ -36,6 +38,7 @@ export class SessionManager {
         this.inviteManager = inviteManager
         this.networkManager = null
         this.localUserId = null
+        this.passwordAuth = new PasswordAuthenticator(dialogManager, notificationManager)
     }
 
     /**
@@ -44,6 +47,168 @@ export class SessionManager {
      */
     setLocalUserId(userId: string): void {
         this.localUserId = userId
+    }
+
+    /**
+     * Setup session connection with message handler
+     * Extracted common logic from createSession and joinSession
+     * @private
+     */
+    private async setupSessionConnection(
+        action: 'create' | 'join',
+        roomCode: string,
+        password: string | null,
+        shouldUpdateUrl: boolean
+    ): Promise<string> {
+        return new Promise<string>(async (resolve, reject) => {
+            if (!this.networkManager) {
+                reject(new Error('Network manager not initialized'))
+                return
+            }
+
+            const originalHandler = this.networkManager.messageHandler
+
+            // Track password retry attempts (only used for join)
+            let passwordAttempts = 0
+
+            this.networkManager.messageHandler = async (message: NetworkMessage) => {
+                console.log('[SessionManager] Received message:', message.type)
+
+                if (message.type === 'network:authenticated') {
+                    console.log('[SessionManager] Authenticated with server userId:', message.userId)
+
+                    // Send room action message (create or join)
+                    const roomMessage = {
+                        type: action === 'create' ? 'createRoom' : 'joinRoom',
+                        password: password || null,
+                    }
+                    console.log(`[SessionManager] Sending ${roomMessage.type} message`)
+                    this.networkManager?.send(roomMessage)
+
+                    // Update state with server userId
+                    actions.setUserId(message.userId ?? null)
+
+                } else if (message.type === 'network:room_joined') {
+                    console.log(`[SessionManager] ${action === 'create' ? 'Room created and joined' : 'Successfully joined room'}`)
+
+                    if (!this.networkManager) {
+                        reject(new Error('Network manager not available'))
+                        return
+                    }
+
+                    // Clear authentication flag if it was set (only for join)
+                    if (action === 'join' && selectors.getIsAuthenticating()) {
+                        actions.setIsAuthenticating(false)
+                    }
+
+                    const userId = selectors.getUserId()
+                    if (!userId) {
+                        reject(new Error('User ID not available'))
+                        return
+                    }
+
+                    // Attach network manager to engine and handle migration
+                    this.engine.attachNetworkManager(this.networkManager, userId)
+                        .then(result => {
+                            // Show migration result notification
+                            this.notificationManager.showMigrationResult(
+                                result.succeeded.length,
+                                result.failed.length
+                            )
+                            if (result.failed.length > 0) {
+                                console.warn(`[SessionManager] ${result.failed.length} objects failed to sync`)
+                            } else if (result.succeeded.length > 0) {
+                                console.log(`[SessionManager] All ${result.succeeded.length} objects synced successfully`)
+                            }
+                        })
+                        .catch(err => {
+                            ErrorHandler.silent(err, {
+                                context: 'SessionManager',
+                                metadata: { operation: 'migration' }
+                            })
+                        })
+
+                    // Update URL with room code (only for create)
+                    if (shouldUpdateUrl) {
+                        window.history.replaceState({}, '', `?room=${roomCode}`)
+                    }
+
+                    // Update invite manager
+                    if (this.inviteManager) {
+                        this.inviteManager.setRoomCode(roomCode)
+                    }
+
+                    resolve(userId)
+
+                } else if (message.type === 'network:error' && action === 'join') {
+                    // Handle errors (only for join operation)
+                    if (!this.networkManager) {
+                        reject(new Error('Network manager not available'))
+                        return
+                    }
+
+                    // Handle specific error types
+                    ErrorHandler.silent(new Error(message.message || 'Unknown error'), {
+                        context: 'SessionManager',
+                        metadata: { code: message.code, phase: 'joinRoom' }
+                    })
+
+                    if (message.code === 'PASSWORD_REQUIRED') {
+                        console.log('[SessionManager] Password required for room')
+                        actions.setIsAuthenticating(true)
+
+                        const result = await this.passwordAuth.promptForPassword(roomCode)
+
+                        if (result.cancelled) {
+                            actions.setIsAuthenticating(false)
+                            reject(new Error('Password required'))
+                            return
+                        }
+
+                        // Send joinRoom message with password
+                        this.networkManager?.send({
+                            type: 'joinRoom',
+                            password: result.password,
+                        })
+                        passwordAttempts = 1 // First attempt with password
+                        return // Don't resolve/reject - wait for response
+
+                    } else if (message.code === 'INVALID_PASSWORD') {
+                        passwordAttempts++
+
+                        const result = await this.passwordAuth.handleInvalidPassword(roomCode, passwordAttempts)
+
+                        if (result.cancelled || result.maxAttemptsExceeded) {
+                            actions.setIsAuthenticating(false)
+                            reject(new Error(
+                                result.maxAttemptsExceeded
+                                    ? 'Maximum password attempts exceeded'
+                                    : 'Password authentication cancelled'
+                            ))
+                            return
+                        }
+
+                        // Send joinRoom message with retry password
+                        this.networkManager?.send({
+                            type: 'joinRoom',
+                            password: result.password,
+                        })
+                        return // Don't resolve/reject - wait for response
+                    }
+
+                    // Other errors
+                    reject(new Error(message.message || 'Connection error'))
+                }
+
+                // Forward all messages to engine
+                if (originalHandler) {
+                    originalHandler(message)
+                }
+            }
+
+            // Connect to server
+            this.networkManager?.connect(roomCode).catch(reject)
+        })
     }
 
     /**
@@ -67,86 +232,12 @@ export class SessionManager {
             })
 
             // Wait for authentication and room creation
-            const userId = await new Promise<string>((resolve, reject) => {
-                if (!this.networkManager) {
-                    reject(new Error('Network manager not initialized'))
-                    return
-                }
-
-                const originalHandler = this.networkManager.messageHandler
-
-                this.networkManager.messageHandler = (message) => {
-                    console.log('[SessionManager] Received message:', message.type)
-
-                    if (message.type === 'network:authenticated') {
-                        console.log('[SessionManager] Authenticated with server userId:', message.userId)
-
-                        // Send createRoom message
-                        const createRoomMsg = {
-                            type: 'createRoom',
-                            password: (settings as { password?: string }).password || null,
-                        }
-                        console.log('[SessionManager] Sending createRoom message')
-                        this.networkManager?.send(createRoomMsg)
-
-                        // Update state with server userId
-                        actions.setUserId(message.userId ?? null)
-
-                    } else if (message.type === 'network:room_joined') {
-                        console.log('[SessionManager] Room created and joined successfully')
-
-                        if (!this.networkManager) {
-                            reject(new Error('Network manager not available'))
-                            return
-                        }
-
-                        const userId = selectors.getUserId()
-                        if (!userId) {
-                            reject(new Error('User ID not available'))
-                            return
-                        }
-
-                        // Attach network manager to engine and handle migration
-                        this.engine.attachNetworkManager(this.networkManager, userId)
-                            .then(result => {
-                                // Show migration result notification
-                                this.notificationManager.showMigrationResult(
-                                    result.succeeded.length,
-                                    result.failed.length
-                                )
-                                if (result.failed.length > 0) {
-                                    console.warn(`[SessionManager] ${result.failed.length} objects failed to sync`)
-                                } else if (result.succeeded.length > 0) {
-                                    console.log(`[SessionManager] All ${result.succeeded.length} objects synced successfully`)
-                                }
-                            })
-                            .catch(err => {
-                                ErrorHandler.silent(err, {
-                                    context: 'SessionManager',
-                                    metadata: { operation: 'migration' }
-                                })
-                            })
-
-                        // Update URL with room code
-                        window.history.replaceState({}, '', `?room=${roomCode}`)
-
-                        // Update invite manager
-                        if (this.inviteManager) {
-                            this.inviteManager.setRoomCode(roomCode)
-                        }
-
-                        resolve(userId)
-                    }
-
-                    // Forward all messages to engine
-                    if (originalHandler) {
-                        originalHandler(message)
-                    }
-                }
-
-                // Connect to server (inside Promise so it executes immediately)
-                this.networkManager?.connect(roomCode).catch(reject)
-            })
+            const userId = await this.setupSessionConnection(
+                'create',
+                roomCode,
+                settings.password || null,
+                true // Update URL with room code
+            )
 
             console.log('[SessionManager] Session created successfully')
             return { roomCode, userId }
@@ -181,170 +272,13 @@ export class SessionManager {
                 // Messages will be handled by engine's message handler
             })
 
-            // Track password retry attempts
-            let passwordAttempts = 0
-            const maxPasswordAttempts = 3
-
             // Wait for authentication and room join
-            const userId = await new Promise<string>(async (resolve, reject) => {
-                if (!this.networkManager) {
-                    reject(new Error('Network manager not initialized'))
-                    return
-                }
-
-                const originalHandler = this.networkManager.messageHandler
-
-                this.networkManager.messageHandler = async (message: NetworkMessage) => {
-                    console.log('[SessionManager] Received message:', message.type)
-
-                    if (message.type === 'network:authenticated') {
-                        console.log('[SessionManager] Authenticated with server userId:', message.userId)
-
-                        // Send joinRoom message
-                        const joinRoomMsg = {
-                            type: 'joinRoom',
-                            password: password || null,
-                        }
-                        console.log('[SessionManager] Sending joinRoom message')
-                        this.networkManager?.send(joinRoomMsg)
-
-                        // Update state with server userId
-                        actions.setUserId(message.userId ?? null)
-
-                    } else if (message.type === 'network:room_joined') {
-                        console.log('[SessionManager] Successfully joined room')
-
-                        if (!this.networkManager) {
-                            reject(new Error('Network manager not available'))
-                            return
-                        }
-
-                        // Clear authentication flag if it was set
-                        if (selectors.getIsAuthenticating()) {
-                            actions.setIsAuthenticating(false)
-                        }
-
-                        const userId = selectors.getUserId()
-                        if (!userId) {
-                            reject(new Error('User ID not available'))
-                            return
-                        }
-
-                        // Attach network manager to engine and handle migration
-                        this.engine.attachNetworkManager(this.networkManager, userId)
-                            .then(result => {
-                                // Show migration result notification
-                                this.notificationManager.showMigrationResult(
-                                    result.succeeded.length,
-                                    result.failed.length
-                                )
-                                if (result.failed.length > 0) {
-                                    console.warn(`[SessionManager] ${result.failed.length} objects failed to sync`)
-                                } else if (result.succeeded.length > 0) {
-                                    console.log(`[SessionManager] All ${result.succeeded.length} objects synced successfully`)
-                                }
-                            })
-                            .catch(err => {
-                                ErrorHandler.silent(err, {
-                                    context: 'SessionManager',
-                                    metadata: { operation: 'migration' }
-                                })
-                            })
-
-                        // Update invite manager
-                        if (this.inviteManager) {
-                            this.inviteManager.setRoomCode(roomCode)
-                        }
-
-                        resolve(userId)
-
-                    } else if (message.type === 'network:error') {
-                        if (!this.networkManager) {
-                            reject(new Error('Network manager not available'))
-                            return
-                        }
-
-                        // Handle specific error types
-                        ErrorHandler.silent(new Error(message.message || 'Unknown error'), {
-                            context: 'SessionManager',
-                            metadata: { code: message.code, phase: 'joinRoom' }
-                        })
-
-                        if (message.code === 'PASSWORD_REQUIRED') {
-                            console.log('[SessionManager] Password required for room')
-                            actions.setIsAuthenticating(true)
-                            const enteredPassword = await this.dialogManager.showPasswordDialog(roomCode)
-
-                            if (enteredPassword) {
-                                // Send joinRoom message again with password
-                                const joinRoomMsg = {
-                                    type: 'joinRoom',
-                                    password: enteredPassword,
-                                }
-                                console.log('[SessionManager] Sending joinRoom message with password')
-                                this.networkManager?.send(joinRoomMsg)
-                                passwordAttempts = 1 // First attempt with password
-                                return // Don't resolve/reject - wait for response
-                            } else {
-                                // User cancelled
-                                actions.setIsAuthenticating(false)
-                                reject(new Error('Password required'))
-                                return
-                            }
-
-                        } else if (message.code === 'INVALID_PASSWORD') {
-                            passwordAttempts++
-                            const attemptsRemaining = maxPasswordAttempts - passwordAttempts
-
-                            if (passwordAttempts < maxPasswordAttempts) {
-                                // Show error and prompt again
-                                console.log(`[SessionManager] Invalid password. Attempts remaining: ${attemptsRemaining}`)
-                                const errorMessage = `Incorrect password. Please try again (${attemptsRemaining} attempt${attemptsRemaining !== 1 ? 's' : ''} remaining)`
-                                this.notificationManager.showError(errorMessage)
-
-                                // Wait a moment for user to see the error
-                                await new Promise(resolve => setTimeout(resolve, 500))
-
-                                // Prompt for password again
-                                const retryPassword = await this.dialogManager.showPasswordDialog(roomCode, errorMessage)
-
-                                if (retryPassword) {
-                                    // Send joinRoom message again with new password
-                                    const joinRoomMsg = {
-                                        type: 'joinRoom',
-                                        password: retryPassword,
-                                    }
-                                    console.log('[SessionManager] Sending joinRoom message with retry password')
-                                    this.networkManager?.send(joinRoomMsg)
-                                    return // Don't resolve/reject - wait for response
-                                } else {
-                                    // User cancelled retry
-                                    actions.setIsAuthenticating(false)
-                                    reject(new Error('Password authentication cancelled'))
-                                    return
-                                }
-                            } else {
-                                // Max attempts exceeded
-                                actions.setIsAuthenticating(false)
-                                this.notificationManager.showError('Maximum password attempts exceeded')
-                                reject(new Error('Maximum password attempts exceeded'))
-                                return
-                            }
-                        }
-
-                        // Other errors
-                        reject(new Error(message.message || 'Connection error'))
-                    }
-
-                    // Forward all messages to engine
-                    if (originalHandler) {
-                        originalHandler(message)
-                    }
-                }
-
-                // Connect to server (inside Promise so it executes immediately)
-                this.networkManager?.connect(roomCode).catch(reject)
-            })
+            const userId = await this.setupSessionConnection(
+                'join',
+                roomCode,
+                password,
+                false // Don't update URL (already has room code)
+            )
 
             console.log('[SessionManager] Joined room successfully')
             return { userId }

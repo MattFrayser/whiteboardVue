@@ -49,9 +49,6 @@ sessionManager.setLocalUserId(localUserId)
 // Now connect SessionManager to InviteManager (circular dependency resolved)
 inviteManager.setSessionManager(sessionManager)
 
-// TODO: Initialize VisibilitySync (auto-sync when user returns to tab)
-// const visibilitySync = new VisibilitySync(sessionManager)
-
 // Sync AppState UI changes to engine
 appState.subscribe('ui.tool', (tool) => {
     engine.setTool(tool as 'draw' | 'rectangle' | 'circle' | 'select' | 'eraser' | 'line' | 'text')
@@ -93,6 +90,5 @@ window.addEventListener('beforeunload', () => {
     dialogManager.destroy()
     connectionStatus.destroy()
     sessionManager.destroy()
-    // visibilitySync.destroy()
     appState.clear() // Clean up state subscriptions
 })

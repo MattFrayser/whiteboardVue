@@ -38,8 +38,7 @@ export class EraserTool extends Tool {
         this.eraserTrail = [worldPos]
         this.currentWorldPos = worldPos
         this.eraseAt(worldPos)
-        this.engine.markDirty()
-        this.engine.render()
+        this.engine.renderDirty()
     }
 
     override onMouseMove(worldPos: Point, _e: MouseEvent): void {
@@ -47,9 +46,8 @@ export class EraserTool extends Tool {
         if (this.isErasing) {
             this.eraserTrail.push(worldPos)
             this.eraseAt(worldPos)
-            this.engine.markDirty()
         }
-        this.engine.render()
+        this.engine.renderDirty()
     }
 
     override onMouseUp(_worldPos: Point, _e: MouseEvent): void {
@@ -67,8 +65,7 @@ export class EraserTool extends Tool {
             this.startFadeAnimation()
         } else {
             this.eraserTrail = []
-            this.engine.markDirty()
-            this.engine.render()
+            this.engine.renderDirty()
         }
     }
 
@@ -87,8 +84,7 @@ export class EraserTool extends Tool {
                 this.fadeAnimationId = requestAnimationFrame(fadeStep)
             }
 
-            this.engine.markDirty()
-            this.engine.render()
+            this.engine.renderDirty()
         }
 
         this.fadeAnimationId = requestAnimationFrame(fadeStep)
@@ -109,9 +105,6 @@ export class EraserTool extends Tool {
                 point.y + eraserSize > bounds.y &&
                 point.y - eraserSize < bounds.y + bounds.height
             ) {
-                // Mark erased object bounds as dirty
-                this.engine.markDirty()
-
                 // Remove using ObjectManager to trigger broadcast and record history
                 this.engine.objectManager.removeObject(obj, true)
                 this.erasedObjects.add(obj)

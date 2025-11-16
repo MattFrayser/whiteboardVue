@@ -126,7 +126,6 @@ export class ObjectStore {
         const obj = this.getObjectById(objectId)
         if (obj) {
             const oldBounds = obj.getBounds()
-            this.quadtree.remove(obj, oldBounds)
 
             // Handle nested structure from backend (new format)
             if (isNestedFormat(objectData)) {
@@ -140,8 +139,7 @@ export class ObjectStore {
                 obj.data = objectData
             }
 
-            const newBounds = obj.getBounds()
-            this.quadtree.insert(obj, newBounds)
+            this.updateObjectInQuadtree(obj, oldBounds)
             return obj
         }
         return null
@@ -249,18 +247,38 @@ export class ObjectStore {
         return this.quadtree.query(rect) as DrawingObject[]
     }
 
-    removeFromQuadtree(object: DrawingObject, bounds: Bounds): void {
-        this.quadtree.remove(object, bounds)
-    }
-
-    insertIntoQuadtree(object: DrawingObject, bounds: Bounds): void {
-        this.quadtree.insert(object, bounds)
-    }
-
     getAllObjects(): DrawingObject[] {
         return this.objects
     }
 
+    /**
+     * Update an object's position in the quadtree after modification
+     *
+     * Call this after moving, resizing, or otherwise changing an object's bounds.
+     * The quadtree needs the old bounds to find where the object is currently indexed,
+     * then re-inserts it at the new position.
+     *
+     * This method also automatically expands the quadtree if the object moves outside
+     * the current bounds.
+     *
+     * @param object - The object to update in the quadtree
+     * @param oldBounds - The bounds BEFORE modification (required for correct removal)
+     * @param newBounds - Optional new bounds. If null, will call object.getBounds()
+     *
+     * @example
+     * // Typical usage when modifying an object
+     * const oldBounds = obj.getBounds()
+     * obj.move(dx, dy)
+     * objectStore.updateObjectInQuadtree(obj, oldBounds)
+     *
+     * @example
+     * // With explicit new bounds
+     * const oldBounds = obj.getBounds()
+     * obj.data.x = newX
+     * obj.data.y = newY
+     * const newBounds = { x: newX, y: newY, width: obj.data.width, height: obj.data.height }
+     * objectStore.updateObjectInQuadtree(obj, oldBounds, newBounds)
+     */
     updateObjectInQuadtree(object: DrawingObject, oldBounds: Bounds, newBounds: Bounds | null = null): void {
         const bounds = newBounds || object.getBounds()
 
@@ -330,19 +348,35 @@ export class ObjectStore {
         if (viewport) {
             const visibleObjects = this.quadtree.query(viewport) as DrawingObject[]
 
-            // Render quadtree-visible objects
-            visibleObjects.forEach(obj => obj.render(ctx))
+            // Render quadtree-visible objects with per-object error isolation
+            visibleObjects.forEach(obj => {
+                try {
+                    obj.render(ctx)
+                } catch (error) {
+                    console.error(`[ObjectStore] Failed to render object ${obj.id}:`, error)
+                }
+            })
 
             // Always render selected objects even if outside quadtree bounds
             // This ensures objects being dragged remain visible
             selectedObjects.forEach(obj => {
                 if (!visibleObjects.includes(obj)) {
-                    obj.render(ctx)
+                    try {
+                        obj.render(ctx)
+                    } catch (error) {
+                        console.error(`[ObjectStore] Failed to render selected object ${obj.id}:`, error)
+                    }
                 }
             })
         } else {
-            // Full render (fallback)
-            this.objects.forEach(obj => obj.render(ctx))
+            // Full render (fallback) with per-object error isolation
+            this.objects.forEach(obj => {
+                try {
+                    obj.render(ctx)
+                } catch (error) {
+                    console.error(`[ObjectStore] Failed to render object ${obj.id}:`, error)
+                }
+            })
         }
     }
 }

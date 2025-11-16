@@ -109,8 +109,7 @@ export class TextTool extends Tool {
             }, 0)
 
             this.engine.objectManager.addObject(textObj)
-            this.engine.markDirty()
-            this.engine.render()
+            this.engine.renderDirty()
         }
 
         this.cleanup()

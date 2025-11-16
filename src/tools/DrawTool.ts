@@ -33,19 +33,12 @@ export class DrawTool extends Tool {
 
     override onMouseMove(worldPos: Point, _e: MouseEvent): void {
         if (this.isDrawing && this.currentStroke) {
-            // Mark previous bounds as dirty
-            if (this.lastBounds) {
-                this.engine.markDirty()
-            }
-
             this.currentStroke.data.points!.push(worldPos)
 
-            // Mark new bounds as dirty
             const newBounds = this.currentStroke.getBounds()
-            this.engine.markDirty()
             this.lastBounds = newBounds
 
-            this.engine.render()
+            this.engine.renderDirty()
         }
     }
 
@@ -61,15 +54,12 @@ export class DrawTool extends Tool {
                 )
             }
 
-            // Mark final bounds as dirty
-            this.engine.markDirty()
-
             this.engine.objectManager.addObject(this.currentStroke)
         }
         this.currentStroke = null
         this.isDrawing = false
         this.lastBounds = null
-        this.engine.render()
+        this.engine.renderDirty()
     }
 
     override renderPreview(ctx: CanvasRenderingContext2D): void {

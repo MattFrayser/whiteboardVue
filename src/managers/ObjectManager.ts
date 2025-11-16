@@ -326,9 +326,8 @@ export class ObjectManager {
         const newObjects: DrawingObject[] = []
 
         clipboard.forEach(data => {
-            // Deep clone
-            const clonedData = JSON.parse(JSON.stringify(data))
-            clonedData.id = null // setting null will trigger new ID
+            // Shallow clone with new ID (null triggers ID generation in constructor)
+            const clonedData = { ...data, id: null as unknown as string }
             const newObject = this.createObjectFromData(clonedData)
             if (newObject) {
                 // Don't save history for each object - we'll save once at the end

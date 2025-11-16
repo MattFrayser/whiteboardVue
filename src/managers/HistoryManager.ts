@@ -124,12 +124,17 @@ export class HistoryManager {
         this.history = this.history.map((operation: Operation) => {
             try {
                 if (operation.userId === oldUserId) {
-                    // Create a new operation with updated userId
-                    const json = operation.toJSON()
-                    json.userId = newUserId
-                    // Note: This requires operation factories to be registered
-                    // For now, we'll modify the userId directly (not ideal but works)
-                    ;(operation as { userId: string }).userId = newUserId
+                    // Modify readonly userId property for local→network migration
+                    // Uses Object.defineProperty to maintain readonly semantics after modification
+                    // This is an exceptional case - userId migration only occurs once during
+                    // the transition from local-first to networked mode
+                    // Pattern matches MoveObjectsOperation.mergeWith() approach
+                    Object.defineProperty(operation, 'userId', {
+                        value: newUserId,
+                        writable: false,
+                        enumerable: true,
+                        configurable: true
+                    })
                 }
                 return operation
             } catch (error) {

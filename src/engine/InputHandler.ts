@@ -58,9 +58,7 @@ export class InputHandler {
             )
 
             if (e.button === 0) {
-                // Get current tool from AppState
-                const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+                const currentTool = this.engine.getCurrentTool()
                 if (currentTool) {
                     currentTool._safeOnMouseDown(worldPos, e)
                 }
@@ -104,8 +102,7 @@ export class InputHandler {
 
             // left click
             if (e.buttons === 1) {
-                const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+                const currentTool = this.engine.getCurrentTool()
                 if (currentTool) {
                     currentTool._safeOnMouseMove(worldPos, e)
                 }
@@ -113,8 +110,7 @@ export class InputHandler {
             } else if (e.buttons === 2) {
                 e.preventDefault()
                 this.engine.coordinates.pan({ x: e.clientX, y: e.clientY })
-                this.engine.needsRedraw = true
-                this.engine.render()
+                this.engine.renderDirty()
             }
         } catch (error) {
             ErrorHandler.silent(error as Error, {
@@ -132,8 +128,7 @@ export class InputHandler {
             )
 
             if (e.button === 0) {
-                const toolName = selectors.getTool()
-                const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+                const currentTool = this.engine.getCurrentTool()
                 if (currentTool) {
                     currentTool._safeOnMouseUp(worldPos, e)
                 }
@@ -157,8 +152,7 @@ export class InputHandler {
         e.preventDefault()
         const zoomPoint = { x: e.clientX, y: e.clientY }
         this.engine.coordinates.zoom(e.deltaY, zoomPoint, this.canvas)
-        this.engine.needsRedraw = true
-        this.engine.render()
+        this.engine.renderDirty()
     }
 
     private updateCursor(worldPos: Point | null = null): void {
@@ -166,9 +160,8 @@ export class InputHandler {
             // Panning mode - show grabbing cursor
             actions.setCursor('grabbing')
         } else {
-            // Get current tool from AppState
             const toolName = selectors.getTool()
-            const currentTool = this.engine.tools[toolName as keyof typeof this.engine.tools]
+            const currentTool = this.engine.getCurrentTool()
 
             // SelectTool has dynamic cursor based on hover position
             if (currentTool && toolName === 'select' && worldPos) {
@@ -213,8 +206,7 @@ export class InputHandler {
             if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
                 e.preventDefault()
                 this.engine.objectManager.cutSelected()
-                this.engine.markDirty()
-                this.engine.render()
+                this.engine.renderDirty()
             }
 
             // paste (ctrl-v)
@@ -222,8 +214,7 @@ export class InputHandler {
                 e.preventDefault()
                 const worldPos = this.engine.coordinates.viewportToWorld(this.lastMousePos, this.canvas)
                 this.engine.objectManager.paste(worldPos.x, worldPos.y)
-                this.engine.markDirty()
-                this.engine.render()
+                this.engine.renderDirty()
             }
 
             // Undo (ctrl-z) / redo (ctrl-shift-z)
@@ -240,8 +231,7 @@ export class InputHandler {
             // Delete
             if (e.key === 'Delete') {
                 this.engine.objectManager.deleteSelected()
-                this.engine.markDirty()
-                this.engine.render()
+                this.engine.renderDirty()
             }
         } catch (error) {
             ErrorHandler.silent(error as Error, {

@@ -23,8 +23,9 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
     devMode: boolean
 
     constructor(initialState: T = {} as T) {
-        this.initialState = this._deepClone(initialState)
-        this.state = this._deepClone(initialState)
+        // Use structuredClone for simple, efficient cloning
+        this.initialState = structuredClone(initialState)
+        this.state = structuredClone(initialState)
         this.listeners = new Map() // path -> Set of callbacks
         this.devMode = import.meta.env?.DEV as boolean
 
@@ -53,8 +54,8 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
     set(path: string, value: StateValue): void {
         const oldValue = this.get(path)
 
-        // Only update if value changed
-        if (this._deepEqual(oldValue, value)) {
+        // Only update if value changed (strict equality for most values)
+        if (oldValue === value) {
             return
         }
 
@@ -90,7 +91,7 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
         for (const [path, value] of Object.entries(updates)) {
             const oldValue = this.get(path)
 
-            if (!this._deepEqual(oldValue, value)) {
+            if (oldValue !== value) {
                 // Update without notifying yet
                 if (path.includes('.')) {
                     const keys = path.split('.')
@@ -164,7 +165,7 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
     // Used for cleanup - clears all listeners and resets state to initial values
     clear(): void {
         this.listeners.clear()
-        this.state = this._deepClone(this.initialState)
+        this.state = structuredClone(this.initialState)
     }
 
     /**
@@ -234,48 +235,5 @@ export class StateStore<T extends Record<string, unknown> = Record<string, unkno
             '\n  Old:', oldValue,
             '\n  New:', newValue
         )
-    }
-
-    /**
-     * Deep equality check
-     * @private
-     */
-    _deepEqual(a: StateValue, b: StateValue): boolean {
-        if (a === b) return true
-        if (a == null || b == null) return false
-        if (typeof a !== 'object' || typeof b !== 'object') return false
-
-        const objA = a as Record<string, unknown>
-        const objB = b as Record<string, unknown>
-        const keysA = Object.keys(objA)
-        const keysB = Object.keys(objB)
-
-        if (keysA.length !== keysB.length) return false
-
-        for (const key of keysA) {
-            if (!keysB.includes(key)) return false
-            if (!this._deepEqual(objA[key], objB[key])) return false
-        }
-
-        return true
-    }
-
-    /**
-     * Deep clone an object
-     * @private
-     */
-    _deepClone<V>(obj: V): V {
-        if (obj === null || typeof obj !== 'object') return obj
-        if (obj instanceof Date) return new Date(obj) as V
-        if (obj instanceof Array) return obj.map(item => this._deepClone(item)) as V
-
-        const cloned: Record<string, unknown> = {}
-        const objRecord = obj as Record<string, unknown>
-        for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                cloned[key] = this._deepClone(objRecord[key])
-            }
-        }
-        return cloned as V
     }
 }
