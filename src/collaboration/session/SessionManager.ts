@@ -13,6 +13,7 @@ import { createLogger } from '../../shared/utils/logger'
 import type { DrawingEngine } from '../../core/engine/DrawingEngine'
 import type { NotificationManager, DialogManager, InviteManager } from '../../shared/types/ui'
 import type { NetworkMessage } from '../../shared/types/network'
+import { hashPassword } from '../../shared/utils/passwordHash'
 const log = createLogger('SessionManager')
 
 export class SessionManager {
@@ -213,6 +214,11 @@ export class SessionManager {
             const roomCode = generateSecureRoomCode(6)
             log.debug('Generated room code', { roomCode })
 
+            let hashedPassword: string | null = null
+            if (settings.password) {
+                hashedPassword = await hashPassword(settings.password)
+            }
+
             // Update state to connecting
             actions.setNetworkState('connecting', roomCode, this.localUserId ?? undefined)
 
@@ -225,7 +231,7 @@ export class SessionManager {
             const userId = await this.setupSessionConnection(
                 'create',
                 roomCode,
-                settings.password || null,
+                hashedPassword,
                 true // Update URL with room code
             )
 
@@ -244,6 +250,7 @@ export class SessionManager {
         }
     }
 
+
     /**
      * Join an existing room
      */
@@ -251,10 +258,13 @@ export class SessionManager {
         console.log('[SessionManager] Joining room:', roomCode, password ? '(with password)' : '')
 
         try {
-            // Update state to connecting
+            let hashedPassword: string | null = null
+            if (password) {
+                hashedPassword = await hashPassword(password)
+            }
+
             actions.setNetworkState('connecting', roomCode, this.localUserId ?? undefined)
 
-            // Create network manager
             this.networkManager = new WebSocketManager(() => {
                 // Messages will be handled by engine's message handler
             })
@@ -263,7 +273,7 @@ export class SessionManager {
             const userId = await this.setupSessionConnection(
                 'join',
                 roomCode,
-                password,
+                hashedPassword,
                 false // Don't update URL (already has room code)
             )
 

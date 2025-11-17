@@ -4,6 +4,8 @@
  * Handles password authentication flow with retry logic
  */
 import type { DialogManager, NotificationManager } from '../../shared/types/ui'
+import { hashPassword } from '../../shared/utils/passwordHash' 
+
 export interface PasswordResult {
     success: boolean
     password: string | null
@@ -41,9 +43,12 @@ export class PasswordAuthenticator {
             }
         }
 
+        const hashedPassword = await hashPassword(password)
+
+
         return {
             success: true,
-            password,
+            password: hashedPassword,
             cancelled: false,
             maxAttemptsExceeded: false,
         }
@@ -86,10 +91,11 @@ export class PasswordAuthenticator {
                 maxAttemptsExceeded: false,
             }
         }
+        const hashedPassword = await hashPassword(retryPassword)
 
         return {
             success: true,
-            password: retryPassword,
+            password: hashedPassword,  
             cancelled: false,
             maxAttemptsExceeded: false,
         }
