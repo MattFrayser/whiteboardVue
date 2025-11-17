@@ -1,6 +1,7 @@
 import type { PendingAck } from '../../shared/types/network'
 import { ACK_TIMEOUT } from '../../shared/constants'
-
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('AckTracker')
 /**
  * Tracks pending acknowledgments for object operations
  *
@@ -56,7 +57,7 @@ export class AckTracker {
         // Resolve the promise
         pending.resolve({ objectId, success: true })
 
-        console.log(`[AckTracker] Object ${objectId} confirmed by server`)
+        log.debug('Object confirmed by server', { objectId })
         return true
     }
 

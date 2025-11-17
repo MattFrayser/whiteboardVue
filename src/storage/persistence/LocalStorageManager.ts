@@ -7,6 +7,9 @@ import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
 import type { DrawingObjectData, Point } from '../../shared/types/common'
 import { clampCoordinate, clampBrushSize, validateColor, isValidObject } from '../../shared/validation'
 
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('LocalStorage')
+
 const STORAGE_KEY = 'whiteboard_local_objects'
 const DEBOUNCE_MS = 500 // Save after 500ms of inactivity
 
@@ -115,7 +118,7 @@ export class LocalStorageManager {
             const parsed = JSON.parse(data)
             
             if (!Array.isArray(parsed)) {
-                console.error('[LocalStorage] Invalid data format (not an array), clearing storage')
+                log.error('Invalid data format (not an array), clearing storage')
                 this.clear() // Clear corrupted data
                 return { objects: [], maxZIndex: 0 }
             }
@@ -126,7 +129,7 @@ export class LocalStorageManager {
 
             const validObjects = parsed.filter((obj: unknown) => {
                 if (!isValidObject(obj)) {
-                    console.warn('[LocalStorage] Skipping invalid object:', obj)
+                    log.warn('Skipping invalid object:', obj)
                     return false
                 }
                 return true

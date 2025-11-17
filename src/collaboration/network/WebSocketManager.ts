@@ -7,6 +7,8 @@ import { WebSocketConnection } from './WebSocketConnection'
 import { ReconnectionManager } from './ReconnectionManager'
 import { AckTracker } from './AckTracker'
 import { isValidMessageStructure } from '../../shared/validation'
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('WebSocketManager')
 
 export class WebSocketManager {
     private connection: WebSocketConnection
@@ -125,7 +127,7 @@ export class WebSocketManager {
         if (handler) {
             handler(msg)
         } else {
-            console.warn('[WebSocket] Unknown message type:', msg.type, msg)
+            log.warn('Unknown message type', { type: msg.type, message: msg })
         }
     }
     

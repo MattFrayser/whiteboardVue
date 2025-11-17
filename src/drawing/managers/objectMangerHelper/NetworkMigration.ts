@@ -10,6 +10,9 @@
 import type { DrawingObject } from '../../objects/DrawingObject'
 import type { WebSocketManager } from '../../../collaboration/network/WebSocketManager'
 import type { MigrationResult } from '../../../shared/types/network'
+import { createLogger } from '../../../shared/utils/logger'
+const log = createLogger('NetworkMigration')
+
 /**
  * Context needed for network migration
  */
@@ -27,7 +30,7 @@ export interface MigrationContext {
  * Returns objects that need to be broadcast to server
  */
 export function prepareNetworkMigration(ctx: MigrationContext): DrawingObject[] {
-    console.log('[NetworkMigration] Preparing migration from local to networked mode')
+    log.debug('Preparing migration from local to networked mode')
 
     // Clear localStorage - no longer needed
     ctx.clearLocalStorage()
@@ -38,7 +41,7 @@ export function prepareNetworkMigration(ctx: MigrationContext): DrawingObject[] 
         obj => obj.userId === ctx.oldUserId
     )
 
-    console.log(`[NetworkMigration] Found ${localObjects.length} local objects to migrate`)
+    log.debug('Found local objects to migrate', { count: localObjects.length }) 
 
     // Update all objects to new server-assigned userId
     localObjects.forEach(obj => {
@@ -50,7 +53,7 @@ export function prepareNetworkMigration(ctx: MigrationContext): DrawingObject[] 
         ctx.migrateHistoryUserId(ctx.oldUserId, ctx.newUserId)
     }
 
-    console.log('[NetworkMigration] Migration preparation complete')
+    log.debug('Migration preparation complete')
 
     return localObjects
 }
@@ -64,11 +67,11 @@ export async function broadcastLocalObjects(
     networkManager: WebSocketManager
 ): Promise<MigrationResult> {
     if (!objects || objects.length === 0) {
-        console.log('[NetworkMigration] No objects to broadcast')
+        log.debug('No objects to broadcast')
         return { succeeded: [], failed: [] }
     }
 
-    console.log(`[NetworkMigration] Broadcasting ${objects.length} objects to server`)
+    log.info('Broadcasting objects to server', { count: objects.length })
 
     // Use Promise.allSettled to handle both successes and failures
     const results = await Promise.allSettled(
@@ -110,12 +113,14 @@ export async function broadcastLocalObjects(
         }
     })
 
-    console.log(
-        `[NetworkMigration] Broadcast complete: ${succeeded.length} succeeded, ${failed.length} failed`
-    )
+    log.debug('Migration complete', { 
+        total: objects.length, 
+        succeeded: succeeded.length, 
+        failed: failed.length 
+    })
 
     if (failed.length > 0) {
-        console.error('[NetworkMigration] Failed objects:', failed)
+        log.error('Objects failed to migrate', { failedObjects: failed })
     }
 
     return { succeeded, failed }

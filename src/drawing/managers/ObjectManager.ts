@@ -8,6 +8,9 @@ import type { WebSocketManager } from '../../collaboration/network/WebSocketMana
 import type { DrawingObject } from '../../drawing/objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../../shared/types/common'
 import type { MigrationResult } from '../../shared/types/network'
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('ObjectManager')
+
 
 // Import extracted algorithms
 import { executePaste, broadcastOperationEffect, prepareNetworkMigration, broadcastLocalObjects } from './objectMangerHelper'
@@ -56,7 +59,7 @@ export class ObjectManager {
     loadFromLocalStorage(): void {
         const { objects: savedObjects, maxZIndex } = this.localStorageManager.loadObjects()
         if (savedObjects.length > 0) {
-            console.log(`[ObjectManager] Loading ${savedObjects.length} objects from localStorage`)
+            log.debug('Loading objects from localStorage', { count: savedObjects.length })
             this.objectStore.loadRemoteObjects(savedObjects)
             this.nextZIndex = Math.max(this.nextZIndex, maxZIndex)
         }
@@ -76,7 +79,7 @@ export class ObjectManager {
         networkManager: WebSocketManager, 
         newUserId: string
     ): Promise<MigrationResult> {
-        console.log('[ObjectManager] Attaching network manager')
+        log.debug('Attaching network manager')
 
         const oldUserId = this.userId
 

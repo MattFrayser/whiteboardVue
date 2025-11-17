@@ -3,7 +3,8 @@ import { API_BASE_URL, WS_BASE_URL, AUTH_TIMEOUT } from '../../shared/constants'
 import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
 import type { StatusCallback, NetworkMessage } from '../../shared/types/network'
 import { parseJSON, isValidMessageStructure } from '../../shared/validation'
-
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('WebSocketConnection')
 
 /**
  * Handles low-level WebSocket connection lifecycle
@@ -64,18 +65,18 @@ export class WebSocketConnection {
             }
 
             const sessionData = await sessionResponse.json()
-            console.log('[WebSocketConnection] Session established:', sessionData.userId)
+            log.debug('Session established', { userId: sessionData.userId })
 
             // Debug: Check if cookie was set
-            console.log('[WebSocketConnection] Cookies:', document.cookie)
+            log.debug('Cookies set', { cookieCount: document.cookie.split(';').length }) 
 
             // Now open WebSocket - cookie will be sent automatically
-            console.log('[WebSocketConnection] Opening WebSocket connection...')
+            log.debug('Opening WebSocket connection')
             this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${roomCode}`)
-            console.log('[WebSocketConnection] WebSocket object created, readyState:', this.socket.readyState)
+            log.debug('WebSocket object created', { readyState: this.socket.readyState }) 
 
             this.socket.onopen = () => {
-                console.log('[WebSocketConnection] Connection opened successfully!')
+                log.info('Connection opened successfully')
                 // Send authenticate message - authentication will use HTTP cookie
                 const authMsg = {
                     type: 'authenticate',
@@ -126,12 +127,11 @@ export class WebSocketConnection {
             }
 
             this.socket.onclose = (event: CloseEvent) => {
-                console.log('[WebSocketConnection] Connection closed:', {
-                    code: event.code,
-                    reason: event.reason,
-                    wasClean: event.wasClean
+                log.info('Connection closed', { 
+                    code: event.code, 
+                    reason: event.reason, 
+                    wasClean: event.wasClean 
                 })
-
                 // Trigger disconnect callback
                 if (this.onDisconnectCallback) {
                     this.onDisconnectCallback()
@@ -159,12 +159,10 @@ export class WebSocketConnection {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify(msg))
         } else {
-            console.warn(
-                '[WebSocketConnection] Cannot send message - socket not open. ReadyState:',
-                this.socket?.readyState,
-                'Message:',
-                msg
-            )
+            log.warn('Cannot send message - socket not open', { 
+                readyState: this.socket?.readyState,
+                messageType: msg.type 
+            })
         }
     }
 

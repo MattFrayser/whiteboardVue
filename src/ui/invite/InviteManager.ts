@@ -2,6 +2,8 @@ import { appState, selectors } from '../../shared/stores/AppState'
 import { ErrorHandler } from '../../shared/utils/ErrorHandler'
 import type { NotificationManager } from '../notifications/NotificationManager'
 import type { SessionManager } from '../../collaboration/session/SessionManager'
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('InviteManager')
 
 export class InviteManager {
     roomCode: string | null
@@ -121,7 +123,7 @@ export class InviteManager {
             password: this.passwordToggle?.checked ? this.passwordInput?.value || undefined : undefined,
         }
 
-        console.log('[InviteManager] Collected settings:', settings)
+        log.debug('Collected settings', { settings })
 
         // Hide settings modal
         this.hideSettings()

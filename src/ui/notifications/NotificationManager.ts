@@ -3,8 +3,9 @@
  *
  * Centralized notification system for displaying toast-style messages
  * Supports multiple types (success, error, warning, info) with auto-dismiss
- * Handles notification queueing when multiple notifications are triggered
  */
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('NotificationManager')
 
 interface NotificationQueueItem {
     message: string
@@ -23,7 +24,7 @@ export class NotificationManager {
         this.notification = document.querySelector('.invite-notification')
 
         if (!this.notification) {
-            console.warn('[NotificationManager] .invite-notification element not found in DOM')
+            log.warn('.invite-notification element not found in DOM')
         }
 
         // Queue for managing multiple notifications
@@ -32,15 +33,9 @@ export class NotificationManager {
         this.currentTimeout = null
     }
 
-    /**
-     * Show a notification with specified type and duration
-     * @param {string} message - Message to display
-     * @param {string} type - Type of notification: 'success', 'error', 'warning', 'info'
-     * @param {number} duration - How long to show notification in ms (default: 5000ms)
-     */
     show(message: string, type = 'success', duration = 5000): void {
         if (!this.notification) {
-            console.warn('[NotificationManager] Cannot show notification - element not found')
+            log.warn('Cannot show notification - element not found')
             return
         }
 
@@ -53,38 +48,18 @@ export class NotificationManager {
         }
     }
 
-    /**
-     * Show a success notification
-     * @param {string} message - Message to display
-     * @param {number} duration - How long to show notification in ms
-     */
     showSuccess(message: string, duration = 5000): void {
         this.show(message, 'success', duration)
     }
 
-    /**
-     * Show an error notification
-     * @param {string} message - Message to display
-     * @param {number} duration - How long to show notification in ms
-     */
     showError(message: string, duration = 5000): void {
         this.show(message, 'error', duration)
     }
 
-    /**
-     * Show a warning notification
-     * @param {string} message - Message to display
-     * @param {number} duration - How long to show notification in ms
-     */
     showWarning(message: string, duration = 5000): void {
         this.show(message, 'warning', duration)
     }
 
-    /**
-     * Show an info notification
-     * @param {string} message - Message to display
-     * @param {number} duration - How long to show notification in ms
-     */
     showInfo(message: string, duration = 5000): void {
         this.show(message, 'info', duration)
     }
@@ -92,8 +67,6 @@ export class NotificationManager {
     /**
      * Show migration result notification (specialized for object sync)
      * Only shows notification if there are failures - success is silent
-     * @param {number} succeeded - Number of objects that succeeded
-     * @param {number} failed - Number of objects that failed
      */
     showMigrationResult(succeeded: number, failed: number) {
         // Only notify users about failures, not successes

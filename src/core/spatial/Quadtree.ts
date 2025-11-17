@@ -4,6 +4,8 @@
  *
  * Recursivly divide 2d space, creating a tree structure.
  */
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('QuadTree')
 
 import type { Bounds, Point } from '../../shared/types'
 interface QuadtreeObject {
@@ -270,7 +272,7 @@ export class Quadtree<T extends QuadtreeObject = QuadtreeObject> {
         if (!bounds || bounds.width === 0 || bounds.height === 0) {
             // Zero-size bounds break getQuadrants() logic and provide no
             // useful spatial information for queries
-            console.warn('[Quadtree] Invalid bounds for insert:', bounds)
+            log.warn('Invalid bounds for insert', { bounds })
             return
         }
         this.root.insert(object, bounds)
@@ -278,7 +280,7 @@ export class Quadtree<T extends QuadtreeObject = QuadtreeObject> {
 
     remove(object: T, bounds: Bounds): void {
         if (!bounds) {
-            console.warn('[Quadtree] Invalid bounds for remove:', bounds)
+            log.warn('Invalid bounds for remove', { bounds })
             return
         }
         this.root.remove(object, bounds)

@@ -9,6 +9,8 @@ import { SessionManager } from './collaboration/session/SessionManager'
 import { appState, actions } from './shared/stores/AppState'
 import { ErrorHandler } from './shared/utils/ErrorHandler'
 import { API_BASE_URL, WS_BASE_URL } from './shared/constants'
+import { createLogger } from './shared/utils/logger'
+const log = createLogger('App')
 
 function validateSecureConnection(): void {
     const isDevelopment = import.meta.env.DEV
@@ -23,7 +25,7 @@ function validateSecureConnection(): void {
             throw new Error("Production must use HTTPS")
         }
     } else {
-        console.warn("Development: using insecure protocols")
+        log.warn('Development mode: using insecure protocols')
     }
 }
 
@@ -35,7 +37,7 @@ const generateLocalUserId = () => {
 
 validateSecureConnection()
 const localUserId = generateLocalUserId()
-console.log('[App] Starting in local mode with temporary userId:', localUserId)
+log.debug('Starting in local mode', { userId: localUserId })
 
 // Initialize components in local-first mode (no network manager yet)
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
@@ -97,7 +99,7 @@ if (roomCodeFromURL) {
             })
         }
     }, () => {
-        console.log('[App] User chose to stay in local mode')
+        log.debug('User chose to stay in local mode')
     })
 }
 

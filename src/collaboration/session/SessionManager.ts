@@ -66,24 +66,24 @@ export class SessionManager {
             let passwordAttempts = 0
 
             this.networkManager.messageHandler = async (message: NetworkMessage) => {
-                console.log('[SessionManager] Received message:', message.type)
+                log.debug('Received message', { messageType: message.type })
 
                 if (message.type === 'network:authenticated') {
-                    console.log('[SessionManager] Authenticated with server userId:', message.userId)
+                    log.debug('Authenticated with server', { userId: message.userId })
 
                     // Send room action message (create or join)
                     const roomMessage = {
                         type: action === 'create' ? 'createRoom' : 'joinRoom',
                         password: password || null,
                     }
-                    console.log(`[SessionManager] Sending ${roomMessage.type} message`)
+                    log.debug(`Sending ${roomMessage.type} message`)
                     this.networkManager?.send(roomMessage)
 
                     // Update state with server userId
                     actions.setUserId(message.userId ?? null)
 
                 } else if (message.type === 'network:room_joined') {
-                    console.log(`[SessionManager] ${action === 'create' ? 'Room created and joined' : 'Successfully joined room'}`)
+                    log.info(`${action === 'create' ? 'Room created and joined' : 'Successfully joined room'}`)
 
                     if (!this.networkManager) {
                         reject(new Error('Network manager not available'))
@@ -110,9 +110,12 @@ export class SessionManager {
                                 result.failed.length
                             )
                             if (result.failed.length > 0) {
-                                console.warn(`[SessionManager] ${result.failed.length} objects failed to sync`)
+                                log.warn('Objects failed to sync', { 
+                                    failed: result.failed.length, 
+                                    succeeded: result.succeeded.length 
+                                })
                             } else if (result.succeeded.length > 0) {
-                                console.log(`[SessionManager] All ${result.succeeded.length} objects synced successfully`)
+                                log.debug('All objects synced successfully', { count: result.succeeded.length })
                             }
                         })
                         .catch(err => {
@@ -148,7 +151,7 @@ export class SessionManager {
                     })
 
                     if (message.code === 'PASSWORD_REQUIRED') {
-                        console.log('[SessionManager] Password required for room')
+                        log.debug('Password required for room')
                         actions.setIsAuthenticating(true)
 
                         const result = await this.passwordAuth.promptForPassword(roomCode)
@@ -235,7 +238,7 @@ export class SessionManager {
                 true // Update URL with room code
             )
 
-            console.log('[SessionManager] Session created successfully')
+            log.debug('Session created successfully')
             return { roomCode, userId }
 
         } catch (error: unknown) {
@@ -255,7 +258,7 @@ export class SessionManager {
      * Join an existing room
      */
     async joinSession(roomCode: string, password: string | null = null): Promise<{ userId: string }> {
-        console.log('[SessionManager] Joining room:', roomCode, password ? '(with password)' : '')
+        log.debug('Joining room', { roomCode, hasPassword: !!password })
 
         try {
             let hashedPassword: string | null = null
@@ -277,7 +280,7 @@ export class SessionManager {
                 false // Don't update URL (already has room code)
             )
 
-            console.log('[SessionManager] Joined room successfully')
+            log.debug('Joined room successfully') 
             return { userId }
 
         } catch (error: unknown) {

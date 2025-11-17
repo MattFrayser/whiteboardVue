@@ -10,6 +10,8 @@
  */
 import { actions, selectors } from '../../shared/stores/AppState'
 import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('ReconnectionManager')
 
 export class ReconnectionManager {
     private reconnectTimeout: ReturnType<typeof setTimeout> | null = null
@@ -65,7 +67,7 @@ export class ReconnectionManager {
 
         // Don't auto-reconnect if we're in the middle of password authentication
         if (selectors.getIsAuthenticating()) {
-            console.log('[ReconnectionManager] Skipping auto-reconnect - password authentication in progress')
+            log.debug('Skipping auto-reconnect - password authentication in progress')
             return false
         }
 
@@ -92,16 +94,13 @@ export class ReconnectionManager {
         const delay = this.calculateBackoffDelay(reconnectAttempts)
         const currentAttempts = reconnectAttempts + 1
 
-        console.log(
-            `[ReconnectionManager] Scheduling reconnection attempt ${currentAttempts}/${this.maxReconnectAttempts} ` +
-            `in ${delay}ms`
-        )
+
 
         // Schedule reconnection
         this.reconnectTimeout = setTimeout(() => {
             const roomCode = selectors.getRoomCode()
             if (roomCode && this.onReconnect) {
-                console.log(`[ReconnectionManager] Attempting reconnection (attempt ${currentAttempts})`)
+                log.info('Attempting reconnection', { attempt: currentAttempts })
                 this.onReconnect(roomCode)
             }
         }, delay)

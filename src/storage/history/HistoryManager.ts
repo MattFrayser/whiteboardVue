@@ -2,6 +2,9 @@ import { actions } from '../../shared/stores/AppState'
 import { ErrorHandler } from '../../shared/utils/ErrorHandler'
 import type { Operation } from './operations/Operation'
 
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('HistoryManager')
+
 /**
  * Manages undo/redo history using operation-based approach
  * Each history entry is an operation that can be reversed
@@ -119,7 +122,7 @@ export class HistoryManager {
      * @param {string} newUserId - The server-assigned userId
      */
     migrateUserId(oldUserId: string, newUserId: string): void {
-        console.log(`[HistoryManager] Migrating history from userId ${oldUserId} to ${newUserId}`)
+        log.debug('Migrating history', { from: oldUserId, to: newUserId })
 
         this.history = this.history.map((operation: Operation) => {
             try {
@@ -146,7 +149,7 @@ export class HistoryManager {
             }
         })
 
-        console.log(`[HistoryManager] Migrated ${this.history.length} history entries`)
+        log.debug('Migration complete', { entries: this.history.length })
     }
 
     /**

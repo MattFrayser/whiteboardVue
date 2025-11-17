@@ -1,5 +1,7 @@
 import type { DrawingObject } from '../DrawingObject'
 import type { DrawingObjectData } from '../../../shared/types'
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('ObjectRegistry')
 /**
  * Object constructor signature
  */
@@ -27,7 +29,7 @@ export class ObjectRegistry {
     ): DrawingObject | null {
         const ObjectClass = this.objects.get(type)
         if (!ObjectClass) {
-            console.warn(`[ObjectRegistry] Unknown object type: ${type}`)
+            log.warn('Unknown object type', { type })
             return null
         }
         return new ObjectClass(id, data, zIndex)

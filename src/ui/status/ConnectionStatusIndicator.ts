@@ -6,6 +6,8 @@
  * Shows status dot with color and text label
  */
 import { appState } from '../../shared/stores/AppState'
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('ConnectionStatusIndicator')
 
 export class ConnectionStatusIndicator {
     element: HTMLElement | null
@@ -19,7 +21,7 @@ export class ConnectionStatusIndicator {
         this.statusText = this.element ? this.element.querySelector('.status-text') : null
 
         if (!this.element || !this.statusText) {
-            console.warn('[ConnectionStatusIndicator] Required DOM elements not found')
+            log.warn('Required DOM elements not found')
             return
         }
 

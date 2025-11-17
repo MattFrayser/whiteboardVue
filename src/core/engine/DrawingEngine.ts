@@ -15,6 +15,7 @@ import { ErrorHandler, ErrorCategory } from '../../shared/utils/ErrorHandler'
 import { selectors } from '../../shared/stores/AppState'
 import type { WebSocketManager } from '../../collaboration/network/WebSocketManager'
 import type { NetworkMessage, MigrationResult } from '../../shared/types/network'
+
 import { 
     isObjectAddedMessage, 
     isObjectUpdatedMessage, 
@@ -24,6 +25,9 @@ import {
     isUserDisconnectedMessage,
     sanitizeObjectData
 } from '../../shared/validation'
+
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('DrawingEngine')
 
 export class DrawingEngine {
     canvas: HTMLCanvasElement
@@ -109,12 +113,12 @@ export class DrawingEngine {
         networkManager: WebSocketManager,
         newUserId: string
     ): Promise<MigrationResult> {
-        console.log('[DrawingEngine] Attaching network manager, transitioning to networked mode')
+        log.debug('Attaching network manager, transitioning to networked mode')
 
         this.networkManager = networkManager
         this.setupNetworkHandler()
 
-        console.log('[DrawingEngine] Network manager attached successfully')
+        log.debug('Network manager attached successfully')
 
         // Attach network to object manager and migrate local objects
         // Return the migration promise so caller can handle results
@@ -137,7 +141,7 @@ export class DrawingEngine {
 
                 case 'network:objectAdded': {
                     if (!isObjectAddedMessage(message)) {
-                        console.error('[DrawingEngine] Invalid objectAdded message')
+                        log.error('Invalid objectAdded message')
                         break
                     }
 
@@ -151,7 +155,7 @@ export class DrawingEngine {
 
                 case 'network:objectUpdated': {
                     if (!isObjectUpdatedMessage(message)) {
-                        console.error('[DrawingEngine] Invalid objectUpdated message')
+                        log.error('Invalid objectUpdate message')
                         break
                     }
                     
@@ -165,7 +169,7 @@ export class DrawingEngine {
                 }
                 case 'network:objectDeleted': {
                     if (!isObjectDeletedMessage(message)) {
-                        console.error('[DrawingEngine] Invalid objectDeleted message')
+                        log.error('Invalid objectDeleted message')
                         break
                     }
                     
@@ -178,7 +182,7 @@ export class DrawingEngine {
                 }
                 case 'network:sync':
                     if (!isSyncMessage(message)) {
-                        console.error('[DrawingEngine] Invalid sync message')
+                        log.error('Invalid sync message')
                         break
                     }
                     
@@ -189,7 +193,7 @@ export class DrawingEngine {
 
                 case 'network:userDisconnected':
                     if (!isUserDisconnectedMessage(message)) {
-                        console.error('[DrawingEngine] Invalid userDisconnected message')
+                        log.error('Invalid userDisconnected message')
                         break
                     }
                     
@@ -199,7 +203,7 @@ export class DrawingEngine {
 
                 case 'network:remoteCursorMove':
                     if (!isCursorMessage(message)) {
-                        console.error('[DrawingEngine] Invalid cursor message')
+                        log.error('Invalid cursor message')
                         break
                     }
                     
@@ -363,7 +367,7 @@ export class DrawingEngine {
                 try {
                     this.currentTool.renderPreview(this.ctx)
                 } catch (error) {
-                    console.error('[DrawingEngine] Failed to render tool preview:', error)
+                    log.error('Failed to render tool preview', error)
                 }
             }
 
@@ -373,7 +377,7 @@ export class DrawingEngine {
                     try {
                         this.renderRemoteCursor(this.ctx, cursor)
                     } catch (error) {
-                        console.error(`[DrawingEngine] Failed to render cursor for user ${cursor.userId}:`, error)
+                        log.error('Failed to render cursor', { userId: cursor.userId, error })
                     }
                 })
             }

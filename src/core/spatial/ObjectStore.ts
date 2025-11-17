@@ -9,6 +9,9 @@ import type { DrawingObjectData, Point, Bounds } from '../../shared/types/common
 import { QUADTREE_MIN_SIZE, QUADTREE_PADDING_MULTIPLIER } from '../../shared/constants'
 import { isValidObject } from '../../shared/validation'
 
+import { createLogger } from '../../shared/utils/logger'
+const log = createLogger('ObjectStore')
+
 // Type definitions for object data formats
 export type NestedObjectData = { id: string; type: string; data: DrawingObjectData; zIndex: number }
 export type FlatObjectData = DrawingObjectData
@@ -59,7 +62,7 @@ export class ObjectStore {
 
     addRemote(objectData: NestedObjectData | FlatObjectData): DrawingObject | null {
         if (!isValidObject(objectData)) {
-            console.error('[ObjectStore] Invalid object data received:', objectData)
+            log.error('Invalid object data received:', objectData)
             return null
         }
 
@@ -130,7 +133,7 @@ export class ObjectStore {
 
     updateRemoteObject(objectId: string, objectData: NestedObjectData | FlatObjectData): DrawingObject | null {
         if (!isValidObject(objectData)) {
-            console.error('[ObjectStore] Invalid object data for update:', objectData)
+            log.error('Invalid object data for update:', objectData)
             return null
         }
         
@@ -163,7 +166,7 @@ export class ObjectStore {
         // This prevents race condition where local objects are destroyed during sync
         objectDataArray.forEach((objData: DrawingObjectData) => {
             if (!isValidObject(objData)) {
-                console.error('[ObjectStore] Skipping invalid object:', objData)
+                log.error('Skipping invalid object:', objData)
                 return // Skip invalid objects
             }
 
@@ -371,7 +374,7 @@ export class ObjectStore {
                 try {
                     obj.render(ctx)
                 } catch (error) {
-                    console.error(`[ObjectStore] Failed to render object ${obj.id}:`, error)
+                    log.error('Failed to render object', { objectId: obj.id, error })
                 }
             })
 
@@ -382,7 +385,7 @@ export class ObjectStore {
                     try {
                         obj.render(ctx)
                     } catch (error) {
-                        console.error(`[ObjectStore] Failed to render selected object ${obj.id}:`, error)
+                        log.error('Failed to render selected object', { objectId: obj.id, error })
                     }
                 }
             })
@@ -392,7 +395,7 @@ export class ObjectStore {
                 try {
                     obj.render(ctx)
                 } catch (error) {
-                    console.error(`[ObjectStore] Failed to render object ${obj.id}:`, error)
+                    log.error('Failed to render object', { objectId: obj.id, error })
                 }
             })
         }
