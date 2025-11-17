@@ -5,7 +5,7 @@
  */
 import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
 import type { DrawingObjectData, Point } from '../../shared/types/common'
-import { clampCoordinate, clampBrushSize, validateColor } from '../../shared/utils/validation'
+import { clampCoordinate, clampBrushSize, validateColor, isValidObject } from '../../shared/validation'
 
 const STORAGE_KEY = 'whiteboard_local_objects'
 const DEBOUNCE_MS = 500 // Save after 500ms of inactivity
@@ -112,13 +112,27 @@ export class LocalStorageManager {
                 return { objects: [], maxZIndex: 0 }
             }
 
-            const objects = JSON.parse(data) as DrawingObjectData[]
-
-            if (objects.length === 0) {
+            const parsed = JSON.parse(data)
+            
+            if (!Array.isArray(parsed)) {
+                console.error('[LocalStorage] Invalid data format (not an array), clearing storage')
+                this.clear() // Clear corrupted data
                 return { objects: [], maxZIndex: 0 }
             }
 
-            const sanitizeObjects = objects.map(obj => this.sanitizeObjectData(obj))
+            if (parsed.length === 0) {
+                return { objects: [], maxZIndex: 0 }
+            }
+
+            const validObjects = parsed.filter((obj: unknown) => {
+                if (!isValidObject(obj)) {
+                    console.warn('[LocalStorage] Skipping invalid object:', obj)
+                    return false
+                }
+                return true
+            })
+
+            const sanitizeObjects = validObjects.map(obj => this.sanitizeObjectData(obj))
 
             let maxZIndex = 0
             sanitizeObjects.forEach((obj: DrawingObjectData) => {
@@ -133,6 +147,7 @@ export class LocalStorageManager {
                 context: 'LocalStorageManager',
                 code: ErrorCode.LOAD_FAILED
             })
+            this.clear() // clear currupt data
             return { objects: [], maxZIndex: 0 }
         }
     }

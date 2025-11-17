@@ -20,7 +20,7 @@ import {
     DefaultMessages,
     type ErrorCategoryType,
     type ErrorCodeType,
-} from './ErrorTypes'
+} from '../types/errors'
 
 interface ErrorHandlerOptions {
     context?: string
@@ -255,4 +255,4 @@ export class ErrorHandler {
 }
 
 // Export error types for convenience
-export { ErrorCategory, ErrorCode } from './ErrorTypes'
+export { ErrorCategory, ErrorCode } from '../types/errors'

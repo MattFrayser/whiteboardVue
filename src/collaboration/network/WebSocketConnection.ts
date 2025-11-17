@@ -2,6 +2,8 @@ import { actions, selectors, type NetworkStatus } from '../../shared/stores/AppS
 import { API_BASE_URL, WS_BASE_URL, AUTH_TIMEOUT } from '../../shared/constants'
 import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
 import type { StatusCallback, NetworkMessage } from '../../shared/types/network'
+import { parseJSON, isValidMessageStructure } from '../../shared/validation'
+
 
 /**
  * Handles low-level WebSocket connection lifecycle
@@ -95,7 +97,17 @@ export class WebSocketConnection {
             }
 
             this.socket.onmessage = (event: MessageEvent) => {
-                const msg = JSON.parse(event.data) as NetworkMessage
+                const msg = parseJSON(event.data)
+                if (!msg) {
+                    // parseJSON logs error, just return
+                    return
+                }
+
+                if (!isValidMessageStructure(msg)) {
+                    console.error('[WebSocket] Invalid message structure, ignoring')
+                    return
+                }
+
                 if (this.onMessageCallback) {
                     this.onMessageCallback(msg)
                 }

@@ -1,5 +1,4 @@
-/**
- * ErrorTypes
+ /* ErrorTypes
  *
  * Centralized error categories, codes, and user-friendly messages
  */

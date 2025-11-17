@@ -7,6 +7,7 @@ import { Text } from '../../drawing/objects/types/Text'
 import { DrawingObject } from '../../drawing/objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../../shared/types/common'
 import { QUADTREE_MIN_SIZE, QUADTREE_PADDING_MULTIPLIER } from '../../shared/constants'
+import { isValidObject } from '../../shared/validation'
 
 // Type definitions for object data formats
 export type NestedObjectData = { id: string; type: string; data: DrawingObjectData; zIndex: number }
@@ -57,6 +58,11 @@ export class ObjectStore {
     }
 
     addRemote(objectData: NestedObjectData | FlatObjectData): DrawingObject | null {
+        if (!isValidObject(objectData)) {
+            console.error('[ObjectStore] Invalid object data received:', objectData)
+            return null
+        }
+
         const obj = this.createObjectFromData(objectData)
         if (obj) {
             this.objects.push(obj)
@@ -123,6 +129,11 @@ export class ObjectStore {
     }
 
     updateRemoteObject(objectId: string, objectData: NestedObjectData | FlatObjectData): DrawingObject | null {
+        if (!isValidObject(objectData)) {
+            console.error('[ObjectStore] Invalid object data for update:', objectData)
+            return null
+        }
+        
         const obj = this.getObjectById(objectId)
         if (obj) {
             const oldBounds = obj.getBounds()
@@ -146,9 +157,16 @@ export class ObjectStore {
     }
 
     loadRemoteObjects(objectDataArray: DrawingObjectData[]): void {
+
+
         // Merge remote objects instead of replacing to preserve local objects
         // This prevents race condition where local objects are destroyed during sync
         objectDataArray.forEach((objData: DrawingObjectData) => {
+            if (!isValidObject(objData)) {
+                console.error('[ObjectStore] Skipping invalid object:', objData)
+                return // Skip invalid objects
+            }
+
             // Skip if object already exists (avoid duplicates)
             if (!this.getObjectById(objData.id)) {
                 const obj = this.createObjectFromData(objData)

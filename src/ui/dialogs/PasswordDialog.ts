@@ -7,7 +7,7 @@
  
 import { BaseDialog } from './BaseDialog'
 import type { PasswordDialogConfig } from './types'
-import { sanitizeRoomCode } from '../../shared/utils/validation'
+import { sanitizeRoomCode } from '../../shared/validation'
  
 export class PasswordDialog extends BaseDialog<string | null> {
     private config: PasswordDialogConfig
@@ -83,6 +83,13 @@ export class PasswordDialog extends BaseDialog<string | null> {
  
     private handleSubmit(): void {
         const password = this.passwordInput?.value.trim() || ''
-        this.close(password || null)
+        // TODO: visual message to user prompting to shorten vs just truncating
+        if (password && password.length > 20) {
+            console.warn('[PasswordDialog] Password too long, truncating')
+            this.close(password.substring(0, 128))
+        } else {
+            this.close(password || null)
+        }
     }
 }
+

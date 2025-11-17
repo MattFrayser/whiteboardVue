@@ -6,6 +6,7 @@ import type { DrawingObject } from '../../drawing/objects/DrawingObject'
 import { WebSocketConnection } from './WebSocketConnection'
 import { ReconnectionManager } from './ReconnectionManager'
 import { AckTracker } from './AckTracker'
+import { isValidMessageStructure } from '../../shared/validation'
 
 export class WebSocketManager {
     private connection: WebSocketConnection
@@ -110,6 +111,15 @@ export class WebSocketManager {
     }
 
     handleMessage(msg: NetworkMessage): void {
+        // Double check of msg
+        if (!isValidMessageStructure(msg)) {
+            ErrorHandler.silent(new Error('Invalid message structure'), {
+                context: 'WebSocketManager',
+                metadata: { msg }
+            })
+            return
+        }
+
         const handler = this.handlers.get(msg.type)
 
         if (handler) {

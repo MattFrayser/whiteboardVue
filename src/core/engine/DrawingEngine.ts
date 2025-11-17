@@ -15,6 +15,15 @@ import { ErrorHandler, ErrorCategory } from '../../shared/utils/ErrorHandler'
 import { selectors } from '../../shared/stores/AppState'
 import type { WebSocketManager } from '../../collaboration/network/WebSocketManager'
 import type { NetworkMessage, MigrationResult } from '../../shared/types/network'
+import { 
+    isObjectAddedMessage, 
+    isObjectUpdatedMessage, 
+    isObjectDeletedMessage,
+    isSyncMessage,
+    isCursorMessage,
+    isUserDisconnectedMessage,
+    sanitizeObjectData
+} from '../../shared/validation'
 
 export class DrawingEngine {
     canvas: HTMLCanvasElement
@@ -121,55 +130,79 @@ export class DrawingEngine {
         try {
             switch (message.type) {
                 case 'network:authenticated':
-                    if (message.userId) {
+                    if (message.userId && typeof message.userId === 'string') {
                         this.objectManager.setUserId(message.userId)
                     }
                     break
+
                 case 'network:objectAdded': {
-                    if (message.object) {
-                        const addedObj = this.objectManager.addRemoteObject(message.object)
-                        if (addedObj) {
-                            this.renderDirty()
-                        }
+                    if (!isObjectAddedMessage(message)) {
+                        console.error('[DrawingEngine] Invalid objectAdded message')
+                        break
+                    }
+
+                    const sanitized = sanitizeObjectData(message.object)
+                    const addedObj = this.objectManager.addRemoteObject(sanitized)
+                    if (addedObj) {
+                        this.renderDirty()
                     }
                     break
-                }
+                    }
+
                 case 'network:objectUpdated': {
-                    if (message.object) {
-                        const updatedObj = this.objectManager.getObjectById(message.object.id)
-                        if (updatedObj) {
-                            this.objectManager.updateRemoteObject(
-                                message.object.id,
-                                message.object
-                            )
-                            this.renderDirty()
-                        }
+                    if (!isObjectUpdatedMessage(message)) {
+                        console.error('[DrawingEngine] Invalid objectUpdated message')
+                        break
+                    }
+                    
+                    const obj = this.objectManager.getObjectById(message.object.id)
+                    if (obj) {
+                        const sanitized = sanitizeObjectData(message.object)
+                        this.objectManager.updateRemoteObject(sanitized.id, sanitized)
+                        this.renderDirty()
                     }
                     break
                 }
                 case 'network:objectDeleted': {
-                    if (message.objectId) {
-                        const deletedObj = this.objectManager.getObjectById(message.objectId)
-                        if (deletedObj) {
-                            this.objectManager.removeRemoteObject(message.objectId)
-                            this.renderDirty()
-                        }
+                    if (!isObjectDeletedMessage(message)) {
+                        console.error('[DrawingEngine] Invalid objectDeleted message')
+                        break
+                    }
+                    
+                    const deletedObj = this.objectManager.getObjectById(message.objectId)
+                    if (deletedObj) {
+                        this.objectManager.removeRemoteObject(message.objectId)
+                        this.renderDirty()
                     }
                     break
                 }
                 case 'network:sync':
-                    if (message.objects) {
-                        this.objectManager.loadRemoteObjects(message.objects)
-                        this.renderDirty()
+                    if (!isSyncMessage(message)) {
+                        console.error('[DrawingEngine] Invalid sync message')
+                        break
                     }
+                    
+                    const sanitized = message.objects.map(sanitizeObjectData)
+                    this.objectManager.loadRemoteObjects(sanitized)
+                    this.renderDirty()
                     break
+
                 case 'network:userDisconnected':
-                    if (message.userId) {
-                        this.remoteCursors.delete(message.userId)
-                        this.renderDirty()
+                    if (!isUserDisconnectedMessage(message)) {
+                        console.error('[DrawingEngine] Invalid userDisconnected message')
+                        break
                     }
+                    
+                    this.remoteCursors.delete(message.userId)
+                    this.renderDirty()
                     break
+
                 case 'network:remoteCursorMove':
+                    if (!isCursorMessage(message)) {
+                        console.error('[DrawingEngine] Invalid cursor message')
+                        break
+                    }
+                    
                     this.handleRemoteCursor(message)
                     break
             }
@@ -193,13 +226,17 @@ export class DrawingEngine {
             return
         }
 
-        const { userId, x, y, color, tool } = message
-        this.remoteCursors.set(userId, {
-            userId,
+        // clamp size
+        const MAX_CURSOR_COORD = 100000
+        const x = Math.max(-MAX_CURSOR_COORD, Math.min(MAX_CURSOR_COORD, message.x))
+        const y = Math.max(-MAX_CURSOR_COORD, Math.min(MAX_CURSOR_COORD, message.y))
+
+        this.remoteCursors.set(message.userId, {
+            userId: message.userId,
             x,
             y,
-            color,
-            tool,
+            color: message.color,
+            tool: message.tool,
             lastUpdate: Date.now(),
         })
         this.renderDirty()

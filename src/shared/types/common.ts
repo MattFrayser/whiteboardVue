@@ -33,6 +33,7 @@ export interface DrawingObjectData {
     y: number
     color?: string
     width?: number
+    height?: number
     points?: Point[]
     text?: string
     fontSize?: number
@@ -43,6 +44,7 @@ export interface DrawingObjectData {
     radius?: number
     timestamp?: number
     userId?: string
+    strokeWidth?: number
     // Additional properties for shapes
     x1?: number
     y1?: number

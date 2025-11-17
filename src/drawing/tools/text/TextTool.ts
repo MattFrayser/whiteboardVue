@@ -97,13 +97,18 @@ export class TextTool extends Tool {
 
         const text = this.inputElement.value.trim()
         if (text) {
+            const MAX_TEXT_LENGTH = 10000
+            const sanitizedText = text.length > MAX_TEXT_LENGTH 
+                ? text.substring(0, MAX_TEXT_LENGTH) 
+                : text
+
             // Create text object
             const textObj = new Text(null, {
                 id: '',
                 type: 'text',
                 x: this.Position.x,
                 y: this.Position.y,
-                text,
+                text: sanitizedText,
                 color: selectors.getColor(),
                 fontSize: selectors.getBrushSize() * FONT_SIZE_MULTIPLIER,
             }, 0)
