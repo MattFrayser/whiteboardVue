@@ -7,7 +7,7 @@
  
 import { BaseDialog } from './BaseDialog'
 import type { PasswordDialogConfig } from './types'
-import { sanitizeRoomCode } from '../../utils/validation'
+import { sanitizeRoomCode } from '../../shared/utils/validation'
  
 export class PasswordDialog extends BaseDialog<string | null> {
     private config: PasswordDialogConfig

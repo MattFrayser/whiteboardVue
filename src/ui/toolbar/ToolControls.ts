@@ -1,8 +1,8 @@
-import { appState, actions } from '../../stores/AppState'
-import type { Tool } from '../../stores/AppState'
-import type { DrawingEngine } from '../../engine/DrawingEngine'
-import { getCursorForTool } from '../../utils/getCursorForTool'
-import { clampBrushSize } from '../../utils/validation'
+import { appState, actions } from '../../shared/stores/AppState'
+import type { Tool } from '../../shared/stores/AppState'
+import type { DrawingEngine } from '../../core/engine/DrawingEngine'
+import { getCursorForTool } from '../../shared/utils/getCursorForTool'
+import { clampBrushSize } from '../../shared/utils/validation'
 
 export class ToolControls {
     engine: DrawingEngine

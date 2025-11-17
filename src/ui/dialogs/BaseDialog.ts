@@ -10,7 +10,7 @@
  * - Promise-based show/hide API
  */
  
-import { DIALOG_FOCUS_DELAY } from '../../constants'
+import { DIALOG_FOCUS_DELAY } from '../../shared/constants'
  
 export abstract class BaseDialog<T = any> {
     protected overlay: HTMLElement | null = null

@@ -1,4 +1,4 @@
-import type { DrawingEngine } from '../../engine/DrawingEngine'
+import type { DrawingEngine } from '../../core/engine/DrawingEngine'
 import { ColorPicker } from './ColorPicker'
 import { ToolControls } from './ToolControls'
 
