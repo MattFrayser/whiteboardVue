@@ -1,6 +1,6 @@
-import { DrawingObject } from './DrawingObject'
-import { DEFAULT_COLOR, LINE_CLICK_TOLERANCE } from '../constants'
-import type { Point, Bounds, DrawingObjectData } from '../types'
+import { DrawingObject } from '../DrawingObject'
+import { DEFAULT_COLOR, LINE_CLICK_TOLERANCE } from '../../constants'
+import type { Point, Bounds, DrawingObjectData } from '../../types'
 
 export class Line extends DrawingObject {
     constructor(id: string | null, data: DrawingObjectData, zIndex: number) {

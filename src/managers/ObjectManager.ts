@@ -3,12 +3,14 @@ import { HistoryManager } from './HistoryManager'
 import { SelectionManager } from './SelectionManager'
 import { ObjectStore } from './ObjectStore'
 import { LocalStorageManager } from './LocalStorageManager'
-import { AddObjectOperation, DeleteObjectOperation, UpdateObjectOperation, MoveObjectsOperation } from './operations'
-import type { Operation } from './operations/Operation'
+import { AddObjectOperation, DeleteObjectOperation } from './operations'
 import type { WebSocketManager } from '../network/WebSocketManager'
 import type { DrawingObject } from '../objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../types/common'
 import type { MigrationResult } from '../types/network'
+
+// Import extracted algorithms
+import { executePaste, broadcastOperationEffect, prepareNetworkMigration, broadcastLocalObjects } from './objectManagerHelper'
 
 export class ObjectManager {
     networkManager: WebSocketManager | null
@@ -23,9 +25,9 @@ export class ObjectManager {
 
     constructor(networkManager: WebSocketManager | null) {
         this.networkManager = networkManager
-        this.userId = null // Will be set by network manager
-        this.nextZIndex = 0 // Track next available zIndex
-        this.isLocalMode = !networkManager // Track if in local mode
+        this.userId = null
+        this.nextZIndex = 0
+        this.isLocalMode = !networkManager
 
         // Initialize managers
         this.objectStore = new ObjectStore()
@@ -40,44 +42,26 @@ export class ObjectManager {
         }
     }
 
-    /**
-     * Set the current user ID (called by network manager)
-     */
     setUserId(userId: string): void {
         this.userId = userId
 
-        // In local mode, update loaded objects' userId
         if (this.isLocalMode) {
             const allObjects = this.objectStore.getAllObjects()
-            // Update userId of all loaded objects to current session
             allObjects.forEach(obj => {
                 obj.userId = userId
             })
-            // Note: With operation-based history, we don't need to update history here
-            // History will be populated as the user makes changes
         }
     }
 
-    /**
-     * Load objects from localStorage (local-first mode)
-     */
     loadFromLocalStorage(): void {
         const { objects: savedObjects, maxZIndex } = this.localStorageManager.loadObjects()
         if (savedObjects.length > 0) {
             console.log(`[ObjectManager] Loading ${savedObjects.length} objects from localStorage`)
             this.objectStore.loadRemoteObjects(savedObjects)
-
-            // Update nextZIndex from loaded objects
             this.nextZIndex = Math.max(this.nextZIndex, maxZIndex)
-
-            // Note: Don't update history here - userId isn't set yet
-            // History will be updated in setUserId() after objects' userId is updated
         }
     }
 
-    /**
-     * Save objects to localStorage (local-first mode)
-     */
     saveToLocalStorage(): void {
         if (this.isLocalMode) {
             const allObjects = this.objectStore.getAllObjects()
@@ -86,105 +70,39 @@ export class ObjectManager {
     }
 
     /**
-     * Attach network manager after initialization (for local-first mode)
-     * Migrates local objects to networked mode and broadcasts to server
-     * @param {WebSocketManager} networkManager - The network manager to attach
-     * @param {string} newUserId - The server-assigned userId to replace local userId
-     * @returns {Promise} Promise that resolves with migration results {succeeded, failed}
+     * Attach network manager - delegates to migration algorithm
      */
-    attachNetworkManager(networkManager: WebSocketManager, newUserId: string): Promise<MigrationResult> {
-        console.log('[ObjectManager] Attaching network manager, migrating from local to networked mode')
+    async attachNetworkManager(
+        networkManager: WebSocketManager, 
+        newUserId: string
+    ): Promise<MigrationResult> {
+        console.log('[ObjectManager] Attaching network manager')
 
         const oldUserId = this.userId
 
-        // Update network manager and userId
+        // Update state
         this.networkManager = networkManager
         this.userId = newUserId
-        this.isLocalMode = false // No longer in local mode
+        this.isLocalMode = false
 
-        // Clear localStorage and disable auto-save (now using network)
-        this.localStorageManager.clear()
-        this.localStorageManager.disable()
-
-        // Migrate all local objects to new userId
-        const localObjects = this.getAllObjects().filter(obj => obj.userId === oldUserId)
-        console.log(`[ObjectManager] Migrating ${localObjects.length} local objects to userId: ${newUserId}`)
-
-        localObjects.forEach(obj => {
-            obj.userId = newUserId
+        // Use extracted migration algorithm
+        const objectsToMigrate = prepareNetworkMigration({
+            oldUserId,
+            newUserId,
+            getAllObjects: () => this.getAllObjects(),
+            clearLocalStorage: () => this.localStorageManager.clear(),
+            disableLocalStorage: () => this.localStorageManager.disable(),
+            migrateHistoryUserId: (oldId, newId) => this.historyManager.migrateUserId(oldId, newId)
         })
 
-        // Migrate history manager userId
-        if (this.historyManager && oldUserId) {
-            this.historyManager.migrateUserId(oldUserId, newUserId)
-        }
-
-        console.log('[ObjectManager] Network attachment complete')
-
-        // Return migration promise so caller can handle results
-        return this.migrateLocalObjectsToNetwork(localObjects, networkManager)
+        // Broadcast to server
+        return broadcastLocalObjects(objectsToMigrate, networkManager)
     }
 
-    /**
-     * Migrate local objects to network with server confirmation
-     * Returns results of migration for error handling
-     */
-    async migrateLocalObjectsToNetwork(objects: DrawingObject[], networkManager: WebSocketManager): Promise<MigrationResult> {
-        if (!objects || objects.length === 0) {
-            console.log('[ObjectManager] No objects to migrate')
-            return { succeeded: [], failed: [] }
-        }
+    // ============================================================
+    // Public API
+    // ============================================================
 
-        console.log(`[ObjectManager] Migrating ${objects.length} local objects to network`)
-
-        // Use Promise.allSettled to track both successes and failures
-        const results = await Promise.allSettled(
-            objects.map(obj =>
-                networkManager.broadcastObjectAddedWithConfirmation(obj)
-                    .then(() => ({ status: 'success', objectId: obj.id }))
-                    .catch(err => ({ status: 'error', objectId: obj.id, error: err.message }))
-            )
-        )
-
-        // Separate succeeded and failed objects
-        const succeeded: string[] = []
-        const failed: Array<{ objectId: string; error: string }> = []
-
-        results.forEach((result, index) => {
-            if (result.status === 'fulfilled') {
-                const migrationResult = result.value
-                if (migrationResult.status === 'success') {
-                    succeeded.push(migrationResult.objectId)
-                } else if (migrationResult.status === 'error' && 'error' in migrationResult) {
-                    failed.push({
-                        objectId: migrationResult.objectId,
-                        error: migrationResult.error
-                    })
-                }
-            } else {
-                // Promise rejected
-                const obj = objects[index]
-                if (obj) {
-                    failed.push({
-                        objectId: obj.id,
-                        error: result.reason?.message || 'Unknown error'
-                    })
-                }
-            }
-        })
-
-        console.log(`[ObjectManager] Migration complete: ${succeeded.length} succeeded, ${failed.length} failed`)
-
-        if (failed.length > 0) {
-            console.error('[ObjectManager] Failed objects:', failed)
-        }
-
-        return { succeeded, failed }
-    }
-
-    /**
-     * Public API getters
-     */
     get selectedObjects(): DrawingObject[] {
         return this.selectionManager.selectedObjects
     }
@@ -193,16 +111,29 @@ export class ObjectManager {
         return this.objectStore.getAllObjects()
     }
 
-    /**
-     * Add object locally (triggers history and network broadcast)
-     */
+    getObjectById(id: string): DrawingObject | undefined {
+        return this.objectStore.getObjectById(id)
+    }
+
+    getObjectAt(point: Point): DrawingObject | null {
+        return this.objectStore.getObjectAt(point)
+    }
+
+    createObjectFromData(data: DrawingObjectData): DrawingObject | null {
+        return this.objectStore.createObjectFromData(data)
+    }
+
+    // ============================================================
+    // Object CRUD Operations
+    // ============================================================
+
+    // Add object locally (triggers history and network broadcast)
     addObject(object: DrawingObject, saveHistory: boolean = true): DrawingObject {
         // Update userId to current user when adding
         if (this.userId) {
             object.userId = this.userId
         }
 
-        // Assign zIndex if not already set
         if (object.zIndex === undefined || object.zIndex === null) {
             object.zIndex = this.nextZIndex++
         } else {
@@ -210,7 +141,6 @@ export class ObjectManager {
             this.nextZIndex = Math.max(this.nextZIndex, object.zIndex + 1)
         }
 
-        // Add to store
         this.objectStore.addLocal(object)
 
         // Record operation to history AFTER adding
@@ -222,7 +152,6 @@ export class ObjectManager {
         // Save to localStorage if in local mode
         this.saveToLocalStorage()
 
-        // Broadcast to network
         if (this.networkManager && this.networkManager.isConnected()) {
             this.networkManager.broadcastObjectAdded(object)
         }
@@ -230,9 +159,7 @@ export class ObjectManager {
         return object
     }
 
-    /**
-     * Remove object locally (triggers history and network broadcast)
-     */
+    //Remove object locally (triggers history and network broadcast)
     removeObject(object: DrawingObject, saveHistory: boolean = true): boolean {
         // Record operation to history BEFORE removing (to capture object data)
         if (saveHistory && this.userId) {
@@ -242,10 +169,8 @@ export class ObjectManager {
 
         const result = this.objectStore.removeLocal(object)
         if (result !== null) {
-            // Save to localStorage if in local mode
             this.saveToLocalStorage()
 
-            // Broadcast to network
             if (this.networkManager && this.networkManager.isConnected()) {
                 this.networkManager.broadcastObjectDeleted(object)
             }
@@ -254,21 +179,13 @@ export class ObjectManager {
         return false
     }
 
-    /**
-     * Update object's position in quadtree and rebuild if bounds exceeded
-     */
     updateObjectInQuadtree(object: DrawingObject, oldBounds: Bounds, newBounds: Bounds | null = null): void {
         this.objectStore.updateObjectInQuadtree(object, oldBounds, newBounds)
     }
 
-    /**
-     * Broadcast object update to network
-     */
-    broadcastObjectUpdate(object: DrawingObject): void {
-        if (this.networkManager && this.networkManager.isConnected()) {
-            this.networkManager.broadcastObjectUpdated(object)
-        }
-    }
+    // ============================================================
+    // Selection Operations (delegated to SelectionManager)
+    // ============================================================
 
     selectObject(object: DrawingObject, multi = false): void {
         this.selectionManager.selectObject(object, multi)
@@ -282,10 +199,6 @@ export class ObjectManager {
         this.selectionManager.deleteSelected()
     }
 
-    getObjectAt(point: Point): DrawingObject | null {
-        return this.objectStore.getObjectAt(point)
-    }
-
     selectObjectsInRect(rect: Bounds, multi = false): void {
         this.selectionManager.selectObjectsInRect(rect, multi)
     }
@@ -294,13 +207,10 @@ export class ObjectManager {
         this.selectionManager.moveSelected(dx, dy)
     }
 
-    /**
-     * Rebuild the entire quadtree, optionally expanding bounds
-     * Call when objects exceed current bounds or structure becomes corrupted
-     */
-    rebuildQuadtree(expandBounds = false): void {
-        this.objectStore.rebuildQuadtree(expandBounds)
-    }
+
+    // ============================================================
+    // Clipboard Operations
+    // ============================================================
 
     copySelected(): void {
         this.clipboardManager.copy(this.selectedObjects)
@@ -322,50 +232,16 @@ export class ObjectManager {
 
         this.clearSelection()
 
-        const clipboard = this.clipboardManager.getClipboard()
-        const newObjects: DrawingObject[] = []
-
-        clipboard.forEach(data => {
-            // Shallow clone with new ID (null triggers ID generation in constructor)
-            const clonedData = { ...data, id: null as unknown as string }
-            const newObject = this.createObjectFromData(clonedData)
-            if (newObject) {
-                // Don't save history for each object - we'll save once at the end
-                this.addObject(newObject, false)
-                newObjects.push(newObject)
-            }
-        })
-
-        // Bounding box of all objects
-        let minX = Infinity,
-            minY = Infinity
-        let maxX = -Infinity,
-            maxY = -Infinity
-
-        newObjects.forEach(obj => {
-            const bounds = obj.getBounds()
-            minX = Math.min(minX, bounds.x)
-            minY = Math.min(minY, bounds.y)
-            maxX = Math.max(maxX, bounds.x + bounds.width)
-            maxY = Math.max(maxY, bounds.y + bounds.height)
-        })
-
-        // Group center offset to cursor
-        const groupCenterX = (minX + maxX) / 2
-        const groupCenterY = (minY + maxY) / 2
-
-        const dx = x - groupCenterX
-        const dy = y - groupCenterY
-
-        newObjects.forEach(obj => {
-            obj.move(dx, dy)
-            this.selectObject(obj, true)
+        const newObjects = executePaste({
+            clipboardData: this.clipboardManager.getClipboard(),
+            targetPosition: { x, y },
+            createObject: (data) => this.createObjectFromData(data),
+            addObjectWithoutHistory: (obj) => this.addObject(obj, false),
+            selectObject: (obj, multi) => this.selectObject(obj, multi)
         })
 
         // Broadcast updates to network
-        newObjects.forEach(obj => {
-            this.broadcastObjectUpdate(obj)
-        })
+        newObjects.forEach(obj => this.broadcastObjectUpdate(obj))
 
         // Record add operations for all pasted objects
         if (this.userId) {
@@ -384,23 +260,20 @@ export class ObjectManager {
             return
         }
 
-        // Get the operation to undo
         const operation = this.historyManager.undo()
-        if (!operation) {
-            return
-        }
+        if (!operation) return
 
-        // Execute the undo (reverses the operation)
         operation.undo(this.objectStore)
-
-        // Clear selection after undo
         this.clearSelection()
-
-        // Save to localStorage if in local mode
         this.saveToLocalStorage()
 
-        // Broadcast the change to network based on operation type
-        this.broadcastOperationEffect(operation, true)
+        if (this.networkManager) {
+            broadcastOperationEffect(operation, true, {
+                networkManager: this.networkManager,
+                getObjectById: (id) => this.getObjectById(id),
+                createObjectFromData: (data) => this.createObjectFromData(data)
+            })
+        }
     }
 
     redo(): void {
@@ -408,140 +281,46 @@ export class ObjectManager {
             return
         }
 
-        // Get the operation to redo
         const operation = this.historyManager.redo()
-        if (!operation) {
-            return
-        }
+        if (!operation) return
 
-        // Execute the redo (re-applies the operation)
         operation.execute(this.objectStore)
-
-        // Clear selection after redo
         this.clearSelection()
-
-        // Save to localStorage if in local mode
         this.saveToLocalStorage()
 
-        // Broadcast the change to network based on operation type
-        this.broadcastOperationEffect(operation, false)
-    }
+        if (this.networkManager) {
+            broadcastOperationEffect(operation, false, {
+                networkManager: this.networkManager,
+                getObjectById: (id) => this.getObjectById(id),
+                createObjectFromData: (data) => this.createObjectFromData(data)
+            })
+        }}
 
-    /**
-     * Broadcast the effect of an operation to the network
-     * @param operation - The operation whose effect to broadcast
-     * @param isUndo - true if undoing, false if redoing
-     */
-    private broadcastOperationEffect(operation: Operation, isUndo: boolean): void {
-        if (!this.networkManager || !this.networkManager.isConnected()) {
-            return
-        }
+    // ============================================================
+    // Remote Operations (from network)
+    // - remote ops dont affect history
+    // ============================================================
 
-        switch (operation.type) {
-            case 'add': {
-                // Add operation: undo = delete, redo = add
-                const addOp = operation as AddObjectOperation
-                const obj = this.objectStore.getObjectById(addOp.objectData.id)
-                if (isUndo) {
-                    // Object was deleted by undo
-                    if (addOp.objectData) {
-                        // Create temp object to broadcast deletion
-                        const tempObj = this.objectStore.createObjectFromData(addOp.objectData)
-                        if (tempObj) {
-                            this.networkManager.broadcastObjectDeleted(tempObj)
-                        }
-                    }
-                } else {
-                    // Object was added by redo
-                    if (obj) {
-                        this.networkManager.broadcastObjectAdded(obj)
-                    }
-                }
-                break
-            }
-            case 'delete': {
-                // Delete operation: undo = add, redo = delete
-                const deleteOp = operation as DeleteObjectOperation
-                const obj = this.objectStore.getObjectById(deleteOp.objectData.id)
-                if (isUndo) {
-                    // Object was added back by undo
-                    if (obj) {
-                        this.networkManager.broadcastObjectAdded(obj)
-                    }
-                } else {
-                    // Object was deleted by redo
-                    if (deleteOp.objectData) {
-                        const tempObj = this.objectStore.createObjectFromData(deleteOp.objectData)
-                        if (tempObj) {
-                            this.networkManager.broadcastObjectDeleted(tempObj)
-                        }
-                    }
-                }
-                break
-            }
-            case 'update': {
-                // Update operation: both undo and redo are updates
-                const updateOp = operation as UpdateObjectOperation
-                const obj = this.objectStore.getObjectById(updateOp.objectId)
-                if (obj) {
-                    this.networkManager.broadcastObjectUpdated(obj)
-                }
-                break
-            }
-            case 'move': {
-                // Move operation: both undo and redo are moves
-                // Broadcast all moved objects as updates
-                const moveOp = operation as MoveObjectsOperation
-                for (const objectId of moveOp.objectIds) {
-                    const obj = this.objectStore.getObjectById(objectId)
-                    if (obj) {
-                        this.networkManager.broadcastObjectUpdated(obj)
-                    }
-                }
-                break
-            }
-        }
-    }
-
-    createObjectFromData(data: DrawingObjectData): DrawingObject | null {
-        return this.objectStore.createObjectFromData(data)
-    }
-
-    /**
-     * Get object by ID (for remote updates)
-     */
-    getObjectById(id: string): DrawingObject | undefined {
-        return this.objectStore.getObjectById(id)
-    }
-
-    /**
-     * Add object from network (no history, no local broadcast)
-     */
     addRemoteObject(objectData: DrawingObjectData): DrawingObject | null {
         return this.objectStore.addRemote(objectData)
     }
 
-    /**
-     * Update object from network (no history, no local broadcast)
-     */
     updateRemoteObject(objectId: string, objectData: DrawingObjectData): DrawingObject | null {
         return this.objectStore.updateRemoteObject(objectId, objectData)
     }
 
-    /**
-     * Remove object from network (no history, no local broadcast)
-     */
     removeRemoteObject(objectId: string): boolean {
         const result = this.objectStore.removeRemote(objectId)
         return result !== null
     }
 
-    /**
-     * Load objects from network (full sync)
-     */
     loadRemoteObjects(objectDataArray: DrawingObjectData[]): void {
         this.objectStore.loadRemoteObjects(objectDataArray)
     }
+
+    // ============================================================
+    // Rendering
+    // ============================================================
 
     render(ctx: CanvasRenderingContext2D, viewport: Bounds | null = null): void {
         this.objectStore.render(ctx, viewport, this.selectedObjects)

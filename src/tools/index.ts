@@ -1,23 +1,20 @@
 /**
  * Tool Registration
  *
- * This file registers all available tools with the ToolRegistry.
  * To add a new tool:
  * 1. Create your tool class extending Tool
  * 2. Import it here
  * 3. Call ToolRegistry.register() with metadata
- *
- * That's it! No need to modify DrawingEngine or other core files.
  */
 
-import { ToolRegistry } from './ToolRegistry'
-import { DrawTool } from './DrawTool'
-import { SelectTool } from './SelectTool'
-import { EraserTool } from './EraserTool'
-import { CircleTool } from './CircleTool'
-import { RectangleTool } from './RectangleTool'
-import { LineTool } from './LineTool'
-import { TextTool } from './TextTool'
+import { ToolRegistry } from './base/ToolRegistry'
+import { DrawTool } from './drawing/DrawTool'
+import { SelectTool } from './select/SelectTool'
+import { EraserTool } from './drawing/EraserTool'
+import { CircleTool } from './shapes/CircleTool'
+import { RectangleTool } from './shapes/RectangleTool'
+import { LineTool } from './shapes/LineTool'
+import { TextTool } from './text/TextTool'
 
 // Register all tools
 ToolRegistry.register('draw', DrawTool, {
@@ -29,7 +26,7 @@ ToolRegistry.register('draw', DrawTool, {
 ToolRegistry.register('select', SelectTool, {
     name: 'select',
     cursor: 'default',
-    keyboardShortcuts: ['s', 'v'], // s for select, v for select (common in design tools)
+    keyboardShortcuts: ['s', 'v'], // s for select, v for select 
 })
 
 ToolRegistry.register('eraser', EraserTool, {

@@ -1,7 +1,7 @@
-import { DrawingObject } from './DrawingObject'
-import { DEFAULT_COLOR } from '../constants'
-import type { Bounds, DrawingObjectData } from '../types'
-import { clampCoordinate, clampBrushSize, validateColor } from '../utils/validation'
+import { DrawingObject } from '../DrawingObject'
+import { DEFAULT_COLOR } from '../../constants'
+import type { Bounds, DrawingObjectData } from '../../types'
+import { clampCoordinate, clampBrushSize, validateColor } from '../../utils/validation'
 
 export class Stroke extends DrawingObject {
     constructor(id: string | null, data: DrawingObjectData, zIndex: number) {

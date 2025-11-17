@@ -10,7 +10,7 @@ export class DrawingObject {
     zIndex: number
 
     constructor(id: string | null, type: string, data: DrawingObjectData, zIndex: number) {
-        this.id = id || this.generateId()
+        this.id = id ?? this.generateId()
         this.type = type
         this.data = data
         this.selected = false

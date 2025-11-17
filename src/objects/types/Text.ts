@@ -1,6 +1,6 @@
-import { DrawingObject } from './DrawingObject'
-import { DEFAULT_COLOR, MIN_FONT_SIZE } from '../constants'
-import type { Point, Bounds, DrawingObjectData, ResizeHandle } from '../types'
+import { DrawingObject } from '../DrawingObject'
+import { DEFAULT_COLOR, MIN_FONT_SIZE } from '../../constants'
+import type { Point, Bounds, DrawingObjectData, ResizeHandle } from '../../types'
 
 export class Text extends DrawingObject {
     textWidth: number = 0

@@ -8,6 +8,24 @@ import { ConnectionStatusIndicator } from './ui/ConnectionStatusIndicator'
 import { SessionManager } from './network/SessionManager'
 import { appState, actions } from './stores/AppState'
 import { ErrorHandler } from './utils/ErrorHandler'
+import { API_BASE_URL, WS_BASE_URL } from './constants'
+
+function validateSecureConnection(): void {
+    const isDevelopment = import.meta.env.DEV
+    const wsUrl = WS_BASE_URL 
+    const apiUrl = API_BASE_URL
+
+    if (!isDevelopment) {
+        if (!wsUrl.startsWith('wss://')) {
+            throw new Error("Production must use WSS")
+        }
+        if (!apiUrl.startsWith('https://')) {
+            throw new Error("Production must use HTTPS")
+        }
+    } else {
+        console.warn("Development: using insecure protocols")
+    }
+}
 
 // Generate temporary local userId for local-first mode
 // This will be replaced with server-assigned userId when session is created
@@ -15,6 +33,7 @@ const generateLocalUserId = () => {
     return 'local-' + Math.random().toString(36).substring(2, 11)
 }
 
+validateSecureConnection()
 const localUserId = generateLocalUserId()
 console.log('[App] Starting in local mode with temporary userId:', localUserId)
 

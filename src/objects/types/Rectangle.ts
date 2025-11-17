@@ -1,6 +1,6 @@
-import { DrawingObject } from './DrawingObject'
-import { DEFAULT_COLOR } from '../constants'
-import type { Bounds, DrawingObjectData } from '../types'
+import { DrawingObject } from '../DrawingObject'
+import { DEFAULT_COLOR } from '../../constants'
+import type { Bounds, DrawingObjectData } from '../../types'
 
 export class Rectangle extends DrawingObject {
     constructor(id: string | null, data: DrawingObjectData, zIndex: number) {

@@ -10,12 +10,12 @@
  * That's it! No need to modify ObjectStore or other core files.
  */
 
-import { ObjectRegistry } from './ObjectRegistry'
-import { Stroke } from './Stroke'
-import { Circle } from './Circle'
-import { Rectangle } from './Rectangle'
-import { Line } from './Line'
-import { Text } from './Text'
+import { ObjectRegistry } from './registry/ObjectRegistry'
+import { Stroke } from './types/Stroke'
+import { Circle } from './types/Circle'
+import { Rectangle } from './types/Rectangle'
+import { Line } from './types/Line'
+import { Text } from './types/Text'
 
 // Register all object types
 ObjectRegistry.register('stroke', Stroke)

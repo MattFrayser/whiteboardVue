@@ -1,5 +1,5 @@
-import { DrawingObject } from './DrawingObject'
-import { DEFAULT_COLOR } from '../constants'
+import { DrawingObject } from '../DrawingObject'
+import { DEFAULT_COLOR } from '../../constants'
 import type { Point, Bounds, DrawingObjectData } from '../types'
 
 export class Circle extends DrawingObject {
