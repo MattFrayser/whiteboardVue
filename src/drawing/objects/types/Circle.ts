@@ -1,18 +1,19 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR } from '../../../shared/constants'
-import type { Point, Bounds, DrawingObjectData } from '../../../shared/types'
-export class Circle extends DrawingObject {
-    constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
+import type { Point, Bounds, CircleData } from '../../../shared/types'
+
+export class Circle extends DrawingObject<CircleData> {
+    constructor(id: string | null, data: CircleData, zIndex: number) {
         super(id, 'circle', data, zIndex)
     }
 
     override getBounds(): Bounds {
         const radius = Math.sqrt(
-            Math.pow(this.data.x2! - this.data.x1!, 2) + Math.pow(this.data.y2! - this.data.y1!, 2)
+            Math.pow(this.data.x2 - this.data.x1, 2) + Math.pow(this.data.y2 - this.data.y1, 2)
         )
         return {
-            x: this.data.x1! - radius,
-            y: this.data.y1! - radius,
+            x: this.data.x1 - radius,
+            y: this.data.y1 - radius,
             width: radius * 2,
             height: radius * 2,
         }
@@ -20,20 +21,20 @@ export class Circle extends DrawingObject {
 
     override containsPoint(point: Point): boolean {
         const radius = Math.sqrt(
-            Math.pow(this.data.x2! - this.data.x1!, 2) + Math.pow(this.data.y2! - this.data.y1!, 2)
+            Math.pow(this.data.x2 - this.data.x1, 2) + Math.pow(this.data.y2 - this.data.y1, 2)
         )
         const distance = Math.sqrt(
-            Math.pow(point.x - this.data.x1!, 2) + Math.pow(point.y - this.data.y1!, 2)
+            Math.pow(point.x - this.data.x1, 2) + Math.pow(point.y - this.data.y1, 2)
         )
 
         return distance <= radius
     }
 
     override move(dx: number, dy: number): void {
-        this.data.x1! += dx
-        this.data.y1! += dy
-        this.data.x2! += dx
-        this.data.y2! += dy
+        this.data.x1 += dx
+        this.data.y1 += dy
+        this.data.x2 += dx
+        this.data.y2 += dy
     }
 
     override applyBounds(newBounds: Bounds, handleIndex?: number): void {
@@ -114,17 +115,17 @@ export class Circle extends DrawingObject {
     }
     override render(ctx: CanvasRenderingContext2D): void {
         const radius = Math.sqrt(
-            Math.pow(this.data.x2! - this.data.x1!, 2) + Math.pow(this.data.y2! - this.data.y1!, 2)
+            Math.pow(this.data.x2 - this.data.x1, 2) + Math.pow(this.data.y2 - this.data.y1, 2)
         )
 
         ctx.strokeStyle = this.data.color || DEFAULT_COLOR
         ctx.lineWidth = this.data.width || 2
-        ctx.fillStyle = (this.data as { fill?: string }).fill || 'transparent'
+        ctx.fillStyle = this.data.fill || 'transparent'
 
         ctx.beginPath()
-        ctx.arc(this.data.x1!, this.data.y1!, radius, 0, Math.PI * 2)
+        ctx.arc(this.data.x1, this.data.y1, radius, 0, Math.PI * 2)
 
-        if ((this.data as { fill?: string }).fill) {
+        if (this.data.fill) {
             ctx.fill()
         }
         ctx.stroke()

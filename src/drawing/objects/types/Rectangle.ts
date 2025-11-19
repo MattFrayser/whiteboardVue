@@ -1,18 +1,18 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR } from '../../../shared/constants'
-import type { Bounds, DrawingObjectData } from '../../../shared/types'
+import type { Bounds, RectangleData } from '../../../shared/types'
 
-export class Rectangle extends DrawingObject {
-    constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
+export class Rectangle extends DrawingObject<RectangleData> {
+    constructor(id: string | null, data: RectangleData, zIndex: number) {
         super(id, 'rectangle', data, zIndex)
     }
 
     override getBounds(): Bounds {
         return {
-            x: Math.min(this.data.x1!, this.data.x2!),
-            y: Math.min(this.data.y1!, this.data.y2!),
-            width: Math.abs(this.data.x2! - this.data.x1!),
-            height: Math.abs(this.data.y2! - this.data.y1!),
+            x: Math.min(this.data.x1, this.data.x2),
+            y: Math.min(this.data.y1, this.data.y2),
+            width: Math.abs(this.data.x2 - this.data.x1),
+            height: Math.abs(this.data.y2 - this.data.y1),
         }
     }
 
@@ -24,10 +24,10 @@ export class Rectangle extends DrawingObject {
     }
 
     override move(dx: number, dy: number): void {
-        this.data.x1! += dx
-        this.data.y1! += dy
-        this.data.x2! += dx
-        this.data.y2! += dy
+        this.data.x1 += dx
+        this.data.y1 += dy
+        this.data.x2 += dx
+        this.data.y2 += dy
     }
 
     override render(ctx: CanvasRenderingContext2D): void {
@@ -35,9 +35,9 @@ export class Rectangle extends DrawingObject {
 
         ctx.strokeStyle = this.data.color || DEFAULT_COLOR
         ctx.lineWidth = this.data.width || 2
-        ctx.fillStyle = (this.data as { fill?: string }).fill || 'transparent'
+        ctx.fillStyle = this.data.fill || 'transparent'
 
-        if ((this.data as { fill?: string }).fill) {
+        if (this.data.fill) {
             ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height)
         }
         ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height)

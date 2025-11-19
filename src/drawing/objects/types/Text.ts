@@ -1,11 +1,11 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR, MIN_FONT_SIZE } from '../../../shared/constants'
-import type { Point, Bounds, DrawingObjectData, ResizeHandle } from '../../../shared/types'
-export class Text extends DrawingObject {
+import type { Point, Bounds, TextData, ResizeHandle } from '../../../shared/types'
+export class Text extends DrawingObject<TextData> {
     textWidth: number = 0
     textHeight: number = 0
 
-    constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
+    constructor(id: string | null, data: TextData, zIndex: number) {
         super(id, 'text', data, zIndex)
         this.measureBounds()
     }
@@ -17,9 +17,9 @@ export class Text extends DrawingObject {
         if (!ctx) return
 
         const fontSize = (this.data.fontSize || 16)
-        const fontFamily = (this.data as { fontFamily?: string }).fontFamily || 'Arial'
+        const fontFamily = this.data.fontFamily || 'Arial'
         ctx.font = `${fontSize}px ${fontFamily}`
-        const metrics = ctx.measureText(this.data.text || '')
+        const metrics = ctx.measureText(this.data.text)
 
         this.textWidth = metrics.width
         this.textHeight = fontSize
@@ -27,33 +27,33 @@ export class Text extends DrawingObject {
 
     override getBounds(): Bounds {
         return {
-            x: this.data.x!,
-            y: this.data.y! - this.textHeight,
+            x: this.data.x,
+            y: this.data.y - this.textHeight,
             width: this.textWidth,
             height: this.textHeight * 1.2,
         }
     }
 
     override move(dx: number, dy: number): void {
-        this.data.x! += dx
-        this.data.y! += dy
+        this.data.x += dx
+        this.data.y += dy
     }
 
     override render(ctx: CanvasRenderingContext2D): void {
         const fontSize = (this.data.fontSize || 16)
-        const fontFamily = (this.data as { fontFamily?: string }).fontFamily || 'Arial'
+        const fontFamily = this.data.fontFamily || 'Arial'
         ctx.font = `${fontSize}px ${fontFamily}`
         ctx.fillStyle = this.data.color || DEFAULT_COLOR
         ctx.textBaseline = 'alphabetic'
 
-        if ((this.data as { bold?: boolean }).bold) {
+        if (this.data.bold) {
             ctx.font = `bold ${ctx.font}`
         }
-        if ((this.data as { italic?: boolean }).italic) {
+        if (this.data.italic) {
             ctx.font = `italic ${ctx.font}`
         }
 
-        ctx.fillText(this.data.text || '', this.data.x!, this.data.y!)
+        ctx.fillText(this.data.text, this.data.x, this.data.y)
 
         if (this.selected) {
             this.renderSelection(ctx)

@@ -1,6 +1,6 @@
 import { Rectangle } from '../../objects/types/Rectangle'
 import { BaseShapeTool } from '../base/BaseShapeTool'
-import type { Point } from '../../../shared/types'
+import type { Point, RectangleData } from '../../../shared/types'
 import type { DrawingObject } from '../../objects/DrawingObject'
 import { selectors } from '../../../shared/stores/AppState'
 import { MIN_SHAPE_SIZE } from '../../../shared/constants'
@@ -20,11 +20,13 @@ export class RectangleTool extends BaseShapeTool {
     }
 
     protected createShape(startPos: Point, e: MouseEvent): DrawingObject {
-        const shapeData = this.createBaseShapeData(startPos)
+        const baseData = this.createBaseShapeData(startPos)
 
-        // Add fill if Shift key is held
-        if (e.shiftKey) {
-            (shapeData as { fill?: string }).fill = selectors.getColor()
+        // Create typed RectangleData
+        const shapeData: RectangleData = {
+            ...baseData,
+            type: 'rectangle',
+            fill: e.shiftKey ? selectors.getColor() : undefined
         }
 
         return new Rectangle(null, shapeData, 0)

@@ -1,27 +1,27 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR, LINE_CLICK_TOLERANCE } from '../../../shared/constants'
-import type { Point, Bounds, DrawingObjectData } from '../../../shared/types'
+import type { Point, Bounds, LineData } from '../../../shared/types'
 
-export class Line extends DrawingObject {
-    constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
+export class Line extends DrawingObject<LineData> {
+    constructor(id: string | null, data: LineData, zIndex: number) {
         super(id, 'line', data, zIndex)
     }
 
     override getBounds(): Bounds {
         const padding = (this.data.width || 2) / 2
         return {
-            x: Math.min(this.data.x1!, this.data.x2!) - padding,
-            y: Math.min(this.data.y1!, this.data.y2!) - padding,
-            width: Math.abs(this.data.x2! - this.data.x1!) + padding * 2,
-            height: Math.abs(this.data.y2! - this.data.y1!) + padding * 2,
+            x: Math.min(this.data.x1, this.data.x2) - padding,
+            y: Math.min(this.data.y1, this.data.y2) - padding,
+            width: Math.abs(this.data.x2 - this.data.x1) + padding * 2,
+            height: Math.abs(this.data.y2 - this.data.y1) + padding * 2,
         }
     }
 
     override containsPoint(point: Point): boolean {
         const distance = this.pointToLineDistance(
             point,
-            { x: this.data.x1!, y: this.data.y1! },
-            { x: this.data.x2!, y: this.data.y2! }
+            { x: this.data.x1, y: this.data.y1 },
+            { x: this.data.x2, y: this.data.y2 }
         )
 
         return distance <= (this.data.width || 2) + LINE_CLICK_TOLERANCE
@@ -61,10 +61,10 @@ export class Line extends DrawingObject {
     }
 
     override move(dx: number, dy: number): void {
-        this.data.x1! += dx
-        this.data.y1! += dy
-        this.data.x2! += dx
-        this.data.y2! += dy
+        this.data.x1 += dx
+        this.data.y1 += dy
+        this.data.x2 += dx
+        this.data.y2 += dy
     }
 
     override resize(handleIndex: number, newX: number, newY: number, fixedPoint: Point, initialBounds: Bounds): void {
@@ -99,10 +99,10 @@ export class Line extends DrawingObject {
         const scaleY = newBounds.height / oldContentHeight
 
         // Apply transformation to line endpoints
-        this.data.x1 = newBounds.x + (this.data.x1! - oldContentX) * scaleX
-        this.data.y1 = newBounds.y + (this.data.y1! - oldContentY) * scaleY
-        this.data.x2 = newBounds.x + (this.data.x2! - oldContentX) * scaleX
-        this.data.y2 = newBounds.y + (this.data.y2! - oldContentY) * scaleY
+        this.data.x1 = newBounds.x + (this.data.x1 - oldContentX) * scaleX
+        this.data.y1 = newBounds.y + (this.data.y1 - oldContentY) * scaleY
+        this.data.x2 = newBounds.x + (this.data.x2 - oldContentX) * scaleX
+        this.data.y2 = newBounds.y + (this.data.y2 - oldContentY) * scaleY
     }
 
     override render(ctx: CanvasRenderingContext2D): void {
@@ -110,13 +110,14 @@ export class Line extends DrawingObject {
         ctx.lineWidth = this.data.width || 2
         ctx.lineCap = 'round'
 
-        if ((this.data as { dashed?: boolean }).dashed) {
+        // Check for dashed property (optional, stored via index signature)
+        if (this.data.dashed) {
             ctx.setLineDash([(this.data.width || 2) * 2, this.data.width || 2])
         }
 
         ctx.beginPath()
-        ctx.moveTo(this.data.x1!, this.data.y1!)
-        ctx.lineTo(this.data.x2!, this.data.y2!)
+        ctx.moveTo(this.data.x1, this.data.y1)
+        ctx.lineTo(this.data.x2, this.data.y2)
         ctx.stroke()
 
         ctx.setLineDash([])

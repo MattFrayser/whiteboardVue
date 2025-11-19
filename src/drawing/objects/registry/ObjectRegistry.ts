@@ -2,14 +2,12 @@ import type { DrawingObject } from '../DrawingObject'
 import type { DrawingObjectData } from '../../../shared/types'
 import { createLogger } from '../../../shared/utils/logger'
 const log = createLogger('ObjectRegistry')
-/**
- * Object constructor signature
- */
+
 export type ObjectConstructor = new (
     id: string | null,
-    data: DrawingObjectData,
+    data: any, 
     zIndex: number
-) => DrawingObject
+) => DrawingObject<any>
 
 /**
  * Provides a centralized system for registering and creating drawing objects.

@@ -1,9 +1,9 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR } from '../../../shared/constants'
-import type { Bounds, DrawingObjectData } from '../../../shared/types'
+import type { Bounds, StrokeData } from '../../../shared/types'
 import { clampCoordinate, clampBrushSize, validateColor } from '../../../shared/validation'
-export class Stroke extends DrawingObject {
-    constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
+export class Stroke extends DrawingObject<StrokeData> {
+    constructor(id: string | null, data: StrokeData, zIndex: number) {
         // Defensive validation to prevent crashes from NaN/Infinity in render loop
         if (data.color) {
             data.color = validateColor(data.color)
@@ -11,12 +11,10 @@ export class Stroke extends DrawingObject {
         if (typeof data.width === 'number') {
             data.width = clampBrushSize(data.width)
         }
-        if (Array.isArray(data.points)) {
-            data.points = data.points.map(point => ({
-                x: clampCoordinate(point.x),
-                y: clampCoordinate(point.y)
-            }))
-        }
+        data.points = data.points.map(point => ({
+            x: clampCoordinate(point.x),
+            y: clampCoordinate(point.y)
+        }))
 
         super(id, 'stroke', data, zIndex)
     }

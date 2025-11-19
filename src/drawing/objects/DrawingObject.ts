@@ -1,15 +1,19 @@
 import type { Point, Bounds, DrawingObjectData, ResizeHandle } from '../../shared/types'
 import { SELECTION_COLOR, SELECTION_HANDLE_BG } from '../../shared/constants'
 
-export class DrawingObject {
+/**
+ * Base class for all drawing objects
+ * Generic over data type for strong typing in subclasses
+ */
+export class DrawingObject<T extends DrawingObjectData = DrawingObjectData> {
     id: string
     type: string
-    data: DrawingObjectData
+    data: T
     selected: boolean
     userId: string | null
     zIndex: number
 
-    constructor(id: string | null, type: string, data: DrawingObjectData, zIndex: number) {
+    constructor(id: string | null, type: string, data: T, zIndex: number) {
         this.id = id ?? this.generateId()
         this.type = type
         this.data = data
@@ -164,7 +168,7 @@ export class DrawingObject {
         this.applyBounds(newBounds, handleIndex)
     }
 
-    toJSON(): { id: string; type: string; data: DrawingObjectData; zIndex: number } {
+    toJSON(): { id: string; type: string; data: T; zIndex: number } {
         // Create a copy of data excluding metadata fields
         const { id: _id, type: _type, userId: _userId, timestamp: _timestamp, ...dataFields } = this.data
 
@@ -174,7 +178,7 @@ export class DrawingObject {
             data: {
                 ...dataFields,
                 timestamp: Date.now(),
-            } as DrawingObjectData,
+            } as T,
             zIndex: this.zIndex,
         }
     }

@@ -78,8 +78,6 @@ export abstract class BaseShapeTool extends Tool {
         return {
             id: '',
             type: this.getShapeType(),
-            x: pos.x,
-            y: pos.y,
             x1: pos.x,
             y1: pos.y,
             x2: pos.x,

@@ -235,19 +235,19 @@ export class ObjectStore {
 
         switch (objectType) {
             case 'stroke':
-                obj = new Stroke(objectId, objectData, zIndex)
+                obj = new Stroke(objectId, objectData as any, zIndex)
                 break
             case 'rectangle':
-                obj = new Rectangle(objectId, objectData, zIndex)
+                obj = new Rectangle(objectId, objectData as any, zIndex)
                 break
             case 'circle':
-                obj = new Circle(objectId, objectData, zIndex)
+                obj = new Circle(objectId, objectData as any, zIndex)
                 break
             case 'line':
-                obj = new Line(objectId, objectData, zIndex)
+                obj = new Line(objectId, objectData as any, zIndex)
                 break
             case 'text':
-                obj = new Text(objectId, objectData, zIndex)
+                obj = new Text(objectId, objectData as any, zIndex)
                 break
         }
 

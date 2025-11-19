@@ -3,6 +3,7 @@
  */
 
 import type { DrawingObjectData } from '../types/common'
+import { isTextData, isStrokeData } from '../types/common'
 
 const MAX_COORD = 1000000
 const MIN_COORD = -1000000
@@ -12,48 +13,56 @@ const MAX_TEXT_LENGTH = 10000
 
 /**
  * Sanitize object data by clamping values to safe ranges
+ * Uses type narrowing for safe property access
  */
 export function sanitizeObjectData(data: DrawingObjectData): DrawingObjectData {
-    const sanitized = { ...data }
+    const sanitized: any = { ...data }
 
-    // Clamp coordinates
-    if (sanitized.x !== undefined) {
+    // Use type guards for type-specific sanitization
+    if (isTextData(sanitized)) {
+        // Clamp text coordinates
         sanitized.x = Math.max(MIN_COORD, Math.min(MAX_COORD, sanitized.x))
-    }
-    if (sanitized.y !== undefined) {
         sanitized.y = Math.max(MIN_COORD, Math.min(MAX_COORD, sanitized.y))
-    }
-    if (sanitized.width !== undefined) {
-        sanitized.width = Math.max(0, Math.min(MAX_COORD, sanitized.width))
-    }
-    if (sanitized.height !== undefined) {
-        sanitized.height = Math.max(0, Math.min(MAX_COORD, sanitized.height))
+
+        // Clamp font size
+        if (sanitized.fontSize !== undefined) {
+            sanitized.fontSize = Math.max(1, Math.min(MAX_FONT_SIZE, sanitized.fontSize))
+        }
+
+        // Truncate text
+        if (typeof sanitized.text === 'string' && sanitized.text.length > MAX_TEXT_LENGTH) {
+            sanitized.text = sanitized.text.substring(0, MAX_TEXT_LENGTH)
+        }
+    } else if (isStrokeData(sanitized)) {
+        // Sanitize points array
+        if (Array.isArray(sanitized.points)) {
+            sanitized.points = sanitized.points.map(p => ({
+                x: Math.max(MIN_COORD, Math.min(MAX_COORD, p.x)),
+                y: Math.max(MIN_COORD, Math.min(MAX_COORD, p.y))
+            }))
+        }
+    } else {
+        // Rectangle, Circle, Line - have x1, y1, x2, y2
+        if ('x1' in sanitized && typeof sanitized.x1 === 'number') {
+            sanitized.x1 = Math.max(MIN_COORD, Math.min(MAX_COORD, sanitized.x1))
+        }
+        if ('y1' in sanitized && typeof sanitized.y1 === 'number') {
+            sanitized.y1 = Math.max(MIN_COORD, Math.min(MAX_COORD, sanitized.y1))
+        }
+        if ('x2' in sanitized && typeof sanitized.x2 === 'number') {
+            sanitized.x2 = Math.max(MIN_COORD, Math.min(MAX_COORD, sanitized.x2))
+        }
+        if ('y2' in sanitized && typeof sanitized.y2 === 'number') {
+            sanitized.y2 = Math.max(MIN_COORD, Math.min(MAX_COORD, sanitized.y2))
+        }
     }
 
-    // Clamp stroke width
-    if (sanitized.strokeWidth !== undefined) {
-        sanitized.strokeWidth = Math.max(0.1, Math.min(MAX_STROKE_WIDTH, sanitized.strokeWidth))
+    // Clamp stroke width (common to all types)
+    if ('width' in sanitized && typeof sanitized.width === 'number') {
+        sanitized.width = Math.max(0.1, Math.min(MAX_STROKE_WIDTH, sanitized.width))
     }
 
-    // Clamp font size
-    if (sanitized.fontSize !== undefined) {
-        sanitized.fontSize = Math.max(1, Math.min(MAX_FONT_SIZE, sanitized.fontSize))
-    }
-
-    // Truncate text
-    if (sanitized.text !== undefined && sanitized.text.length > MAX_TEXT_LENGTH) {
-        sanitized.text = sanitized.text.substring(0, MAX_TEXT_LENGTH)
-    }
-
-    // Sanitize points array
-    if (sanitized.points !== undefined && Array.isArray(sanitized.points)) {
-        sanitized.points = sanitized.points.map(p => ({
-            x: Math.max(MIN_COORD, Math.min(MAX_COORD, p.x)),
-            y: Math.max(MIN_COORD, Math.min(MAX_COORD, p.y))
-        }))
-    }
-
-    return sanitized
+    return sanitized as DrawingObjectData
 }
 
 /**

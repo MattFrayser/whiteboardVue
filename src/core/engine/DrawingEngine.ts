@@ -17,12 +17,6 @@ import type { WebSocketManager } from '../../collaboration/network/WebSocketMana
 import type { NetworkMessage, MigrationResult } from '../../shared/types/network'
 
 import { 
-    isObjectAddedMessage, 
-    isObjectUpdatedMessage, 
-    isObjectDeletedMessage,
-    isSyncMessage,
-    isCursorMessage,
-    isUserDisconnectedMessage,
     sanitizeObjectData
 } from '../../shared/validation'
 
@@ -134,82 +128,77 @@ export class DrawingEngine {
     handleNetworkMessage(message: NetworkMessage): void {
         try {
             switch (message.type) {
-                case 'network:authenticated':
-                    if (message.userId && typeof message.userId === 'string') {
-                        this.objectManager.setUserId(message.userId)
-                    }
+            case 'network:authenticated':
+                if (message.userId && typeof message.userId === 'string') {
+                    this.objectManager.setUserId(message.userId)
+                }
+                break
+
+            case 'network:objectAdded': {
+                if (!message.object) {
+                    log.error('Invalid objectAdded message: missing object')
                     break
+                }
 
-                case 'network:objectAdded': {
-                    if (!isObjectAddedMessage(message)) {
-                        log.error('Invalid objectAdded message')
-                        break
-                    }
+                const sanitized = sanitizeObjectData(message.object)
+                const addedObj = this.objectManager.addRemoteObject(sanitized)
+                if (addedObj) {
+                    this.renderDirty()
+                }
+                break
+                }
 
+            case 'network:objectUpdated': {
+                if (!message.object) {
+                    log.error('Invalid objectUpdated message: missing object')
+                    break
+                }
+
+                const obj = this.objectManager.getObjectById(message.object.id)
+                if (obj) {
                     const sanitized = sanitizeObjectData(message.object)
-                    const addedObj = this.objectManager.addRemoteObject(sanitized)
-                    if (addedObj) {
-                        this.renderDirty()
-                    }
-                    break
-                    }
-
-                case 'network:objectUpdated': {
-                    if (!isObjectUpdatedMessage(message)) {
-                        log.error('Invalid objectUpdate message')
-                        break
-                    }
-                    
-                    const obj = this.objectManager.getObjectById(message.object.id)
-                    if (obj) {
-                        const sanitized = sanitizeObjectData(message.object)
-                        this.objectManager.updateRemoteObject(sanitized.id, sanitized)
-                        this.renderDirty()
-                    }
+                    this.objectManager.updateRemoteObject(sanitized.id, sanitized)
+                    this.renderDirty()
+                }
+                break
+            }
+            case 'network:objectDeleted': {
+                if (!message.objectId) {
+                    log.error('Invalid objectDeleted message: missing objectId')
                     break
                 }
-                case 'network:objectDeleted': {
-                    if (!isObjectDeletedMessage(message)) {
-                        log.error('Invalid objectDeleted message')
-                        break
-                    }
-                    
-                    const deletedObj = this.objectManager.getObjectById(message.objectId)
-                    if (deletedObj) {
-                        this.objectManager.removeRemoteObject(message.objectId)
-                        this.renderDirty()
-                    }
+
+                const deletedObj = this.objectManager.getObjectById(message.objectId)
+                if (deletedObj) {
+                    this.objectManager.removeRemoteObject(message.objectId)
+                    this.renderDirty()
+                }
+                break
+            }
+            case 'network:sync':
+                if (!message.objects || !Array.isArray(message.objects)) {
+                    log.error('Invalid sync message: missing objects array')
                     break
                 }
-                case 'network:sync':
-                    if (!isSyncMessage(message)) {
-                        log.error('Invalid sync message')
-                        break
-                    }
-                    
-                    const sanitized = message.objects.map(sanitizeObjectData)
-                    this.objectManager.loadRemoteObjects(sanitized)
-                    this.renderDirty()
-                    break
 
-                case 'network:userDisconnected':
-                    if (!isUserDisconnectedMessage(message)) {
-                        log.error('Invalid userDisconnected message')
-                        break
-                    }
-                    
-                    this.remoteCursors.delete(message.userId)
-                    this.renderDirty()
-                    break
+                const sanitized = message.objects.map(sanitizeObjectData)
+                this.objectManager.loadRemoteObjects(sanitized)
+                this.renderDirty()
+                break
 
-                case 'network:remoteCursorMove':
-                    if (!isCursorMessage(message)) {
-                        log.error('Invalid cursor message')
-                        break
-                    }
-                    
-                    this.handleRemoteCursor(message)
+            case 'network:userDisconnected':
+                if (!message.userId) {
+                    log.error('Invalid userDisconnected message: missing userId')
                     break
+                }
+
+                this.remoteCursors.delete(message.userId)
+                this.renderDirty()
+                break
+
+            case 'network:remoteCursorMove':
+                this.handleRemoteCursor(message)
+                break
             }
         } catch (error) {
             ErrorHandler.handle(error as Error, ErrorCategory.NETWORK, {

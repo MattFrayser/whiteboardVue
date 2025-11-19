@@ -1,6 +1,6 @@
 import { Circle } from '../../objects/types/Circle'
 import { BaseShapeTool } from '../base/BaseShapeTool'
-import type { Point } from '../../../shared/types'
+import type { Point, CircleData } from '../../../shared/types'
 import type { DrawingObject } from '../../objects/DrawingObject'
 import { selectors } from '../../../shared/stores/AppState'
 import { MIN_SHAPE_SIZE } from '../../../shared/constants'
@@ -21,21 +21,24 @@ export class CircleTool extends BaseShapeTool {
     }
 
     protected createShape(startPos: Point, e: MouseEvent): DrawingObject {
-        const shapeData = this.createBaseShapeData(startPos)
+        const baseData = this.createBaseShapeData(startPos)
 
-        // Add fill if Shift key is held
-        if (e.shiftKey) {
-            (shapeData as { fill?: string }).fill = selectors.getColor()
+        // Create typed CircleData
+        const shapeData: CircleData = {
+            ...baseData,
+            type: 'circle',
+            fill: e.shiftKey ? selectors.getColor() : undefined
         }
 
         return new Circle(null, shapeData, 0)
     }
 
     protected isShapeValid(shape: DrawingObject): boolean {
-        // Calculate radius from center to edge
+        // Calculate radius from center to edge (shape should be a Circle)
+        const circle = shape as Circle
         const radius = Math.sqrt(
-            Math.pow(shape.data.x2! - shape.data.x1!, 2) +
-                Math.pow(shape.data.y2! - shape.data.y1!, 2)
+            Math.pow(circle.data.x2 - circle.data.x1, 2) +
+                Math.pow(circle.data.y2 - circle.data.y1, 2)
         )
         return radius > MIN_SHAPE_SIZE
     }

@@ -1,7 +1,7 @@
 import { Stroke } from '../../objects/types/Stroke'
 import { simplifyStroke } from '../../../shared/utils/simplify'
 import { Tool } from '../base/Tool'
-import type { Point, Bounds } from '../../../shared/types'
+import type { Point, Bounds, StrokeData } from '../../../shared/types'
 import type { DrawingEngine } from '../../../core/engine/DrawingEngine'
 import { selectors } from '../../../shared/stores/AppState'
 
@@ -19,21 +19,22 @@ export class DrawTool extends Tool {
 
     override onMouseDown(worldPos: Point, _e: MouseEvent): void {
         this.isDrawing = true
-        this.currentStroke = new Stroke(null, {
+
+        const strokeData: StrokeData = {
             id: '',
             type: 'stroke',
-            x: worldPos.x,
-            y: worldPos.y,
             points: [worldPos],
             color: selectors.getColor(),
             width: selectors.getBrushSize(),
-        }, 0)
+        }
+
+        this.currentStroke = new Stroke(null, strokeData, 0)
         this.lastBounds = null
     }
 
     override onMouseMove(worldPos: Point, _e: MouseEvent): void {
         if (this.isDrawing && this.currentStroke) {
-            this.currentStroke.data.points!.push(worldPos)
+            this.currentStroke.data.points.push(worldPos)
 
             const newBounds = this.currentStroke.getBounds()
             this.lastBounds = newBounds
@@ -43,7 +44,7 @@ export class DrawTool extends Tool {
     }
 
     override onMouseUp(_worldPos: Point, _e: MouseEvent): void {
-        if (this.currentStroke && this.currentStroke.data.points && this.currentStroke.data.points.length > 1) {
+         if (this.currentStroke && this.currentStroke.data.points.length > 1) {
             // Apply Douglas-Peucker simplification to reduce point count
             // Only simplify if we have more than 5 points (otherwise not worth it)
             if (this.currentStroke.data.points.length > 5) {
