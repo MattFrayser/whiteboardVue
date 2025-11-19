@@ -19,9 +19,6 @@ export class Tool {
         this.active = false
     }
 
-    /**
-     * Wrap event handlers with error handling
-     */
     _handleError(error: unknown, eventType: string, worldPos: Point): void {
         ErrorHandler.handle(error instanceof Error ? error : new Error(String(error)), ErrorCategory.SILENT, {
             context: `${this.constructor.name}`,
@@ -30,37 +27,30 @@ export class Tool {
         })
     }
 
-    /**
-     * Safe wrapper for onMouseDown with error handling
-     */
+     // Safe wrapper for onMouseDown with error handling
+    _safeWrap(
+        eventType: 'mousedown' | 'mousemove' | 'mouseup',
+        handler: (worldPos: Point, e: MouseEvent) => void,
+        worldPos: Point,
+        e: MouseEvent
+    ): void {
+        try {
+            handler.call(this, worldPos, e)
+        } catch (error) {
+            this._handleError(error, eventType, worldPos)
+        }
+    }
+
     _safeOnMouseDown(worldPos: Point, e: MouseEvent): void {
-        try {
-            this.onMouseDown(worldPos, e)
-        } catch (error) {
-            this._handleError(error, 'mousedown', worldPos)
-        }
+        this._safeWrap('mousedown', this.onMouseDown, worldPos, e)
     }
 
-    /**
-     * Safe wrapper for onMouseMove with error handling
-     */
     _safeOnMouseMove(worldPos: Point, e: MouseEvent): void {
-        try {
-            this.onMouseMove(worldPos, e)
-        } catch (error) {
-            this._handleError(error, 'mousemove', worldPos)
-        }
+        this._safeWrap('mousemove', this.onMouseMove, worldPos, e)
     }
 
-    /**
-     * Safe wrapper for onMouseUp with error handling
-     */
     _safeOnMouseUp(worldPos: Point, e: MouseEvent): void {
-        try {
-            this.onMouseUp(worldPos, e)
-        } catch (error) {
-            this._handleError(error, 'mouseup', worldPos)
-        }
+        this._safeWrap('mouseup', this.onMouseUp, worldPos, e)
     }
 
     onMouseDown(_worldPos: Point, _e: MouseEvent): void {}

@@ -1,7 +1,7 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR } from '../../../shared/constants'
 import type { Bounds, DrawingObjectData } from '../../../shared/types'
-import { clampCoordinate, clampBrushSize, validateColor } from '../../../shared/utils/validation'
+import { clampCoordinate, clampBrushSize, validateColor } from '../../../shared/validation'
 export class Stroke extends DrawingObject {
     constructor(id: string | null, data: DrawingObjectData, zIndex: number) {
         // Defensive validation to prevent crashes from NaN/Infinity in render loop

@@ -6,7 +6,7 @@ import { Stroke } from '../../drawing/objects/types/Stroke'
 import { Text } from '../../drawing/objects/types/Text'
 import { DrawingObject } from '../../drawing/objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../../shared/types/common'
-import { QUADTREE_MIN_SIZE, QUADTREE_PADDING_MULTIPLIER } from '../../shared/constants'
+import { QUADTREE_MIN_SIZE} from '../../shared/constants'
 import { isValidObject } from '../../shared/validation'
 
 import { createLogger } from '../../shared/utils/logger'
@@ -16,9 +16,6 @@ const log = createLogger('ObjectStore')
 export type NestedObjectData = { id: string; type: string; data: DrawingObjectData; zIndex: number }
 export type FlatObjectData = DrawingObjectData
 
-/**
- * Type guard to distinguish between nested (backend) and flat (legacy) object formats
- */
 function isNestedFormat(data: NestedObjectData | FlatObjectData): data is NestedObjectData {
     return (
         typeof data === 'object' &&
@@ -30,9 +27,8 @@ function isNestedFormat(data: NestedObjectData | FlatObjectData): data is Nested
     )
 }
 
-/**
- * Manages object storage, spatial indexing, and CRUD operations
- */
+
+// Manages object storage, spatial indexing, and CRUD operations
 export class ObjectStore {
     objects: DrawingObject[]
     quadtree: Quadtree
@@ -42,12 +38,14 @@ export class ObjectStore {
 
         // Initialize quadtree with large bounds (will expand as needed)
         this.quadtree = new Quadtree(
-            { x: -10000, y: -10000, width: 20000, height: 20000 },
+            { x: -10000, y: -10000, width: 50000, height: 50000 },
             10, // max objects per node
             8 // max levels
         )
     }
 
+    private rebuildScheduled: boolean = false
+    private rebuildTimeout: ReturnType<typeof setTimeout> | null = null
     // Storage Operations
 
     addLocal(object: DrawingObject): DrawingObject {
@@ -199,10 +197,10 @@ export class ObjectStore {
 
         // Update quadtree - only update changed objects, much faster than entire rebuild
         oldObjects.forEach((obj: DrawingObject) => {
-            this.quadtree.remove(obj, obj.getBounds())
+            this._removeFromQuadtree(obj, obj.getBounds())
         })
         myRestoredObjects.forEach(obj => {
-            this.quadtree.insert(obj, obj.getBounds())
+            this._insertIntoQuadtree(obj) 
         })
     }
 
@@ -275,30 +273,12 @@ export class ObjectStore {
     /**
      * Update an object's position in the quadtree after modification
      *
-     * Call this after moving, resizing, or otherwise changing an object's bounds.
+     * Call after moving, resizing, or otherwise changing an object's bounds.
      * The quadtree needs the old bounds to find where the object is currently indexed,
      * then re-inserts it at the new position.
      *
-     * This method also automatically expands the quadtree if the object moves outside
+     * Automatically expands the quadtree if the object moves outside
      * the current bounds.
-     *
-     * @param object - The object to update in the quadtree
-     * @param oldBounds - The bounds BEFORE modification (required for correct removal)
-     * @param newBounds - Optional new bounds. If null, will call object.getBounds()
-     *
-     * @example
-     * // Typical usage when modifying an object
-     * const oldBounds = obj.getBounds()
-     * obj.move(dx, dy)
-     * objectStore.updateObjectInQuadtree(obj, oldBounds)
-     *
-     * @example
-     * // With explicit new bounds
-     * const oldBounds = obj.getBounds()
-     * obj.data.x = newX
-     * obj.data.y = newY
-     * const newBounds = { x: newX, y: newY, width: obj.data.width, height: obj.data.height }
-     * objectStore.updateObjectInQuadtree(obj, oldBounds, newBounds)
      */
     updateObjectInQuadtree(object: DrawingObject, oldBounds: Bounds, newBounds: Bounds | null = null): void {
         const bounds = newBounds || object.getBounds()
@@ -314,8 +294,27 @@ export class ObjectStore {
             bounds.x + bounds.width > qtBounds.x + qtBounds.width ||
             bounds.y + bounds.height > qtBounds.y + qtBounds.height
         ) {
-            this.rebuildQuadtree(true)
+            this.scheduleQuadtreeRebuild()
         }
+    }
+
+    // debounced to prevent excessive rebuilds)
+    private scheduleQuadtreeRebuild(): void {
+        if (this.rebuildScheduled) {
+            return
+        }
+        
+        this.rebuildScheduled = true
+        
+        if (this.rebuildTimeout) {
+            clearTimeout(this.rebuildTimeout)
+        }
+        
+        this.rebuildTimeout = setTimeout(() => {
+            this.rebuildQuadtree(true)
+            this.rebuildScheduled = false
+            this.rebuildTimeout = null
+        }, 0)
     }
 
     /**
@@ -325,7 +324,6 @@ export class ObjectStore {
         let bounds = this.quadtree.bounds
 
         if (expandBounds) {
-            // Calculate bounds that encompass all objects
             let minX = Infinity, minY = Infinity
             let maxX = -Infinity, maxY = -Infinity
 
@@ -337,9 +335,10 @@ export class ObjectStore {
                 maxY = Math.max(maxY, objBounds.y + objBounds.height)
             })
 
-            // Add padding and ensure minimum size
-            const width = Math.max(QUADTREE_MIN_SIZE, (maxX - minX) * QUADTREE_PADDING_MULTIPLIER)
-            const height = Math.max(QUADTREE_MIN_SIZE, (maxY - minY) * QUADTREE_PADDING_MULTIPLIER)
+            // Increased padding: 2.0x instead of 1.2x
+            const EXPANSION_PADDING = 2.0
+            const width = Math.max(QUADTREE_MIN_SIZE, (maxX - minX) * EXPANSION_PADDING)
+            const height = Math.max(QUADTREE_MIN_SIZE, (maxY - minY) * EXPANSION_PADDING)
             const centerX = (minX + maxX) / 2
             const centerY = (minY + maxY) / 2
 
@@ -351,16 +350,13 @@ export class ObjectStore {
             }
         }
 
-        // Recreate quadtree with new/same bounds
         this.quadtree = new Quadtree(bounds, 10, 8)
 
-        // Reinsert all objects
         this.objects.forEach(obj => {
             const objBounds = obj.getBounds()
             this.quadtree.insert(obj, objBounds)
         })
     }
-
     /**
      * Render all objects with optional viewport culling
      */
@@ -400,4 +396,16 @@ export class ObjectStore {
             })
         }
     }
-}
+
+    // Remove object from quadtree at its old location
+    private _removeFromQuadtree(object: DrawingObject, bounds: Bounds): void {
+        this.quadtree.remove(object, bounds)
+    }
+
+    // Insert object into quadtree at its current location
+    private _insertIntoQuadtree(object: DrawingObject, bounds?: Bounds): void {
+        const objectBounds = bounds || object.getBounds()
+        this.quadtree.insert(object, objectBounds)
+    }
+
+ }

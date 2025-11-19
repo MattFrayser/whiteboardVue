@@ -1,6 +1,6 @@
 import type { DrawingObject } from '../DrawingObject'
 import type { DrawingObjectData } from '../../../shared/types'
-import { createLogger } from '../../shared/utils/logger'
+import { createLogger } from '../../../shared/utils/logger'
 const log = createLogger('ObjectRegistry')
 /**
  * Object constructor signature

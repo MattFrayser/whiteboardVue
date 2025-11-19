@@ -7,7 +7,7 @@
  
 import { BaseDialog } from './BaseDialog'
 import type { JoinRoomDialogConfig } from './types'
-import { sanitizeRoomCode } from '../../shared/utils/validation'
+import { sanitizeRoomCode } from '../../shared/validation'
  
 export class JoinRoomDialog extends BaseDialog<boolean> {
     private config: JoinRoomDialogConfig

@@ -71,8 +71,7 @@ export class SelectionResize {
         // Store initial state for undo
         const bounds = obj.getBounds()
         this.resizeInitialBounds = { ...bounds }
-        this.resizeInitialData = JSON.parse(JSON.stringify(obj.data))
-
+        this.resizeInitialData = structuredClone(obj.data)
         // Calculate fixed point based on which handle was grabbed
         this.resizeFixedPoint = this.calculateFixedPoint(handleIndex, bounds)
     }
@@ -144,7 +143,7 @@ export class SelectionResize {
             const operation = new UpdateObjectOperation(
                 this.resizeObject.id,
                 this.resizeInitialData,
-                JSON.parse(JSON.stringify(this.resizeObject.data)),
+                structuredClone(this.resizeObject.data),
                 userId
             )
             this.engine.objectManager.historyManager.recordOperation(operation)

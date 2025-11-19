@@ -29,10 +29,9 @@ function validateSecureConnection(): void {
     }
 }
 
-// Generate temporary local userId for local-first mode
 // This will be replaced with server-assigned userId when session is created
 const generateLocalUserId = () => {
-    return 'local-' + Math.random().toString(36).substring(2, 11)
+    return 'local-' + crypto.randomUUID()
 }
 
 validateSecureConnection()

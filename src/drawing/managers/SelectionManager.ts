@@ -12,37 +12,22 @@ export class SelectionManager {
     objectManager: ObjectManager
     objectStore: ObjectStore
     historyManager: HistoryManager
-    private _cachedSelectedObjects: DrawingObject[] | null = null
-    private _cachedSelectionIds: string[] | null = null
-
     constructor(objectManager: ObjectManager, objectStore: ObjectStore, historyManager: HistoryManager) {
         this.objectManager = objectManager
         this.objectStore = objectStore
         this.historyManager = historyManager
 
-        // Subscribe to selection changes to invalidate cache
-        appState.subscribe('selection.objectIds', () => {
-            this._cachedSelectedObjects = null
-            this._cachedSelectionIds = null
-        })
     }
 
+    // Thinking about caching here, but not sure if preformance gains
+    // are worth extra complexity
     get selectedObjects() {
         const selectedIds = appState.get('selection.objectIds') as string[]
-
-        // Return cached objects if selection hasn't changed
-        if (this._cachedSelectedObjects && this._cachedSelectionIds === selectedIds) {
-            return this._cachedSelectedObjects
-        }
-
-        // Compute and cache
-        this._cachedSelectionIds = selectedIds
-        this._cachedSelectedObjects = selectedIds
+        return selectedIds
             .map((id: string) => this.objectStore.getObjectById(id))
             .filter((obj: DrawingObject | undefined): obj is DrawingObject => obj !== undefined)
-
-        return this._cachedSelectedObjects
     }
+
 
     // Multi is used for selecting mutiple objects
     selectObject(object: DrawingObject, multi = false) {

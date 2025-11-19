@@ -80,6 +80,7 @@ export class DrawingEngine {
         this.currentWidth = 5
 
         this.remoteCursors = new Map()
+        setInterval(() => this.cleanupStaleCursors(), 30000)
 
         // Window resize handler
         this.boundResize = () => this.resize()
@@ -409,6 +410,17 @@ export class DrawingEngine {
         ctx.restore()
     }
 
+    cleanupStaleCursors() {
+        const now = Date.now()
+        const CURSOR_TTL = 10000 // 10 seconds
+
+        for (const [userId, cursor] of this.remoteCursors) {
+            if (now - cursor.lastUpdate > CURSOR_TTL) {
+                this.remoteCursors.delete(userId)
+            }
+        }
+    }
+
     start(): void {
         this.render()
     }
@@ -433,7 +445,5 @@ export class DrawingEngine {
             })
         }
 
-        // References will be garbage collected when the instance is destroyed
-        // No need for manual null assignments
     }
 }

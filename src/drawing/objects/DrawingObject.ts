@@ -19,7 +19,7 @@ export class DrawingObject {
     }
 
     generateId(): string {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2)
+        return crypto.randomUUID()
     }
 
     getBounds(): Bounds {
@@ -93,61 +93,72 @@ export class DrawingObject {
         ]
     }
 
-    /**
-     * Calculate new bounds based on resize handle drag
-     * Returns bounds without applying them (for subclass customization)
-     */
+    private _calculateSideHandleBounds(
+        handleIndex: 1 | 3 | 5 | 7,
+        newX: number,
+        newY: number,
+        left: number,
+        right: number,
+        top: number,
+        bottom: number
+    ): Bounds {
+        const isVertical = handleIndex === 1 || handleIndex === 5    
+        
+        if (isVertical) {
+            // North (1) or South (5)
+            const isNorth = handleIndex === 1
+            const newEdge = isNorth ? newY : newY
+            const fixedEdge = isNorth ? bottom : top
+            
+            return {
+                x: Math.min(left, right),
+                y: Math.min(newEdge, fixedEdge),
+                width: Math.abs(right - left),
+                height: Math.max(1, Math.abs(fixedEdge - newEdge))
+            }
+        } else {
+            // East (3) or West (7)
+            const isEast = handleIndex === 3
+            const newEdge = isEast ? newX : newX
+            const fixedEdge = isEast ? left : right
+            
+            return {
+                x: Math.min(newEdge, fixedEdge),
+                y: Math.min(top, bottom),
+                width: Math.max(1, Math.abs(newEdge - fixedEdge)),
+                height: Math.abs(bottom - top)
+            }
+        }
+    }
+
     calculateResizedBounds(handleIndex: number, newX: number, newY: number, fixedPoint: Point, initialBounds: Bounds): Bounds {
         const isSideHandle = [1, 3, 5, 7].includes(handleIndex)
 
         if (isSideHandle) {
-            // For side handles, keep the perpendicular dimension fixed
             const left = initialBounds.x
             const right = initialBounds.x + initialBounds.width
             const top = initialBounds.y
             const bottom = initialBounds.y + initialBounds.height
 
-            switch (handleIndex) {
-                case 1: // North
-                    return {
-                        x: Math.min(left, right),
-                        y: Math.min(newY, bottom),
-                        width: Math.abs(right - left),
-                        height: Math.max(1, Math.abs(bottom - newY))
-                    }
-                case 3: // East
-                    return {
-                        x: Math.min(left, newX),
-                        y: Math.min(top, bottom),
-                        width: Math.max(1, Math.abs(newX - left)),
-                        height: Math.abs(bottom - top)
-                    }
-                case 5: // South
-                    return {
-                        x: Math.min(left, right),
-                        y: Math.min(top, newY),
-                        width: Math.abs(right - left),
-                        height: Math.max(1, Math.abs(newY - top))
-                    }
-                case 7: // West
-                    return {
-                        x: Math.min(newX, right),
-                        y: Math.min(top, bottom),
-                        width: Math.max(1, Math.abs(right - newX)),
-                        height: Math.abs(bottom - top)
-                    }
-            }
+            return this._calculateSideHandleBounds(
+                handleIndex as 1 | 3 | 5 | 7,
+                newX,
+                newY,
+                left,
+                right,
+                top,
+                bottom
+            )
         }
 
-        // Corner handles - use fixed point approach
-        return {
-            x: Math.min(fixedPoint.x, newX),
-            y: Math.min(fixedPoint.y, newY),
-            width: Math.max(1, Math.abs(newX - fixedPoint.x)),
-            height: Math.max(1, Math.abs(newY - fixedPoint.y))
-        }
+    // use fixed point approach for corner handles
+    return {
+        x: Math.min(fixedPoint.x, newX),
+        y: Math.min(fixedPoint.y, newY),
+        width: Math.max(1, Math.abs(newX - fixedPoint.x)),
+        height: Math.max(1, Math.abs(newY - fixedPoint.y))
     }
-
+}
     resize(handleIndex: number, newX: number, newY: number, fixedPoint: Point, initialBounds: Bounds): void {
         const newBounds = this.calculateResizedBounds(handleIndex, newX, newY, fixedPoint, initialBounds)
         this.applyBounds(newBounds, handleIndex)

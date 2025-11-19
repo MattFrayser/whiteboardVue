@@ -1,6 +1,6 @@
 import { appState, actions } from '../../shared/stores/AppState'
 import { COLOR_PALETTE } from '../../shared/constants'
-import { validateColor } from '../../shared/utils/validation'
+import { validateColor } from '../../shared/validation'
  
 export class ColorPicker {
     activeSwatch: HTMLElement | null

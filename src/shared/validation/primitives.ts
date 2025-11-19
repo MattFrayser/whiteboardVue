@@ -39,3 +39,27 @@ export function isValidPointArray(value: unknown): value is Array<{ x: number; y
     if (!isArray(value)) return false
     return value.every(isValidPoint)
 }
+
+/**
+ * Safely parses JSON with error handling
+ */
+export function parseJSON(data: string): unknown | null {
+    // Silently ignore empty or whitespace-only data (e.g., WebSocket heartbeats)
+    if (!data || data.trim().length === 0) {
+        return null
+    }
+
+    try {
+        return JSON.parse(data)
+    } catch (error) {
+        console.error('Failed to parse JSON:', error)
+        return null
+    }
+}
+
+/**
+ * Validates basic message structure (must be object with type field)
+ */
+export function isValidMessageStructure(msg: unknown): msg is { type: string } {
+    return isObject(msg) && isString(msg.type)
+}

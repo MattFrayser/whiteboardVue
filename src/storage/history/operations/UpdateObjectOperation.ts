@@ -23,8 +23,8 @@ export class UpdateObjectOperation implements Operation {
         this.objectId = objectId
 
         // Deep clone to prevent mutation
-        this.beforeData = JSON.parse(JSON.stringify(beforeData))
-        this.afterData = JSON.parse(JSON.stringify(afterData))
+        this.beforeData = structuredClone(beforeData)
+        this.afterData = structuredClone(afterData)
     }
 
     execute(objectStore: ObjectStore): void {
@@ -32,7 +32,7 @@ export class UpdateObjectOperation implements Operation {
         const obj = objectStore.getObjectById(this.objectId)
         if (obj) {
             const oldBounds = obj.getBounds()
-            obj.data = JSON.parse(JSON.stringify(this.afterData))
+            obj.data = structuredClone(this.afterData)
             const newBounds = obj.getBounds()
             objectStore.updateObjectInQuadtree(obj, oldBounds, newBounds)
         }
@@ -43,7 +43,7 @@ export class UpdateObjectOperation implements Operation {
         const obj = objectStore.getObjectById(this.objectId)
         if (obj) {
             const oldBounds = obj.getBounds()
-            obj.data = JSON.parse(JSON.stringify(this.beforeData))
+            obj.data = structuredClone(this.beforeData)
             const newBounds = obj.getBounds()
             objectStore.updateObjectInQuadtree(obj, oldBounds, newBounds)
         }

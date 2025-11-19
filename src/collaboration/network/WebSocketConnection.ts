@@ -70,9 +70,9 @@ export class WebSocketConnection {
             // Debug: Check if cookie was set
             log.debug('Cookies set', { cookieCount: document.cookie.split(';').length }) 
 
-            // Now open WebSocket - cookie will be sent automatically
+            // open WebSocket - cookie will be sent automatically
             log.debug('Opening WebSocket connection')
-            this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${roomCode}`)
+            this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${encodeURIComponent(roomCode)}`)
             log.debug('WebSocket object created', { readyState: this.socket.readyState }) 
 
             this.socket.onopen = () => {

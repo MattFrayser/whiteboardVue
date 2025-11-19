@@ -8,7 +8,7 @@
 
 import { StateStore } from './StateStore'
 import { DEFAULT_COLOR } from '../constants'
-import { clampBrushSize, validateColor } from '../utils/validation'
+import { clampBrushSize, validateColor } from '../validation'
 import { RemoteCursor } from '../types'
 
 // Type definitions for the application state
