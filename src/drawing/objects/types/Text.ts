@@ -4,7 +4,7 @@ import type { Point, Bounds, TextData, ResizeHandle } from '../../../shared/type
 import type { Transform } from '../../transforms/Transform'
 import type { ResizeConstraints } from '../../transforms/ResizeConstraints'
 import { createDefaultConstraints } from '../../transforms/ResizeConstraints'
-import { applyTransformToBounds } from '../../transforms/Transform'
+import { applyTransformToBounds, applyTransformToPoint} from '../../transforms/Transform'
 
 export class Text extends DrawingObject<TextData> {
     textWidth: number = 0
@@ -145,7 +145,12 @@ export class Text extends DrawingObject<TextData> {
         this.measureBounds()
 
         // Update position
-        this.data.x = newBounds.x
-        this.data.y = newBounds.y + this.textHeight
+        const newBaseline = applyTransformToPoint(
+            { x: this.data.x, y: this.data.y },  // Transform the baseline
+            transform
+        )
+        this.data.x = newBaseline.x
+        this.data.y = newBaseline.y
+
     }
 }
