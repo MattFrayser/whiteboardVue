@@ -215,7 +215,7 @@ export class SessionManager {
             }
 
             // Connect to server
-            this.networkManager?.connect(roomCode).catch(reject)
+            this.networkManager?.connect(roomCode, this.csrfToken ?? undefined).catch(reject)
         })
     }
 
