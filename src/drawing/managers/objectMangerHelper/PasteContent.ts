@@ -1,37 +1,31 @@
 /**
- * Paste Algorithm
- * Handles the complex logic for pasting objects at a target position
- * - Calculates bounding box of clipboard objects
- * - Centers group at cursor position
- * - Returns created objects for caller to handle history/network
+ * Logic for pasting objects at a target position
  */
 
 import type { DrawingObject } from '../../../drawing/objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../../../shared/types/common'
-/**
- * Context needed for paste operation
- * This avoids tight coupling to ObjectManager
- */
+
 export interface PasteContext {
-    clipboardData: DrawingObjectData[]
+    clipboardData: Array<{ id: string; type: string; data: DrawingObjectData; zIndex: number }>
     targetPosition: Point
-    createObject: (data: DrawingObjectData) => DrawingObject | null
+    createObject: (data: DrawingObjectData | { id: string; type: string; data: DrawingObjectData; zIndex: number }) => DrawingObject | null
     addObjectWithoutHistory: (obj: DrawingObject) => void
     selectObject: (obj: DrawingObject, addToSelection: boolean) => void
 }
 
-/**
- * Execute paste operation
- * @returns Array of newly created objects (for history recording)
- */
 export function executePaste(ctx: PasteContext): DrawingObject[] {
     const newObjects: DrawingObject[] = []
 
-    // Step 1: Create cloned objects with new IDs
-    ctx.clipboardData.forEach(data => {
+    // clone objects with new IDs
+    ctx.clipboardData.forEach(obj => {
         const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2)
-        const clonedData = { ...data, id: generateId() }
-        const newObject = ctx.createObject(clonedData)
+        const clonedObject = {
+            id: generateId(),
+            type: obj.type,
+            data: structuredClone(obj.data), // Deep clone to avoid shared references
+            zIndex: obj.zIndex
+        }
+        const newObject = ctx.createObject(clonedObject)
         if (newObject) {
             ctx.addObjectWithoutHistory(newObject)
             newObjects.push(newObject)
@@ -42,13 +36,13 @@ export function executePaste(ctx: PasteContext): DrawingObject[] {
         return []
     }
 
-    // Step 2: Calculate bounding box of all pasted objects
+    // bounding box of all pasted objects
     const bounds = calculateGroupBounds(newObjects)
 
-    // Step 3: Calculate offset to center group at cursor
+    // center offset to cursor
     const offset = calculateCenterOffset(bounds, ctx.targetPosition)
 
-    // Step 4: Move all objects and select them
+    // select obj on move, more of a visual thing than needed 
     newObjects.forEach(obj => {
         obj.move(offset.dx, offset.dy)
         ctx.selectObject(obj, true) // true = add to selection
@@ -57,9 +51,6 @@ export function executePaste(ctx: PasteContext): DrawingObject[] {
     return newObjects
 }
 
-/**
- * Calculate the bounding box that contains all objects
- */
 function calculateGroupBounds(objects: DrawingObject[]): Bounds {
     let minX = Infinity
     let minY = Infinity
@@ -78,19 +69,16 @@ function calculateGroupBounds(objects: DrawingObject[]): Bounds {
         x: minX,
         y: minY,
         width: maxX - minX,
-        height: maxY - minY
+        height: maxY - minY,
     }
 }
 
-/**
- * Calculate offset needed to center group at target position
- */
 function calculateCenterOffset(bounds: Bounds, target: Point): { dx: number; dy: number } {
     const groupCenterX = bounds.x + bounds.width / 2
     const groupCenterY = bounds.y + bounds.height / 2
-    
+
     return {
         dx: target.x - groupCenterX,
-        dy: target.y - groupCenterY
+        dy: target.y - groupCenterY,
     }
 }

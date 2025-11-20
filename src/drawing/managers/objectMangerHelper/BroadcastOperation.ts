@@ -1,9 +1,5 @@
 /**
- * Operation Broadcasting
- * Handles the complex logic for broadcasting undo/redo operations to the network
- * - Converts operations to network messages
- * - Handles different operation types differently
- * - Creates temporary objects for broadcasting when needed
+ * broadcasting undo/redo operations to the network messages
  */
 
 import type { Operation } from '../../../storage/history/operations/Operation'
@@ -15,9 +11,7 @@ import type { WebSocketManager } from '../../../collaboration/network/WebSocketM
 import type { DrawingObject } from '../../objects/DrawingObject'
 import type { DrawingObjectData } from '../../../shared/types/common'
 import type { NestedObjectData } from '../../../core/spatial/ObjectStore'
-/**
- * Context needed for broadcasting operations
- */
+
 export interface BroadcastContext {
     networkManager: WebSocketManager
     getObjectById: (id: string) => DrawingObject | undefined
@@ -25,12 +19,11 @@ export interface BroadcastContext {
 }
 
 /**
- * Broadcast the effect of an undo/redo operation to the network
- * Different operations have different effects:
- * - Add: undo=delete, redo=add
- * - Delete: undo=add, redo=delete
- * - Update: both=update
- * - Move: both=update (for all moved objects)
+ * Undo/redo operation
+ *      -> Add: undo=delete, redo=add
+ *      -> Delete: undo=add, redo=delete
+ *      -> Update: both=update
+ *      -> Move: both=update (all moved obj)
  */
 export function broadcastOperationEffect(
     operation: Operation,
@@ -58,9 +51,9 @@ export function broadcastOperationEffect(
 }
 
 /**
- * Broadcast add operation
- * - Undo: object was deleted → broadcast delete
- * - Redo: object was added → broadcast add
+ * Add operation
+ *      -> Undo: broadcast delete
+ *      -> Redo: broadcast add 
  */
 function broadcastAddOperation(
     operation: AddObjectOperation,
@@ -68,14 +61,11 @@ function broadcastAddOperation(
     ctx: BroadcastContext
 ): void {
     if (isUndo) {
-        // Object was removed by undo - broadcast deletion
-        // Need to create temporary object for broadcast
         const tempObj = ctx.createObjectFromData(operation.objectData)
         if (tempObj) {
             ctx.networkManager.broadcastObjectDeleted(tempObj)
         }
     } else {
-        // Object was added by redo - broadcast addition
         const obj = ctx.getObjectById(operation.objectData.id)
         if (obj) {
             ctx.networkManager.broadcastObjectAdded(obj)
@@ -84,9 +74,9 @@ function broadcastAddOperation(
 }
 
 /**
- * Broadcast delete operation
- * - Undo: object was restored → broadcast add
- * - Redo: object was deleted → broadcast delete
+ * Delete operation
+ *      -> Undo: broadcast add
+ *      -> Redo: broadcast delete 
  */
 function broadcastDeleteOperation(
     operation: DeleteObjectOperation,
@@ -94,14 +84,11 @@ function broadcastDeleteOperation(
     ctx: BroadcastContext
 ): void {
     if (isUndo) {
-        // Object was restored by undo - broadcast addition
         const obj = ctx.getObjectById(operation.objectData.id)
         if (obj) {
             ctx.networkManager.broadcastObjectAdded(obj)
         }
     } else {
-        // Object was deleted by redo - broadcast deletion
-        // Need to create temporary object for broadcast
         const tempObj = ctx.createObjectFromData(operation.objectData)
         if (tempObj) {
             ctx.networkManager.broadcastObjectDeleted(tempObj)
@@ -110,13 +97,9 @@ function broadcastDeleteOperation(
 }
 
 /**
- * Broadcast update operation
- * Both undo and redo result in an update
+ * Update operation
  */
-function broadcastUpdateOperation(
-    operation: UpdateObjectOperation,
-    ctx: BroadcastContext
-): void {
+function broadcastUpdateOperation(operation: UpdateObjectOperation, ctx: BroadcastContext): void {
     const obj = ctx.getObjectById(operation.objectId)
     if (obj) {
         ctx.networkManager.broadcastObjectUpdated(obj)
@@ -125,12 +108,8 @@ function broadcastUpdateOperation(
 
 /**
  * Broadcast move operation
- * Both undo and redo result in updates for all moved objects
  */
-function broadcastMoveOperation(
-    operation: MoveObjectsOperation,
-    ctx: BroadcastContext
-): void {
+function broadcastMoveOperation(operation: MoveObjectsOperation, ctx: BroadcastContext): void {
     for (const objectId of operation.objectIds) {
         const obj = ctx.getObjectById(objectId)
         if (obj) {

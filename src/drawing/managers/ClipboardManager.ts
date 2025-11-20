@@ -1,12 +1,11 @@
 import type { DrawingObjectData } from '../../shared/types'
 import type { DrawingObject } from '../../drawing/objects/DrawingObject'
-import { sanitizeObjectData } from '../../shared/validation/sanitizers'
 
 /**
- * Manages copy/paste/cut operations for objects
+ *  copy/paste/cut operations for objects
  */
 export class ClipboardManager {
-    private clipboard: DrawingObjectData[]
+    private clipboard: Array<{ id: string; type: string; data: DrawingObjectData; zIndex: number }>
 
     constructor() {
         this.clipboard = []
@@ -16,10 +15,10 @@ export class ClipboardManager {
         if (objects.length === 0) {
             return
         }
-        this.clipboard = objects.map(obj => sanitizeObjectData(obj.toJSON().data))
-    }  
-
-    getClipboard(): DrawingObjectData[] {
+        this.clipboard = objects.map(obj => obj.toJSON())
+    }
+ 
+    getClipboard(): Array<{ id: string; type: string; data: DrawingObjectData; zIndex: number }> {
         return this.clipboard
     }
 
