@@ -1,6 +1,10 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR } from '../../../shared/constants'
 import type { Point, Bounds, CircleData } from '../../../shared/types'
+import type { Transform } from '../../transforms/Transform'
+import type { ResizeConstraints } from '../../transforms/ResizeConstraints'
+import { createCircleConstraints } from '../../transforms/ResizeConstraints'
+import { applyTransformToBounds } from '../../transforms/Transform'
 
 export class Circle extends DrawingObject<CircleData> {
     constructor(id: string | null, data: CircleData, zIndex: number) {
@@ -109,10 +113,33 @@ export class Circle extends DrawingObject<CircleData> {
         this.data.x1 = centerX
         this.data.y1 = centerY
 
-        // Update radius point (to the right of center)
+        // radius point (to the right of center)
         this.data.x2 = centerX + radius
         this.data.y2 = centerY
     }
+
+    override getResizeConstraints(): ResizeConstraints {
+        return createCircleConstraints() // Always maintain aspect ratio
+    }
+
+    override applyTransform(transform: Transform): void {
+        const bounds = this.getBounds()
+        const newBounds = applyTransformToBounds(bounds, transform)
+
+        // always use the average of width/height for radius; keeps it circle
+        const radius = Math.max(newBounds.width, newBounds.height) / 2
+
+        // Calculate center position
+        const centerX = newBounds.x + newBounds.width / 2
+        const centerY = newBounds.y + newBounds.height / 2
+
+        // Update center and radius
+        this.data.x1 = centerX
+        this.data.y1 = centerY
+        this.data.x2 = centerX + radius
+        this.data.y2 = centerY
+    }
+
     override render(ctx: CanvasRenderingContext2D): void {
         const radius = Math.sqrt(
             Math.pow(this.data.x2 - this.data.x1, 2) + Math.pow(this.data.y2 - this.data.y1, 2)

@@ -1,6 +1,10 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR, LINE_CLICK_TOLERANCE } from '../../../shared/constants'
 import type { Point, Bounds, LineData } from '../../../shared/types'
+import type { Transform } from '../../transforms/Transform'
+import type { ResizeConstraints } from '../../transforms/ResizeConstraints'
+import { createDefaultConstraints } from '../../transforms/ResizeConstraints'
+import { applyTransformToPoint } from '../../transforms/Transform'
 
 export class Line extends DrawingObject<LineData> {
     constructor(id: string | null, data: LineData, zIndex: number) {
@@ -67,9 +71,21 @@ export class Line extends DrawingObject<LineData> {
         this.data.y2 += dy
     }
 
-    override resize(handleIndex: number, newX: number, newY: number, fixedPoint: Point, initialBounds: Bounds): void {
+    override resize(
+        handleIndex: number,
+        newX: number,
+        newY: number,
+        fixedPoint: Point,
+        initialBounds: Bounds
+    ): void {
         // Use parent's calculation, then adjust for padding
-        const visualBounds = this.calculateResizedBounds(handleIndex, newX, newY, fixedPoint, initialBounds)
+        const visualBounds = this.calculateResizedBounds(
+            handleIndex,
+            newX,
+            newY,
+            fixedPoint,
+            initialBounds
+        )
         const padding = (this.data.width || 2) / 2
 
         // Convert visual bounds to content bounds (remove padding)
@@ -103,6 +119,25 @@ export class Line extends DrawingObject<LineData> {
         this.data.y1 = newBounds.y + (this.data.y1 - oldContentY) * scaleY
         this.data.x2 = newBounds.x + (this.data.x2 - oldContentX) * scaleX
         this.data.y2 = newBounds.y + (this.data.y2 - oldContentY) * scaleY
+    }
+
+    /**
+     * NEW TRANSFORM-BASED API
+     */
+
+    override getResizeConstraints(): ResizeConstraints {
+        return createDefaultConstraints() // Free resize
+    }
+
+    override applyTransform(transform: Transform): void {
+        // Transform both endpoints of the line
+        const p1 = applyTransformToPoint({ x: this.data.x1, y: this.data.y1 }, transform)
+        const p2 = applyTransformToPoint({ x: this.data.x2, y: this.data.y2 }, transform)
+
+        this.data.x1 = p1.x
+        this.data.y1 = p1.y
+        this.data.x2 = p2.x
+        this.data.y2 = p2.y
     }
 
     override render(ctx: CanvasRenderingContext2D): void {

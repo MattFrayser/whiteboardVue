@@ -1,6 +1,10 @@
 import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR } from '../../../shared/constants'
 import type { Bounds, RectangleData } from '../../../shared/types'
+import type { Transform } from '../../transforms/Transform'
+import type { ResizeConstraints } from '../../transforms/ResizeConstraints'
+import { createDefaultConstraints } from '../../transforms/ResizeConstraints'
+import { applyTransformToBounds } from '../../transforms/Transform'
 
 export class Rectangle extends DrawingObject<RectangleData> {
     constructor(id: string | null, data: RectangleData, zIndex: number) {
@@ -17,10 +21,11 @@ export class Rectangle extends DrawingObject<RectangleData> {
     }
 
     override applyBounds(newBounds: Bounds): void {
+        // Negative width/height = flipped
         this.data.x1 = newBounds.x
         this.data.y1 = newBounds.y
-        this.data.x2 = newBounds.x + newBounds.width
-        this.data.y2 = newBounds.y + newBounds.height
+        this.data.x2 = newBounds.x + newBounds.width  // w < 0 || x2 < x1 = flip
+        this.data.y2 = newBounds.y + newBounds.height // h< 0 || y2 < y1 = flip
     }
 
     override move(dx: number, dy: number): void {
@@ -28,6 +33,25 @@ export class Rectangle extends DrawingObject<RectangleData> {
         this.data.y1 += dy
         this.data.x2 += dx
         this.data.y2 += dy
+    }
+
+    /**
+     * NEW TRANSFORM-BASED API
+     */
+
+    override getResizeConstraints(): ResizeConstraints {
+        return createDefaultConstraints() // Free resize by default
+    }
+
+    override applyTransform(transform: Transform): void {
+        const bounds = this.getBounds()
+        const newBounds = applyTransformToBounds(bounds, transform)
+
+        // Apply new bounds (supports flipping with negative width/height)
+        this.data.x1 = newBounds.x
+        this.data.y1 = newBounds.y
+        this.data.x2 = newBounds.x + newBounds.width
+        this.data.y2 = newBounds.y + newBounds.height
     }
 
     override render(ctx: CanvasRenderingContext2D): void {

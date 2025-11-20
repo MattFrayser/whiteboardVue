@@ -2,6 +2,11 @@ import { DrawingObject } from '../DrawingObject'
 import { DEFAULT_COLOR } from '../../../shared/constants'
 import type { Bounds, StrokeData } from '../../../shared/types'
 import { clampCoordinate, clampBrushSize, validateColor } from '../../../shared/validation'
+import type { Transform } from '../../transforms/Transform'
+import type { ResizeConstraints } from '../../transforms/ResizeConstraints'
+import { createDefaultConstraints } from '../../transforms/ResizeConstraints'
+import { applyTransformToPoint } from '../../transforms/Transform'
+
 export class Stroke extends DrawingObject<StrokeData> {
     constructor(id: string | null, data: StrokeData, zIndex: number) {
         // Defensive validation to prevent crashes from NaN/Infinity in render loop
@@ -13,7 +18,7 @@ export class Stroke extends DrawingObject<StrokeData> {
         }
         data.points = data.points.map(point => ({
             x: clampCoordinate(point.x),
-            y: clampCoordinate(point.y)
+            y: clampCoordinate(point.y),
         }))
 
         super(id, 'stroke', data, zIndex)
@@ -65,6 +70,23 @@ export class Stroke extends DrawingObject<StrokeData> {
             x: newBounds.x + (point.x - oldBounds.x) * scaleX,
             y: newBounds.y + (point.y - oldBounds.y) * scaleY,
         }))
+    }
+
+    /**
+     * NEW TRANSFORM-BASED API
+     */
+
+    override getResizeConstraints(): ResizeConstraints {
+        return createDefaultConstraints() // Free resize
+    }
+
+    override applyTransform(transform: Transform): void {
+        if (!this.data.points) return
+
+        // Transform each point in the stroke
+        this.data.points = this.data.points.map(point =>
+            applyTransformToPoint(point, transform)
+        )
     }
 
     override render(ctx: CanvasRenderingContext2D): void {

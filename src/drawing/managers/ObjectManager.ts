@@ -9,11 +9,15 @@ import type { DrawingObject } from '../../drawing/objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../../shared/types/common'
 import type { MigrationResult } from '../../shared/types/network'
 import { createLogger } from '../../shared/utils/logger'
+import {
+    executePaste,
+    broadcastOperationEffect,
+    prepareNetworkMigration,
+    broadcastLocalObjects,
+} from './objectMangerHelper'
+
+
 const log = createLogger('ObjectManager')
-
-
-// Import extracted algorithms
-import { executePaste, broadcastOperationEffect, prepareNetworkMigration, broadcastLocalObjects } from './objectMangerHelper'
 
 export class ObjectManager {
     networkManager: WebSocketManager | null
@@ -32,14 +36,12 @@ export class ObjectManager {
         this.nextZIndex = 0
         this.isLocalMode = !networkManager
 
-        // Initialize managers
         this.objectStore = new ObjectStore()
         this.historyManager = new HistoryManager(() => this.userId)
         this.clipboardManager = new ClipboardManager()
         this.selectionManager = new SelectionManager(this, this.objectStore, this.historyManager)
         this.localStorageManager = new LocalStorageManager()
 
-        // Load objects from localStorage if in local mode
         if (this.isLocalMode) {
             this.loadFromLocalStorage()
         }
@@ -76,7 +78,7 @@ export class ObjectManager {
      * Attach network manager - delegates to migration algorithm
      */
     async attachNetworkManager(
-        networkManager: WebSocketManager, 
+        networkManager: WebSocketManager,
         newUserId: string
     ): Promise<MigrationResult> {
         log.debug('Attaching network manager')
@@ -95,7 +97,7 @@ export class ObjectManager {
             getAllObjects: () => this.getAllObjects(),
             clearLocalStorage: () => this.localStorageManager.clear(),
             disableLocalStorage: () => this.localStorageManager.disable(),
-            migrateHistoryUserId: (oldId, newId) => this.historyManager.migrateUserId(oldId, newId)
+            migrateHistoryUserId: (oldId, newId) => this.historyManager.migrateUserId(oldId, newId),
         })
 
         // Broadcast to server
@@ -122,7 +124,11 @@ export class ObjectManager {
         return this.objectStore.getObjectAt(point)
     }
 
-    createObjectFromData(data: DrawingObjectData | { id: string; type: string; data: DrawingObjectData; zIndex: number }): DrawingObject | null {
+    createObjectFromData(
+        data:
+            | DrawingObjectData
+            | { id: string; type: string; data: DrawingObjectData; zIndex: number }
+    ): DrawingObject | null {
         return this.objectStore.createObjectFromData(data)
     }
 
@@ -182,7 +188,11 @@ export class ObjectManager {
         return false
     }
 
-    updateObjectInQuadtree(object: DrawingObject, oldBounds: Bounds, newBounds: Bounds | null = null): void {
+    updateObjectInQuadtree(
+        object: DrawingObject,
+        oldBounds: Bounds,
+        newBounds: Bounds | null = null
+    ): void {
         this.objectStore.updateObjectInQuadtree(object, oldBounds, newBounds)
     }
 
@@ -216,7 +226,6 @@ export class ObjectManager {
         this.selectionManager.moveSelected(dx, dy)
     }
 
-
     // ============================================================
     // Clipboard Operations
     // ============================================================
@@ -244,9 +253,9 @@ export class ObjectManager {
         const newObjects = executePaste({
             clipboardData: this.clipboardManager.getClipboard(),
             targetPosition: { x, y },
-            createObject: (data) => this.createObjectFromData(data),
-            addObjectWithoutHistory: (obj) => this.addObject(obj, false),
-            selectObject: (obj, multi) => this.selectObject(obj, multi)
+            createObject: data => this.createObjectFromData(data),
+            addObjectWithoutHistory: obj => this.addObject(obj, false),
+            selectObject: (obj, multi) => this.selectObject(obj, multi),
         })
 
         // Broadcast updates to network
@@ -279,8 +288,8 @@ export class ObjectManager {
         if (this.networkManager) {
             broadcastOperationEffect(operation, true, {
                 networkManager: this.networkManager,
-                getObjectById: (id) => this.getObjectById(id),
-                createObjectFromData: (data) => this.createObjectFromData(data)
+                getObjectById: id => this.getObjectById(id),
+                createObjectFromData: data => this.createObjectFromData(data),
             })
         }
     }
@@ -300,10 +309,11 @@ export class ObjectManager {
         if (this.networkManager) {
             broadcastOperationEffect(operation, false, {
                 networkManager: this.networkManager,
-                getObjectById: (id) => this.getObjectById(id),
-                createObjectFromData: (data) => this.createObjectFromData(data)
+                getObjectById: id => this.getObjectById(id),
+                createObjectFromData: data => this.createObjectFromData(data),
             })
-        }}
+        }
+    }
 
     // ============================================================
     // Remote Operations (from network)
@@ -334,5 +344,4 @@ export class ObjectManager {
     render(ctx: CanvasRenderingContext2D, viewport: Bounds | null = null): void {
         this.objectStore.render(ctx, viewport, this.selectedObjects)
     }
-
 }

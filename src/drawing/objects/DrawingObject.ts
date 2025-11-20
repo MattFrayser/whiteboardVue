@@ -1,5 +1,9 @@
 import type { Point, Bounds, DrawingObjectData, ResizeHandle } from '../../shared/types'
 import { SELECTION_COLOR, SELECTION_HANDLE_BG } from '../../shared/constants'
+import type { Transform } from '../transforms/Transform'
+import type { ResizeConstraints } from '../transforms/ResizeConstraints'
+import { createDefaultConstraints } from '../transforms/ResizeConstraints'
+import { applyTransformToBounds } from '../transforms/Transform'
 
 /**
  * Base class for all drawing objects
@@ -97,7 +101,7 @@ export class DrawingObject<T extends DrawingObjectData = DrawingObjectData> {
         ]
     }
 
-    private _calculateSideHandleBounds(
+    private calculateSideHandleBounds(
         handleIndex: 1 | 3 | 5 | 7,
         newX: number,
         newY: number,
@@ -106,36 +110,42 @@ export class DrawingObject<T extends DrawingObjectData = DrawingObjectData> {
         top: number,
         bottom: number
     ): Bounds {
-        const isVertical = handleIndex === 1 || handleIndex === 5    
-        
+        const isVertical = handleIndex === 1 || handleIndex === 5
+
         if (isVertical) {
             // North (1) or South (5)
             const isNorth = handleIndex === 1
             const newEdge = isNorth ? newY : newY
             const fixedEdge = isNorth ? bottom : top
-            
+
             return {
                 x: Math.min(left, right),
                 y: Math.min(newEdge, fixedEdge),
                 width: Math.abs(right - left),
-                height: Math.max(1, Math.abs(fixedEdge - newEdge))
+                height: Math.max(1, Math.abs(fixedEdge - newEdge)),
             }
         } else {
             // East (3) or West (7)
             const isEast = handleIndex === 3
             const newEdge = isEast ? newX : newX
             const fixedEdge = isEast ? left : right
-            
+
             return {
                 x: Math.min(newEdge, fixedEdge),
                 y: Math.min(top, bottom),
                 width: Math.max(1, Math.abs(newEdge - fixedEdge)),
-                height: Math.abs(bottom - top)
+                height: Math.abs(bottom - top),
             }
         }
     }
 
-    calculateResizedBounds(handleIndex: number, newX: number, newY: number, fixedPoint: Point, initialBounds: Bounds): Bounds {
+    calculateResizedBounds(
+        handleIndex: number,
+        newX: number,
+        newY: number,
+        fixedPoint: Point,
+        initialBounds: Bounds
+    ): Bounds {
         const isSideHandle = [1, 3, 5, 7].includes(handleIndex)
 
         if (isSideHandle) {
@@ -144,7 +154,7 @@ export class DrawingObject<T extends DrawingObjectData = DrawingObjectData> {
             const top = initialBounds.y
             const bottom = initialBounds.y + initialBounds.height
 
-            return this._calculateSideHandleBounds(
+            return this.calculateSideHandleBounds(
                 handleIndex as 1 | 3 | 5 | 7,
                 newX,
                 newY,
@@ -154,23 +164,57 @@ export class DrawingObject<T extends DrawingObjectData = DrawingObjectData> {
                 bottom
             )
         }
+         
+        const rawWidth = newX - fixedPoint.x
+        const rawHeight = newY - fixedPoint.y
 
-    // use fixed point approach for corner handles
-    return {
-        x: Math.min(fixedPoint.x, newX),
-        y: Math.min(fixedPoint.y, newY),
-        width: Math.max(1, Math.abs(newX - fixedPoint.x)),
-        height: Math.max(1, Math.abs(newY - fixedPoint.y))
+        return {
+            x: fixedPoint.x,
+            y: fixedPoint.y,
+            width: rawWidth,   
+            height: rawHeight  
+        }
     }
-}
-    resize(handleIndex: number, newX: number, newY: number, fixedPoint: Point, initialBounds: Bounds): void {
-        const newBounds = this.calculateResizedBounds(handleIndex, newX, newY, fixedPoint, initialBounds)
+    resize(
+        handleIndex: number,
+        newX: number,
+        newY: number,
+        fixedPoint: Point,
+        initialBounds: Bounds
+    ): void {
+        const newBounds = this.calculateResizedBounds(
+            handleIndex,
+            newX,
+            newY,
+            fixedPoint,
+            initialBounds
+        )
         this.applyBounds(newBounds, handleIndex)
+    }
+
+    // Override in subclasses to specify custom behavior
+    getResizeConstraints(): ResizeConstraints {
+        return createDefaultConstraints()
+    }
+
+
+    // Override in subclasses for element-specific behavior
+    applyTransform(transform: Transform): void {
+        // Default implementation: apply to bounds
+        const bounds = this.getBounds()
+        const newBounds = applyTransformToBounds(bounds, transform)
+        this.applyBounds(newBounds, 0) // Use corner handle (0) as default
     }
 
     toJSON(): { id: string; type: string; data: T; zIndex: number } {
         // Create a copy of data excluding metadata fields
-        const { id: _id, type: _type, userId: _userId, timestamp: _timestamp, ...dataFields } = this.data
+        const {
+            id: _id,
+            type: _type,
+            userId: _userId,
+            timestamp: _timestamp,
+            ...dataFields
+        } = this.data
 
         return {
             id: this.id,

@@ -5,13 +5,10 @@ const log = createLogger('ObjectRegistry')
 
 export type ObjectConstructor = new (
     id: string | null,
-    data: any, 
+    data: any,
     zIndex: number
 ) => DrawingObject<any>
 
-/**
- * Provides a centralized system for registering and creating drawing objects.
-*/
 export class ObjectRegistry {
     private static objects: Map<string, ObjectConstructor> = new Map()
 

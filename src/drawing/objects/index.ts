@@ -1,6 +1,4 @@
 /**
- * Object Type Registration
- *
  * This file registers all available drawing object types with the ObjectRegistry.
  */
 
