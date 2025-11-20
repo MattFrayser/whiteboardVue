@@ -136,14 +136,14 @@ export class HistoryManager {
                         value: newUserId,
                         writable: false,
                         enumerable: true,
-                        configurable: true
+                        configurable: true,
                     })
                 }
                 return operation
             } catch (error) {
                 ErrorHandler.silent(error as Error, {
                     context: 'HistoryManager',
-                    metadata: { operation: 'migrateUserId', oldUserId, newUserId }
+                    metadata: { operation: 'migrateUserId', oldUserId, newUserId },
                 })
                 return operation // Return unchanged on error
             }

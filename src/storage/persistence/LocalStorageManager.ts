@@ -5,7 +5,12 @@
  */
 import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
 import type { DrawingObjectData, Point } from '../../shared/types/common'
-import { clampCoordinate, clampBrushSize, validateColor, isValidObject } from '../../shared/validation'
+import {
+    clampCoordinate,
+    clampBrushSize,
+    validateColor,
+    isValidObject,
+} from '../../shared/validation'
 
 import { createLogger } from '../../shared/utils/logger'
 const log = createLogger('LocalStorage')
@@ -32,7 +37,7 @@ export class LocalStorageManager {
         this.isLocal = isLocal
     }
 
-   /**
+    /**
      * For offline mode where no backend validation exists
      */
     private sanitizeObjectData(data: DrawingObjectData): DrawingObjectData {
@@ -58,7 +63,7 @@ export class LocalStorageManager {
         if (Array.isArray(data.points)) {
             data.points = data.points.map((point: Point) => ({
                 x: clampCoordinate(point.x),
-                y: clampCoordinate(point.y)
+                y: clampCoordinate(point.y),
             }))
         }
 
@@ -87,13 +92,13 @@ export class LocalStorageManager {
                     ErrorHandler.storage(error, {
                         context: 'LocalStorageManager',
                         code: ErrorCode.STORAGE_QUOTA_EXCEEDED,
-                        metadata: { objectCount: objects.length }
+                        metadata: { objectCount: objects.length },
                     })
                 } else {
                     ErrorHandler.storage(error as Error, {
                         context: 'LocalStorageManager',
                         code: ErrorCode.SAVE_FAILED,
-                        metadata: { objectCount: objects.length }
+                        metadata: { objectCount: objects.length },
                     })
                 }
             }
@@ -104,7 +109,7 @@ export class LocalStorageManager {
      * Load objects from localStorage
      * @returns {Array} Array of object data (not instantiated objects)
      */
-    loadObjects(): { objects: DrawingObjectData[], maxZIndex: number } {
+    loadObjects(): { objects: DrawingObjectData[]; maxZIndex: number } {
         if (!this.enabled) {
             return { objects: [], maxZIndex: 0 }
         }
@@ -116,7 +121,7 @@ export class LocalStorageManager {
             }
 
             const parsed = JSON.parse(data)
-            
+
             if (!Array.isArray(parsed)) {
                 log.error('Invalid data format (not an array), clearing storage')
                 this.clear() // Clear corrupted data
@@ -139,7 +144,11 @@ export class LocalStorageManager {
 
             let maxZIndex = 0
             sanitizeObjects.forEach((obj: DrawingObjectData) => {
-                if (obj.zIndex !== undefined && obj.zIndex !== null && typeof obj.zIndex === 'number') {
+                if (
+                    obj.zIndex !== undefined &&
+                    obj.zIndex !== null &&
+                    typeof obj.zIndex === 'number'
+                ) {
                     maxZIndex = Math.max(maxZIndex, obj.zIndex + 1)
                 }
             })
@@ -148,13 +157,13 @@ export class LocalStorageManager {
         } catch (error) {
             ErrorHandler.storage(error as Error, {
                 context: 'LocalStorageManager',
-                code: ErrorCode.LOAD_FAILED
+                code: ErrorCode.LOAD_FAILED,
             })
             this.clear() // clear currupt data
             return { objects: [], maxZIndex: 0 }
         }
     }
- 
+
     /**
      * Called when transitioning from local mode to networked mode
      */
@@ -166,7 +175,7 @@ export class LocalStorageManager {
             // Use silent error - clearing is not critical
             ErrorHandler.silent(error as Error, {
                 context: 'LocalStorageManager',
-                metadata: { operation: 'clear' }
+                metadata: { operation: 'clear' },
             })
         }
     }

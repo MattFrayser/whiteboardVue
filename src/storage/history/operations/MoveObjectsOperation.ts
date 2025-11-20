@@ -110,7 +110,7 @@ export class MoveObjectsOperation implements Operation {
             value: Math.min(this.timestamp, otherMove.timestamp),
             writable: false,
             enumerable: true,
-            configurable: true
+            configurable: true,
         })
 
         return merged

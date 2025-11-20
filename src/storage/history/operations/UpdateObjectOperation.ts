@@ -16,7 +16,15 @@ export class UpdateObjectOperation implements Operation {
     readonly beforeData: DrawingObjectData
     readonly afterData: DrawingObjectData
 
-    constructor(objectId: string, beforeData: DrawingObjectData, afterData: DrawingObjectData, userId: string) {
+    // TODO: history is storing data flat, vs nested in rest of project.
+    //       Deciding if i should switch rest of proj to flat for easier
+    //       clarity of obj attributes. or just change this to nested
+    constructor(
+        objectId: string,
+        beforeData: DrawingObjectData,
+        afterData: DrawingObjectData,
+        userId: string
+    ) {
         this.id = `update_${objectId}_${Date.now()}`
         this.userId = userId
         this.timestamp = Date.now()
