@@ -43,16 +43,16 @@ export class ToolControls {
     }
 
     subscribeToState(): void {
-        this.unsubscribeTool = appState.subscribe('ui.tool', (tool) => {
+        this.unsubscribeTool = appState.subscribe('ui.tool', tool => {
             this.updateToolButtons(tool as string)
         })
 
-        this.unsubscribeBrushSize = appState.subscribe('ui.brushSize', (size) => {
+        this.unsubscribeBrushSize = appState.subscribe('ui.brushSize', size => {
             this.updateBrushSizeUI(size as number)
         })
 
         // History state changes
-        this.unsubscribeHistory = appState.subscribe('history', (historyState) => {
+        this.unsubscribeHistory = appState.subscribe('history', historyState => {
             const { canUndo, canRedo } = historyState as { canUndo: boolean; canRedo: boolean }
             const undoBtn = document.getElementById('undoBtn') as HTMLButtonElement
             const redoBtn = document.getElementById('redoBtn') as HTMLButtonElement
@@ -65,7 +65,7 @@ export class ToolControls {
         // Tool buttons
         document.querySelectorAll('.tool-btn').forEach(btn => {
             const handler = () => {
-                const tool = ((btn as HTMLElement).dataset).tool
+                const tool = (btn as HTMLElement).dataset.tool
                 if (tool) actions.setTool(tool as Tool)
             }
             btn.addEventListener('click', handler)
@@ -126,7 +126,7 @@ export class ToolControls {
     updateToolButtons(tool: string): void {
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.classList.remove('active')
-            if (((btn as HTMLElement).dataset).tool === tool) {
+            if ((btn as HTMLElement).dataset.tool === tool) {
                 btn.classList.add('active')
             }
         })

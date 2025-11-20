@@ -20,7 +20,11 @@ export class InviteManager {
     boundHandleCreateSession: (() => void) | null
     boundHandleOverlayClick: ((e: MouseEvent) => void) | null
 
-    constructor(roomCode: string | null, notificationManager: NotificationManager | null = null, sessionManager: SessionManager | null = null) {
+    constructor(
+        roomCode: string | null,
+        notificationManager: NotificationManager | null = null,
+        sessionManager: SessionManager | null = null
+    ) {
         this.roomCode = roomCode // null in local mode, string when networked
         this.notificationManager = notificationManager
         this.sessionManager = sessionManager
@@ -46,10 +50,6 @@ export class InviteManager {
         })
     }
 
-    /**
-     * Set session manager (called after SessionManager is created)
-     * @param {SessionManager} sessionManager - The session manager instance
-     */
     setSessionManager(sessionManager: SessionManager) {
         this.sessionManager = sessionManager
     }
@@ -120,7 +120,9 @@ export class InviteManager {
     async handleCreateSession() {
         // Collect settings from modal
         const settings = {
-            password: this.passwordToggle?.checked ? this.passwordInput?.value || undefined : undefined,
+            password: this.passwordToggle?.checked
+                ? this.passwordInput?.value || undefined
+                : undefined,
         }
 
         log.debug('Collected settings', { settings })
@@ -138,7 +140,7 @@ export class InviteManager {
             } catch (error) {
                 ErrorHandler.silent(error as Error, {
                     context: 'InviteManager',
-                    metadata: { operation: 'createSession' }
+                    metadata: { operation: 'createSession' },
                 })
                 if (this.notificationManager) {
                     this.notificationManager.showError('Failed to create session', 3000)
@@ -147,7 +149,7 @@ export class InviteManager {
         } else {
             ErrorHandler.silent(new Error('SessionManager not set'), {
                 context: 'InviteManager',
-                metadata: { operation: 'createSession' }
+                metadata: { operation: 'createSession' },
             })
         }
     }
@@ -180,7 +182,10 @@ export class InviteManager {
             }
         } catch (error) {
             if (this.notificationManager) {
-                this.notificationManager.showError('Error encountered while copying to clipboard', 3000)
+                this.notificationManager.showError(
+                    'Error encountered while copying to clipboard',
+                    3000
+                )
             }
         }
     }
@@ -197,9 +202,6 @@ export class InviteManager {
         this.createSessionMenu.classList.remove('show')
     }
 
-    /**
-     * Cleanup method - remove event listeners and subscriptions
-     */
     destroy() {
         // Unsubscribe from state changes
         if (this.unsubscribeNetworkStatus) {

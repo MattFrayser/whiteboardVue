@@ -5,29 +5,29 @@ import type { DrawingObjectData } from '../../src/shared/types/common'
 
 // Mock AppState
 vi.mock('../../src/shared/stores/AppState', () => ({
-  appState: {
-    get: vi.fn(),
-    set: vi.fn(),
-    subscribe: vi.fn(() => () => {}),
-  },
-  actions: {
-    setCanUndo: vi.fn(),
-    setCanRedo: vi.fn(),
-  },
+    appState: {
+        get: vi.fn(),
+        set: vi.fn(),
+        subscribe: vi.fn(() => () => {}),
+    },
+    actions: {
+        setCanUndo: vi.fn(),
+        setCanRedo: vi.fn(),
+    },
 }))
 
 function createRectangleData(overrides: Partial<DrawingObjectData> = {}): DrawingObjectData {
-  return {
-    id: '',
-    type: 'rectangle',
-    x: 0,
-    y: 0,
-    width: 100,
-    height: 50,
-    color: '#000000',
-    strokeWidth: 2,
-    ...overrides,
-  }
+    return {
+        id: '',
+        type: 'rectangle',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        color: '#000000',
+        strokeWidth: 2,
+        ...overrides,
+    }
 }
 
 describe('ObjectManager', () => {

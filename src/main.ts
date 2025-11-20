@@ -14,15 +14,15 @@ const log = createLogger('App')
 
 function validateSecureConnection(): void {
     const isDevelopment = import.meta.env.DEV
-    const wsUrl = WS_BASE_URL 
+    const wsUrl = WS_BASE_URL
     const apiUrl = API_BASE_URL
 
     if (!isDevelopment) {
         if (!wsUrl.startsWith('wss://')) {
-            throw new Error("Production must use WSS")
+            throw new Error('Production must use WSS')
         }
         if (!apiUrl.startsWith('https://')) {
-            throw new Error("Production must use HTTPS")
+            throw new Error('Production must use HTTPS')
         }
     } else {
         log.warn('Development mode: using insecure protocols')
@@ -70,15 +70,15 @@ sessionManager.setLocalUserId(localUserId)
 inviteManager.setSessionManager(sessionManager)
 
 // Sync AppState UI changes to engine
-appState.subscribe('ui.tool', (tool) => {
+appState.subscribe('ui.tool', tool => {
     engine.setTool(tool as 'draw' | 'rectangle' | 'circle' | 'select' | 'eraser' | 'line' | 'text')
 })
 
-appState.subscribe('ui.color', (color) => {
+appState.subscribe('ui.color', color => {
     engine.currentColor = color as string
 })
 
-appState.subscribe('ui.brushSize', (size) => {
+appState.subscribe('ui.brushSize', size => {
     engine.currentWidth = size as number
 })
 
@@ -87,19 +87,23 @@ engine.start()
 
 // Show join room prompt if URL contains room code
 if (roomCodeFromURL) {
-    dialogManager.showJoinRoomDialog(roomCodeFromURL, async () => {
-        try {
-            await sessionManager.joinSession(roomCodeFromURL)
-        } catch (error) {
-            // SessionManager already handles error display, just log here
-            ErrorHandler.silent(error as Error, {
-                context: 'App',
-                metadata: { roomCode: roomCodeFromURL }
-            })
+    dialogManager.showJoinRoomDialog(
+        roomCodeFromURL,
+        async () => {
+            try {
+                await sessionManager.joinSession(roomCodeFromURL)
+            } catch (error) {
+                // SessionManager already handles error display, just log here
+                ErrorHandler.silent(error as Error, {
+                    context: 'App',
+                    metadata: { roomCode: roomCodeFromURL },
+                })
+            }
+        },
+        () => {
+            log.debug('User chose to stay in local mode')
         }
-    }, () => {
-        log.debug('User chose to stay in local mode')
-    })
+    )
 }
 
 // Clean up on exit

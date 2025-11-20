@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
-  sanitizeObjectData,
-  sanitizeRoomCode,
-  validateColor,
-  clampBrushSize,
-  clampCoordinate,
-  isValidDrawingObjectData,
-  isAuthenticatedMessage,
+    sanitizeObjectData,
+    sanitizeRoomCode,
+    validateColor,
+    clampBrushSize,
+    clampCoordinate,
+    isValidDrawingObjectData,
+    isAuthenticatedMessage,
 } from '../../src/shared/validation'
 import type { DrawingObjectData } from '../../src/shared/types/common'
 
@@ -95,14 +95,14 @@ describe('createMessageValidator', () => {
         const msg = { type: 'authenticated', userId: 'user123' }
         expect(isAuthenticatedMessage(msg)).toBe(true)
     })
-    
+
     it('should reject invalid type', () => {
         const msg = { type: 'wrong', userId: 'user123' }
         expect(isAuthenticatedMessage(msg)).toBe(false)
     })
-    
+
     it('should reject invalid optional field', () => {
-        const msg = { type: 'authenticated', userId: 123 }  // number instead of string
+        const msg = { type: 'authenticated', userId: 123 } // number instead of string
         expect(isAuthenticatedMessage(msg)).toBe(false)
     })
 })

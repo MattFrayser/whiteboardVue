@@ -9,34 +9,33 @@ import { actions } from '../../src/shared/stores/AppState'
 
 // Mock AppState
 vi.mock('../../src/shared/stores/AppState', () => ({
-  appState: {
-    get: vi.fn((key: string) => {
-      if (key === 'selection.objectIds') return []
-      return undefined
-    }),
-    set: vi.fn(),
-    subscribe: vi.fn(() => () => {}),
-  },
-  actions: {
-    setSelection: vi.fn(),
-    clearSelection: vi.fn(),
-    setHistoryState: vi.fn(), 
-  },
+    appState: {
+        get: vi.fn((key: string) => {
+            if (key === 'selection.objectIds') return []
+            return undefined
+        }),
+        set: vi.fn(),
+        subscribe: vi.fn(() => () => {}),
+    },
+    actions: {
+        setSelection: vi.fn(),
+        clearSelection: vi.fn(),
+        setHistoryState: vi.fn(),
+    },
 }))
 
-
 function createRectangleData(overrides: Partial<DrawingObjectData> = {}): DrawingObjectData {
-  return {
-    id: '',
-    type: 'rectangle',
-    x: 0,
-    y: 0,
-    width: 100,
-    height: 50,
-    color: '#000000',
-    strokeWidth: 2,
-    ...overrides,
-  }
+    return {
+        id: '',
+        type: 'rectangle',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        color: '#000000',
+        strokeWidth: 2,
+        ...overrides,
+    }
 }
 
 describe('SelectionManager', () => {

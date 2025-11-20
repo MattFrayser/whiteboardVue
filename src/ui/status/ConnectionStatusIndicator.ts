@@ -35,7 +35,7 @@ export class ConnectionStatusIndicator {
         }
 
         // Subscribe to network status changes
-        this.unsubscribe = appState.subscribe('network.status', (status) => {
+        this.unsubscribe = appState.subscribe('network.status', status => {
             this.updateStatus(status as string)
         })
 

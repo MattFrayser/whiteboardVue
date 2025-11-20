@@ -30,4 +30,3 @@ export class Toolbar {
         this.toolControls.destroy()
     }
 }
-

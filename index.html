@@ -1,143 +1,208 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>whiteboard</title>
-  </head>
-  <body>
-    <div id="app">
-
-        <div class = "toolbar"> 
-            <div class="toolbar-section">
-                <div class="color-picker-container">
-                    <div class="color-swatches">
-                        <button class="swatch active" data-color="#000000" data-size="5">
-                            <div class="swatch-circle" style="background: #000000; width: 12px; height: 12px;"></div>
-                        </button>
-                        <button class="swatch" data-color="#FF0000" data-size="15">
-                            <div class="swatch-circle" style="background: #FF0000; width: 22px; height: 22px;"></div>
-                        </button>
-                        <button class="swatch" data-color="#0000FF" data-size="25">
-                            <div class="swatch-circle" style="background: #0000FF; width: 28px; height: 28px;"></div>
-                        </button>
-                    </div>
-                    
-                    <div id="colorMenu" class="color-menu hidden">
-                        <div class="brush-size-control">
-                            <input type="range" id="brushSize" min="1" max="25" value="5">
-                            <label>Thickness</label>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>whiteboard</title>
+    </head>
+    <body>
+        <div id="app">
+            <div class="toolbar">
+                <div class="toolbar-section">
+                    <div class="color-picker-container">
+                        <div class="color-swatches">
+                            <button class="swatch active" data-color="#000000" data-size="5">
+                                <div
+                                    class="swatch-circle"
+                                    style="background: #000000; width: 12px; height: 12px"
+                                ></div>
+                            </button>
+                            <button class="swatch" data-color="#FF0000" data-size="15">
+                                <div
+                                    class="swatch-circle"
+                                    style="background: #ff0000; width: 22px; height: 22px"
+                                ></div>
+                            </button>
+                            <button class="swatch" data-color="#0000FF" data-size="25">
+                                <div
+                                    class="swatch-circle"
+                                    style="background: #0000ff; width: 28px; height: 28px"
+                                ></div>
+                            </button>
                         </div>
-                        <input type="color" id="colorPicker" value="#000000">
-                        <div class="color-grid" id="colorGrid"></div>
+
+                        <div id="colorMenu" class="color-menu hidden">
+                            <div class="brush-size-control">
+                                <input type="range" id="brushSize" min="1" max="25" value="5" />
+                                <label>Thickness</label>
+                            </div>
+                            <input type="color" id="colorPicker" value="#000000" />
+                            <div class="color-grid" id="colorGrid"></div>
+                        </div>
                     </div>
-                </div>        
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <div class="toolbar-section">
+                    <button class="tool-btn" data-tool="select" title="Select (S)">
+                        <svg width="20" height="20" viewBox="0 0 16 16">
+                            <path d="M2 2L6 14L8 9L14 7L2 2Z" fill="currentColor" />
+                        </svg>
+                    </button>
+                    <button class="tool-btn active" data-tool="draw" title="Pen (P)">
+                        <svg width="16" height="16" viewBox="0 0 16 16">
+                            <path
+                                d="M13.5 2.5L12 1L2 11V15H6L16 5L14.5 3.5L13.5 2.5Z"
+                                fill="currentColor"
+                            />
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tool="eraser" title="Eraser (E)">
+                        <svg width="21" height="16" viewBox="0 0 21 18">
+                            <path
+                                d="M11.004 3.79825L13.1477 1.69956C13.5424 1.31321 14.1755 1.31992 14.5618 1.71457L19.4588 6.71656C19.8451 7.11121 19.8384 7.74434 19.4438 8.1307L17.3001 10.2294M11.004 3.79825L1.71458 12.8926C1.31993 13.2789 1.31321 13.9121 1.69957 14.3067L4.20806 16.869C4.39359 17.0585 4.64681 17.1666 4.91202 17.1694L9.74017 17.2206C10.0054 17.2234 10.2608 17.1208 10.4503 16.9353L17.3001 10.2294M11.004 3.79825L17.3001 10.2294"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-width="2"
+                            />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <div class="toolbar-section">
+                    <button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">
+                        <svg width="16" height="16" viewBox="0 0 16 16">
+                            <rect
+                                x="2"
+                                y="2"
+                                width="12"
+                                height="12"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            />
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tool="circle" title="Circle (C)">
+                        <svg width="16" height="16" viewBox="0 0 16 16">
+                            <circle
+                                cx="8"
+                                cy="8"
+                                r="6"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            />
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tool="line" title="Line (L)">
+                        <svg width="16" height="16" viewBox="0 0 16 16">
+                            <line
+                                x1="2"
+                                y1="14"
+                                x2="14"
+                                y2="2"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            />
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tool="text" title="Text (T)">
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M4.23575 17.024C4.20375 16.784 4.20375 16.528 4.23575 16.256C5.03575 16.176 5.60375 16.104 5.93975 16.04C6.27575 15.96 6.48375 15.8 6.56375 15.56C6.64375 15.32 6.68375 14.912 6.68375 14.336V1.232H4.95575C4.10775 1.232 3.43575 1.352 2.93975 1.592C2.45975 1.816 2.06775 2.16 1.76375 2.624C1.47575 3.088 1.18775 3.68 0.89975 4.4C0.64375 4.432 0.38775 4.432 0.13175 4.4C0.22775 3.632 0.31575 2.896 0.39575 2.192C0.49175 1.488 0.57175 0.808 0.63575 0.151999C1.67575 0.216 2.82775 0.256 4.09175 0.271999C5.35575 0.271999 6.66775 0.271999 8.02775 0.271999C9.40375 0.271999 10.7238 0.271999 11.9878 0.271999C13.2678 0.256 14.4198 0.216 15.4438 0.151999C15.5078 0.791999 15.5718 1.472 15.6358 2.192C15.6998 2.896 15.7798 3.632 15.8758 4.4C15.6038 4.432 15.3398 4.432 15.0838 4.4C14.7798 3.664 14.4758 3.064 14.1718 2.6C13.8678 2.136 13.4758 1.792 12.9958 1.568C12.5318 1.344 11.8758 1.232 11.0278 1.232H9.32375V14.024C9.32375 14.52 9.33975 14.912 9.37175 15.2C9.40375 15.488 9.49175 15.696 9.63575 15.824C9.79575 15.952 10.0438 16.048 10.3798 16.112C10.7158 16.16 11.1798 16.208 11.7718 16.256C11.8198 16.512 11.8198 16.768 11.7718 17.024C11.4358 17.024 11.0278 17.016 10.5478 17C10.0838 17 9.61975 17 9.15575 17C8.69175 16.984 8.29975 16.976 7.97975 16.976C7.67575 16.976 7.29175 16.984 6.82775 17C6.37975 17 5.91575 17 5.43575 17C4.97175 17.016 4.57175 17.024 4.23575 17.024Z"
+                                fill="currentColor"
+                            />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <div class="toolbar-section">
+                    <button id="undoBtn" class="icon-btn" disabled title="Undo (Ctrl+Z)">
+                        <svg width="16" height="16" viewBox="0 0 16 16">
+                            <path
+                                d="M2 8H12C13.1 8 14 8.9 14 10C14 11.1 13.1 12 12 12H10M2 8L5 5M2 8L5 11"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-width="1.5"
+                            />
+                        </svg>
+                    </button>
+                    <button id="redoBtn" class="icon-btn" disabled title="Redo (Ctrl+Shift+Z)">
+                        <svg width="16" height="16" viewBox="0 0 16 16">
+                            <path
+                                d="M14 8H4C2.9 8 2 8.9 2 10C2 11.1 2.9 12 4 12H6M14 8L11 5M14 8L11 11"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-width="1.5"
+                            />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
-            <div class="toolbar-divider"></div>
-
-            <div class="toolbar-section">
-                <button class="tool-btn" data-tool="select" title="Select (S)">
-                    <svg width="20" height="20" viewBox="0 0 16 16">
-                        <path d="M2 2L6 14L8 9L14 7L2 2Z" fill="currentColor"/>
-                    </svg>
-                </button>
-                <button class="tool-btn active" data-tool="draw" title="Pen (P)">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                        <path d="M13.5 2.5L12 1L2 11V15H6L16 5L14.5 3.5L13.5 2.5Z" fill="currentColor"/>
-                    </svg>
-                </button>
-                <button class="tool-btn" data-tool="eraser" title="Eraser (E)">
-                    <svg width="21" height="16" viewBox="0 0 21 18">
-                        <path d="M11.004 3.79825L13.1477 1.69956C13.5424 1.31321 14.1755 1.31992 14.5618 1.71457L19.4588 6.71656C19.8451 7.11121 19.8384 7.74434 19.4438 8.1307L17.3001 10.2294M11.004 3.79825L1.71458 12.8926C1.31993 13.2789 1.31321 13.9121 1.69957 14.3067L4.20806 16.869C4.39359 17.0585 4.64681 17.1666 4.91202 17.1694L9.74017 17.2206C10.0054 17.2234 10.2608 17.1208 10.4503 16.9353L17.3001 10.2294M11.004 3.79825L17.3001 10.2294" stroke="currentColor" fill="none" stroke-width="2"/>
-                    </svg>
-                </button>
+            <div class="invite-link">
+                <button>Start Session</button>
             </div>
-        
-            <div class="toolbar-divider"></div>
+            <div class="createSession-overlay">
+                <div class="createSession-container">
+                    <h1>Start a Collaborative Session</h1>
+                    <p>Invite Others to join your whiteboard.</p>
 
-            <div class="toolbar-section">
-                <button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                        <rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                </button>
-                <button class="tool-btn" data-tool="circle" title="Circle (C)">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                </button>
-                <button class="tool-btn" data-tool="line" title="Line (L)">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                        <line x1="2" y1="14" x2="14" y2="2" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                </button>
-                <button class="tool-btn" data-tool="text" title="Text (T)">
-                    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M4.23575 17.024C4.20375 16.784 4.20375 16.528 4.23575 16.256C5.03575 16.176 5.60375 16.104 5.93975 16.04C6.27575 15.96 6.48375 15.8 6.56375 15.56C6.64375 15.32 6.68375 14.912 6.68375 14.336V1.232H4.95575C4.10775 1.232 3.43575 1.352 2.93975 1.592C2.45975 1.816 2.06775 2.16 1.76375 2.624C1.47575 3.088 1.18775 3.68 0.89975 4.4C0.64375 4.432 0.38775 4.432 0.13175 4.4C0.22775 3.632 0.31575 2.896 0.39575 2.192C0.49175 1.488 0.57175 0.808 0.63575 0.151999C1.67575 0.216 2.82775 0.256 4.09175 0.271999C5.35575 0.271999 6.66775 0.271999 8.02775 0.271999C9.40375 0.271999 10.7238 0.271999 11.9878 0.271999C13.2678 0.256 14.4198 0.216 15.4438 0.151999C15.5078 0.791999 15.5718 1.472 15.6358 2.192C15.6998 2.896 15.7798 3.632 15.8758 4.4C15.6038 4.432 15.3398 4.432 15.0838 4.4C14.7798 3.664 14.4758 3.064 14.1718 2.6C13.8678 2.136 13.4758 1.792 12.9958 1.568C12.5318 1.344 11.8758 1.232 11.0278 1.232H9.32375V14.024C9.32375 14.52 9.33975 14.912 9.37175 15.2C9.40375 15.488 9.49175 15.696 9.63575 15.824C9.79575 15.952 10.0438 16.048 10.3798 16.112C10.7158 16.16 11.1798 16.208 11.7718 16.256C11.8198 16.512 11.8198 16.768 11.7718 17.024C11.4358 17.024 11.0278 17.016 10.5478 17C10.0838 17 9.61975 17 9.15575 17C8.69175 16.984 8.29975 16.976 7.97975 16.976C7.67575 16.976 7.29175 16.984 6.82775 17C6.37975 17 5.91575 17 5.43575 17C4.97175 17.016 4.57175 17.024 4.23575 17.024Z" fill="currentColor"/>
-                    </svg>
-                </button>
+                    <div class="createSession-settings">
+                        <div class="option password-option">
+                            <div class="password-toggle">
+                                <div class="option-content">
+                                    <div class="option-header">
+                                        <span class="option-label">Password Protection</span>
+                                        <span class="optional-tag">Optional</span>
+                                        <div
+                                            class="info-icon"
+                                            data-tooltip="Add a password to restrict access to your session. Only users with the password can join."
+                                        >
+                                            i
+                                        </div>
+                                    </div>
+                                    <div class="option-description">
+                                        Protect your session with a password
+                                    </div>
+                                </div>
+                                <input type="checkbox" id="password-toggle" />
+                            </div>
+                            <input
+                                type="password"
+                                class="password-input"
+                                id="password-input"
+                                placeholder="Enter password"
+                                disabled
+                            />
+                        </div>
+                    </div>
+
+                    <button>Create Session</button>
+                    <p></p>
+                </div>
+            </div>
+            <div class="invite-notification"></div>
+
+            <div id="connection-status" class="connection-status status-disconnected">
+                <span class="status-dot"></span>
+                <span class="status-text">Disconnected</span>
             </div>
 
-            <div class="toolbar-divider"></div>
-
-            <div class="toolbar-section">
-            <button id="undoBtn" class="icon-btn" disabled title="Undo (Ctrl+Z)">
-                <svg width="16" height="16" viewBox="0 0 16 16">
-                    <path d="M2 8H12C13.1 8 14 8.9 14 10C14 11.1 13.1 12 12 12H10M2 8L5 5M2 8L5 11" 
-                          stroke="currentColor" fill="none" stroke-width="1.5"/>
-                </svg>
-            </button>
-            <button id="redoBtn" class="icon-btn" disabled title="Redo (Ctrl+Shift+Z)">
-                <svg width="16" height="16" viewBox="0 0 16 16">
-                    <path d="M14 8H4C2.9 8 2 8.9 2 10C2 11.1 2.9 12 4 12H6M14 8L11 5M14 8L11 11" 
-                          stroke="currentColor" fill="none" stroke-width="1.5"/>
-                </svg>
-            </button>
-            </div>
+            <canvas id="canvas"></canvas>
         </div>
-       
-        <div class="invite-link">
-            <button> Start Session </button>
-        </div>
-        <div class="createSession-overlay">
-          <div class="createSession-container"> 
-              <h1>Start a Collaborative Session</h1>
-              <p>Invite Others to join your whiteboard.</p>
-
-              <div class="createSession-settings">
-                  <div class="option password-option">
-                      <div class="password-toggle">
-                          <div class="option-content">
-                              <div class="option-header">
-                                  <span class="option-label">Password Protection</span>
-                                  <span class="optional-tag">Optional</span>
-                                  <div class="info-icon" data-tooltip="Add a password to restrict access to your session. Only users with the password can join.">i</div>
-                              </div>
-                              <div class="option-description">
-                                  Protect your session with a password
-                              </div>
-                          </div>
-                          <input type="checkbox" id="password-toggle"/> 
-                      </div>
-                      <input type="password" class="password-input" id="password-input" placeholder="Enter password" disabled />
-                  </div>
-              </div>
-
-              <button>Create Session</button>
-              <p> 
-          </div>
-        </div>
-        <div class="invite-notification"> </div>
-
-        <div id="connection-status" class="connection-status status-disconnected">
-            <span class="status-dot"></span>
-            <span class="status-text">Disconnected</span>
-        </div>
-
-    <canvas id="canvas"></canvas>
-    </div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
 </html>
