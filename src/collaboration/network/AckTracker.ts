@@ -2,16 +2,11 @@ import type { PendingAck } from '../../shared/types/network'
 import { ACK_TIMEOUT } from '../../shared/constants'
 import { createLogger } from '../../shared/utils/logger'
 const log = createLogger('AckTracker')
+
 /**
  * Tracks pending acknowledgments for object operations
- *
- * Responsibilities:
- * - Track pending promises waiting for server acknowledgment
- * - Manage timeouts for pending acknowledgments
- * - Handle successful acknowledgments
- * - Handle acknowledgment errors
- * - Clean up pending acknowledgments on disconnect
-  */
+ * Ensures objects are sent to server
+ */
 export class AckTracker {
     private pendingAcks: Map<string, PendingAck>
     private readonly ackTimeout: number
@@ -26,30 +21,29 @@ export class AckTracker {
         resolve: (value: { objectId: string; success: boolean }) => void,
         reject: (reason?: unknown) => void
     ): ReturnType<typeof setTimeout> {
-        // Create timeout to reject if no response within ackTimeout
+
+        // timeout rejects if no response 
         const timeoutId = setTimeout(() => {
             this.pendingAcks.delete(objectId)
             reject(new Error(`Timeout waiting for server confirmation (${this.ackTimeout}ms)`))
         }, this.ackTimeout)
 
-        // Store promise handlers
+        // Store promise handlers & timeout
         this.pendingAcks.set(objectId, { resolve, reject, timeoutId })
 
         return timeoutId
     }
 
-    /**
-     * Handle successful acknowledgment from server
-     */
+    
+    // successful ack from server
     handleAck(objectId: string): boolean {
         const pending = this.pendingAcks.get(objectId)
 
         if (!pending) {
-            return false
+            return false 
         }
 
-        // Clear timeout
-        clearTimeout(pending.timeoutId)
+        clearTimeout(pending.timeoutId) // Clear timeout
 
         // Remove from pending map
         this.pendingAcks.delete(objectId)
@@ -61,9 +55,8 @@ export class AckTracker {
         return true
     }
 
-    /**
-     * Handle acknowledgment error from server
-     */
+    
+    // ack error from server
     handleError(objectId: string, errorMessage: string): boolean {
         const pending = this.pendingAcks.get(objectId)
 
@@ -71,8 +64,7 @@ export class AckTracker {
             return false
         }
 
-        // Clear timeout
-        clearTimeout(pending.timeoutId)
+        clearTimeout(pending.timeoutId)  
 
         // Remove from pending map
         this.pendingAcks.delete(objectId)
@@ -85,42 +77,33 @@ export class AckTracker {
     }
 
     /**
-     * Clear all pending acknowledgments (e.g., on disconnect)
-     * @param reason The reason for clearing (used in rejection message)
+     * Clear all pending acks 
+     * used for things like disconnect
      */
     clearAll(reason: string = 'Connection closed'): void {
-        this.pendingAcks.forEach((pending) => {
+        this.pendingAcks.forEach(pending => {
             clearTimeout(pending.timeoutId)
             pending.reject(new Error(reason))
         })
         this.pendingAcks.clear()
     }
 
-    /**
-     * Check if an object ID has a pending acknowledgment
-     * @param objectId The object ID to check
-     */
+    
+    // Check if an object ID has a pending ack
     hasPending(objectId: string): boolean {
         return this.pendingAcks.has(objectId)
     }
 
-    /**
-     * Get the number of pending acknowledgments
-     */
     getPendingCount(): number {
         return this.pendingAcks.size
     }
 
-    /**
-     * Get all pending object IDs
-     */
+    
+    // Get all pending object IDs
     getPendingIds(): string[] {
         return Array.from(this.pendingAcks.keys())
     }
 
-    /**
-     * Get the acknowledgment timeout value
-     */
     getAckTimeout(): number {
         return this.ackTimeout
     }

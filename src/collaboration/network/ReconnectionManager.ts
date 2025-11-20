@@ -1,12 +1,5 @@
 /**
- * Manages WebSocket reconnection logic with exponential backoff
-
- * Responsibilities:
- * - Track reconnection attempts
- * - Calculate backoff delays (exponential with cap)
- * - Schedule reconnection attempts
- * - Manage reconnection timeouts
- * - Handle max attempt limits
+ * Manages WebSocket reconnection w/ exponential backoff
  */
 import { actions, selectors } from '../../shared/stores/AppState'
 import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
@@ -27,29 +20,19 @@ export class ReconnectionManager {
         this.maxReconnectAttempts = maxReconnectAttempts
     }
 
-    /**
-     * Set callback for reconnection attempts
-     */
     setReconnectCallback(callback: (roomCode: string) => void): void {
         this.onReconnect = callback
     }
 
-    /**
-     * Get reconnecting flag
-     */
     get reconnecting(): boolean {
         return this.isReconnecting
     }
 
-    /**
-     * Set reconnecting flag
-     */
     set reconnecting(value: boolean) {
         this.isReconnecting = value
     }
 
     /**
-     * Calculate exponential backoff delay
      * Formula: min(BASE_DELAY * 2^attempt, MAX_DELAY)
      */
     private calculateBackoffDelay(attempt: number): number {
@@ -57,15 +40,13 @@ export class ReconnectionManager {
         return Math.min(delay, this.MAX_DELAY_MS)
     }
 
-    /**
-     * Handle disconnection and schedule reconnection if needed
-     * Returns true if reconnection was scheduled
-     */
+    
+    // Handle disconnection and schedule reconnection if needed
     handleDisconnect(): boolean {
         // Clear any existing reconnect timeout
         this.clearReconnectTimeout()
 
-        // Don't auto-reconnect if we're in the middle of password authentication
+        // Don't auto-reconnect if in middle of password authentication
         if (selectors.getIsAuthenticating()) {
             log.debug('Skipping auto-reconnect - password authentication in progress')
             return false
@@ -73,13 +54,14 @@ export class ReconnectionManager {
 
         const reconnectAttempts = selectors.getReconnectAttempts()
 
-        // Check if we've exceeded max attempts
+        // exceeded max attempts?
         if (reconnectAttempts >= this.maxReconnectAttempts) {
             ErrorHandler.network(new Error('Max reconnection attempts exceeded'), {
                 context: 'ReconnectionManager',
                 code: ErrorCode.CONNECTION_FAILED,
-                userMessage: 'Unable to reconnect to the session after multiple attempts. Please refresh the page.',
-                metadata: { attempts: this.maxReconnectAttempts }
+                userMessage:
+                    'Unable to reconnect to the session after multiple attempts. Please refresh the page.',
+                metadata: { attempts: this.maxReconnectAttempts },
             })
             return false
         }
@@ -94,8 +76,6 @@ export class ReconnectionManager {
         const delay = this.calculateBackoffDelay(reconnectAttempts)
         const currentAttempts = reconnectAttempts + 1
 
-
-
         // Schedule reconnection
         this.reconnectTimeout = setTimeout(() => {
             const roomCode = selectors.getRoomCode()
@@ -108,28 +88,22 @@ export class ReconnectionManager {
         return true
     }
 
-    /**
-     * Clear reconnect timeout
-     */
-    clearReconnectTimeout(): void {
+     clearReconnectTimeout(): void {
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout)
             this.reconnectTimeout = null
         }
     }
 
-    /**
-     * Reset reconnection state (called on successful connection)
-     */
+    // called on successful connect
     resetReconnectionState(): void {
         this.clearReconnectTimeout()
         this.isReconnecting = false
         actions.resetReconnectAttempts()
     }
 
-    /**
-     * Cancel reconnection and prevent future attempts
-     */
+    
+    // Cancel reconnection and prevent future attempts
     cancelReconnection(): void {
         this.clearReconnectTimeout()
         this.isReconnecting = false

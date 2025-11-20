@@ -1,11 +1,11 @@
 /**
  * Collaboration Module
- * 
+ *
  * Handles all real-time multiplayer features:
  * - WebSocket connections and reconnection
  * - Session lifecycle (create/join/authenticate)
  * - Password-protected rooms
- * 
+ *
  * Usage:
  *   import { SessionManager, WebSocketManager } from './collaboration'
  */

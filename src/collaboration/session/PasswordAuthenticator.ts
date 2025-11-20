@@ -1,7 +1,7 @@
 /**
  * PasswordAuthenticator
  *
- * Handles password authentication flow with retry logic
+ * password authentication flow &  retry logic
  */
 import type { DialogManager, NotificationManager } from '../../shared/types/ui'
 
@@ -27,9 +27,8 @@ export class PasswordAuthenticator {
         this.maxAttempts = maxAttempts
     }
 
-    /**
-     * Prompt user for initial password
-     */
+    
+    // Prompt user for initial password
     async promptForPassword(roomCode: string): Promise<PasswordResult> {
         const password = await this.dialogManager.showPasswordDialog(roomCode)
 
@@ -42,7 +41,6 @@ export class PasswordAuthenticator {
             }
         }
 
-
         return {
             success: true,
             password: password, // backend will hash
@@ -51,13 +49,8 @@ export class PasswordAuthenticator {
         }
     }
 
-    /**
-     * Handle invalid password with retry logic
-     */
-    async handleInvalidPassword(
-        roomCode: string,
-        currentAttempt: number
-    ): Promise<PasswordResult> {
+
+    async handleInvalidPassword(roomCode: string, currentAttempt: number): Promise<PasswordResult> {
         const attemptsRemaining = this.maxAttempts - currentAttempt
 
         if (currentAttempt >= this.maxAttempts) {
@@ -91,7 +84,7 @@ export class PasswordAuthenticator {
 
         return {
             success: true,
-            password: retryPassword,  
+            password: retryPassword,
             cancelled: false,
             maxAttemptsExceeded: false,
         }

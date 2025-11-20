@@ -6,8 +6,9 @@ import { Stroke } from '../../drawing/objects/types/Stroke'
 import { Text } from '../../drawing/objects/types/Text'
 import { DrawingObject } from '../../drawing/objects/DrawingObject'
 import type { DrawingObjectData, Point, Bounds } from '../../shared/types/common'
-import { QUADTREE_MIN_SIZE} from '../../shared/constants'
+import { QUADTREE_MIN_SIZE } from '../../shared/constants'
 import { isValidObject } from '../../shared/validation'
+import { SELECTION_COLOR, SELECTION_HANDLE_BG } from '../../shared/constants'
 
 import { createLogger } from '../../shared/utils/logger'
 const log = createLogger('ObjectStore')
@@ -26,7 +27,6 @@ function isNestedFormat(data: NestedObjectData | FlatObjectData): data is Nested
         typeof (data as Record<string, unknown>).zIndex === 'number'
     )
 }
-
 
 // Manages object storage, spatial indexing, and CRUD operations
 export class ObjectStore {
@@ -129,12 +129,15 @@ export class ObjectStore {
         return null
     }
 
-    updateRemoteObject(objectId: string, objectData: NestedObjectData | FlatObjectData): DrawingObject | null {
+    updateRemoteObject(
+        objectId: string,
+        objectData: NestedObjectData | FlatObjectData
+    ): DrawingObject | null {
         if (!isValidObject(objectData)) {
             log.error('Invalid object data for update:', objectData)
             return null
         }
-        
+
         const obj = this.getObjectById(objectId)
         if (obj) {
             const oldBounds = obj.getBounds()
@@ -158,8 +161,6 @@ export class ObjectStore {
     }
 
     loadRemoteObjects(objectDataArray: DrawingObjectData[]): void {
-
-
         // Merge remote objects instead of replacing to preserve local objects
         // This prevents race condition where local objects are destroyed during sync
         objectDataArray.forEach((objData: DrawingObjectData) => {
@@ -192,7 +193,9 @@ export class ObjectStore {
         this.objects = this.objects.filter(obj => obj.userId !== userId)
 
         // Restore THIS user's objects from history
-        const myRestoredObjects = stateData.map((data: DrawingObjectData) => this.createObjectFromData(data)).filter((obj): obj is DrawingObject => obj !== null)
+        const myRestoredObjects = stateData
+            .map((data: DrawingObjectData) => this.createObjectFromData(data))
+            .filter((obj): obj is DrawingObject => obj !== null)
         this.objects.push(...myRestoredObjects)
 
         // Update quadtree - only update changed objects, much faster than entire rebuild
@@ -200,7 +203,7 @@ export class ObjectStore {
             this._removeFromQuadtree(obj, obj.getBounds())
         })
         myRestoredObjects.forEach(obj => {
-            this._insertIntoQuadtree(obj) 
+            this._insertIntoQuadtree(obj)
         })
     }
 
@@ -260,8 +263,8 @@ export class ObjectStore {
     }
 
     /**
-    * Quadtree Operations
-    */
+     * Quadtree Operations
+     */
     queryQuadtree(rect: Bounds): DrawingObject[] {
         return this.quadtree.query(rect) as DrawingObject[]
     }
@@ -280,7 +283,11 @@ export class ObjectStore {
      * Automatically expands the quadtree if the object moves outside
      * the current bounds.
      */
-    updateObjectInQuadtree(object: DrawingObject, oldBounds: Bounds, newBounds: Bounds | null = null): void {
+    updateObjectInQuadtree(
+        object: DrawingObject,
+        oldBounds: Bounds,
+        newBounds: Bounds | null = null
+    ): void {
         const bounds = newBounds || object.getBounds()
 
         this.quadtree.remove(object, oldBounds)
@@ -303,13 +310,13 @@ export class ObjectStore {
         if (this.rebuildScheduled) {
             return
         }
-        
+
         this.rebuildScheduled = true
-        
+
         if (this.rebuildTimeout) {
             clearTimeout(this.rebuildTimeout)
         }
-        
+
         this.rebuildTimeout = setTimeout(() => {
             this.rebuildQuadtree(true)
             this.rebuildScheduled = false
@@ -324,8 +331,10 @@ export class ObjectStore {
         let bounds = this.quadtree.bounds
 
         if (expandBounds) {
-            let minX = Infinity, minY = Infinity
-            let maxX = -Infinity, maxY = -Infinity
+            let minX = Infinity,
+                minY = Infinity
+            let maxX = -Infinity,
+                maxY = -Infinity
 
             this.objects.forEach(obj => {
                 const objBounds = obj.getBounds()
@@ -346,7 +355,7 @@ export class ObjectStore {
                 x: centerX - width / 2,
                 y: centerY - height / 2,
                 width,
-                height
+                height,
             }
         }
 
@@ -360,8 +369,25 @@ export class ObjectStore {
     /**
      * Render all objects with optional viewport culling
      */
-    render(ctx: CanvasRenderingContext2D, viewport: Bounds | null = null, selectedObjects: DrawingObject[] = []): void {
-        // If viewport is provided, use quadtree for culling
+    render(
+        ctx: CanvasRenderingContext2D,
+        viewport: Bounds | null = null,
+        selectedObjects: DrawingObject[] = []
+    ): void {
+        // multi-selection temporarily disables individual selection rendering
+        // this prevents seeing every obj bounding boxes
+        const isMultiSelection = selectedObjects.length > 1
+        const savedSelectedFlags = new Map<string, boolean>()
+        
+        if (isMultiSelection) {
+            // Save and clear selected flags
+            selectedObjects.forEach(obj => {
+                savedSelectedFlags.set(obj.id, obj.selected)
+                obj.selected = false
+            })
+        }
+        
+        // use quadtree for culling
         if (viewport) {
             const visibleObjects = this.quadtree.query(viewport) as DrawingObject[]
 
@@ -374,8 +400,8 @@ export class ObjectStore {
                 }
             })
 
-            // Always render selected objects even if outside quadtree bounds
-            // This ensures objects being dragged remain visible
+            // rendering objects outside quadtree bounds
+            // ensures objects being dragged remain visible
             selectedObjects.forEach(obj => {
                 if (!visibleObjects.includes(obj)) {
                     try {
@@ -386,7 +412,7 @@ export class ObjectStore {
                 }
             })
         } else {
-            // Full render (fallback) with per-object error isolation
+            // Full render (fallback) 
             this.objects.forEach(obj => {
                 try {
                     obj.render(ctx)
@@ -395,6 +421,76 @@ export class ObjectStore {
                 }
             })
         }
+        
+        // Restore selected flags
+        if (isMultiSelection) {
+            selectedObjects.forEach(obj => {
+                obj.selected = savedSelectedFlags.get(obj.id) || false
+            })
+            
+            // Render single group selection box for multiple objects
+            this.renderGroupSelection(ctx, selectedObjects)
+        }
+    }
+
+    private renderGroupSelection(ctx: CanvasRenderingContext2D, objects: DrawingObject[]): void {
+        // Calculate group bounds
+        let minX = Infinity
+        let minY = Infinity
+        let maxX = -Infinity
+        let maxY = -Infinity
+        
+        objects.forEach(obj => {
+            const bounds = obj.getBounds()
+            minX = Math.min(minX, bounds.x)
+            minY = Math.min(minY, bounds.y)
+            maxX = Math.max(maxX, bounds.x + bounds.width)
+            maxY = Math.max(maxY, bounds.y + bounds.height)
+        })
+        
+        const groupBounds = {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        }
+        
+        // dashed border
+        ctx.strokeStyle = SELECTION_COLOR
+        ctx.lineWidth = 2 / ctx.getTransform().a
+        ctx.setLineDash([5, 5])
+        ctx.strokeRect(groupBounds.x, groupBounds.y, groupBounds.width, groupBounds.height)
+        ctx.setLineDash([])
+        
+        // Draw 8 resize handles
+        const handleSize = 12 / ctx.getTransform().a
+        const handles = [
+            { x: groupBounds.x, y: groupBounds.y },                                    // NW
+            { x: groupBounds.x + groupBounds.width / 2, y: groupBounds.y },           // N
+            { x: groupBounds.x + groupBounds.width, y: groupBounds.y },               // NE
+            { x: groupBounds.x + groupBounds.width, y: groupBounds.y + groupBounds.height / 2 }, // E
+            { x: groupBounds.x + groupBounds.width, y: groupBounds.y + groupBounds.height },     // SE
+            { x: groupBounds.x + groupBounds.width / 2, y: groupBounds.y + groupBounds.height }, // S
+            { x: groupBounds.x, y: groupBounds.y + groupBounds.height },              // SW
+            { x: groupBounds.x, y: groupBounds.y + groupBounds.height / 2 },          // W
+        ]
+        
+        ctx.fillStyle = SELECTION_HANDLE_BG
+        ctx.strokeStyle = SELECTION_COLOR
+        handles.forEach(handle => {
+            ctx.fillRect(
+                handle.x - handleSize / 2,
+                handle.y - handleSize / 2,
+                handleSize,
+                handleSize
+            )
+            ctx.strokeRect(
+                handle.x - handleSize / 2,
+                handle.y - handleSize / 2,
+                handleSize,
+                handleSize
+            )
+        })
     }
 
     // Remove object from quadtree at its old location
@@ -407,5 +503,4 @@ export class ObjectStore {
         const objectBounds = bounds || object.getBounds()
         this.quadtree.insert(object, objectBounds)
     }
-
- }
+}

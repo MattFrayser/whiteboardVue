@@ -1,7 +1,5 @@
 /**
- * SessionManager
- *
- * Manages network session lifecycle (create/join/disconnect)
+ * network session lifecycle (create/join/disconnect)
  * Coordinates between network connection, authentication, and object migration
  */
 import { WebSocketManager } from '../network/WebSocketManager'
@@ -13,20 +11,26 @@ import { createLogger } from '../../shared/utils/logger'
 import type { DrawingEngine } from '../../core/engine/DrawingEngine'
 import type { NotificationManager, DialogManager, InviteManager } from '../../shared/types/ui'
 import type { NetworkMessage } from '../../shared/types/network'
+import { API_BASE_URL } from '../../shared/constants/config'
 const log = createLogger('SessionManager')
 
 export class SessionManager {
     engine: DrawingEngine
-    notificationManager: NotificationManager & { showMigrationResult(succeeded: number, failed: number): void }
+    notificationManager: NotificationManager & {
+        showMigrationResult(succeeded: number, failed: number): void
+    }
     dialogManager: DialogManager
     inviteManager: InviteManager | null
     networkManager: WebSocketManager | null
     localUserId: string | null
+    csrfToken: string | null
     passwordAuth: PasswordAuthenticator
 
     constructor(
         engine: DrawingEngine,
-        notificationManager: NotificationManager & { showMigrationResult(succeeded: number, failed: number): void },
+        notificationManager: NotificationManager & {
+            showMigrationResult(succeeded: number, failed: number): void
+        },
         dialogManager: DialogManager,
         inviteManager: InviteManager | null
     ) {
@@ -36,6 +40,7 @@ export class SessionManager {
         this.inviteManager = inviteManager
         this.networkManager = null
         this.localUserId = null
+        this.csrfToken = null
         this.passwordAuth = new PasswordAuthenticator(dialogManager, notificationManager)
     }
 
@@ -80,9 +85,10 @@ export class SessionManager {
 
                     // Update state with server userId
                     actions.setUserId(message.userId ?? null)
-
                 } else if (message.type === 'network:room_joined') {
-                    log.info(`${action === 'create' ? 'Room created and joined' : 'Successfully joined room'}`)
+                    log.info(
+                        `${action === 'create' ? 'Room created and joined' : 'Successfully joined room'}`
+                    )
 
                     if (!this.networkManager) {
                         reject(new Error('Network manager not available'))
@@ -101,7 +107,8 @@ export class SessionManager {
                     }
 
                     // Attach network manager to engine and handle migration
-                    this.engine.attachNetworkManager(this.networkManager, userId)
+                    this.engine
+                        .attachNetworkManager(this.networkManager, userId)
                         .then(result => {
                             // Show migration result notification
                             this.notificationManager.showMigrationResult(
@@ -109,18 +116,20 @@ export class SessionManager {
                                 result.failed.length
                             )
                             if (result.failed.length > 0) {
-                                log.warn('Objects failed to sync', { 
-                                    failed: result.failed.length, 
-                                    succeeded: result.succeeded.length 
+                                log.warn('Objects failed to sync', {
+                                    failed: result.failed.length,
+                                    succeeded: result.succeeded.length,
                                 })
                             } else if (result.succeeded.length > 0) {
-                                log.debug('All objects synced successfully', { count: result.succeeded.length })
+                                log.debug('All objects synced successfully', {
+                                    count: result.succeeded.length,
+                                })
                             }
                         })
                         .catch(err => {
                             ErrorHandler.silent(err, {
                                 context: 'SessionManager',
-                                metadata: { operation: 'migration' }
+                                metadata: { operation: 'migration' },
                             })
                         })
 
@@ -135,7 +144,6 @@ export class SessionManager {
                     }
 
                     resolve(userId)
-
                 } else if (message.type === 'network:error' && action === 'join') {
                     // Handle errors (only for join operation)
                     if (!this.networkManager) {
@@ -146,7 +154,7 @@ export class SessionManager {
                     // Handle specific error types
                     ErrorHandler.silent(new Error(message.message || 'Unknown error'), {
                         context: 'SessionManager',
-                        metadata: { code: message.code, phase: 'joinRoom' }
+                        metadata: { code: message.code, phase: 'joinRoom' },
                     })
 
                     if (message.code === 'PASSWORD_REQUIRED') {
@@ -168,19 +176,23 @@ export class SessionManager {
                         })
                         passwordAttempts = 1 // First attempt with password
                         return // Don't resolve/reject - wait for response
-
                     } else if (message.code === 'INVALID_PASSWORD') {
                         passwordAttempts++
 
-                        const result = await this.passwordAuth.handleInvalidPassword(roomCode, passwordAttempts)
+                        const result = await this.passwordAuth.handleInvalidPassword(
+                            roomCode,
+                            passwordAttempts
+                        )
 
                         if (result.cancelled || result.maxAttemptsExceeded) {
                             actions.setIsAuthenticating(false)
-                            reject(new Error(
-                                result.maxAttemptsExceeded
-                                    ? 'Maximum password attempts exceeded'
-                                    : 'Password authentication cancelled'
-                            ))
+                            reject(
+                                new Error(
+                                    result.maxAttemptsExceeded
+                                        ? 'Maximum password attempts exceeded'
+                                        : 'Password authentication cancelled'
+                                )
+                            )
                             return
                         }
 
@@ -210,11 +222,18 @@ export class SessionManager {
     /**
      * Create a new session (room)
      */
-    async createSession(settings: { password?: string } = {}): Promise<{ roomCode: string; userId: string }> {
+    async createSession(
+        settings: { password?: string } = {}
+    ): Promise<{ roomCode: string; userId: string }> {
         try {
             // Generate cryptographically secure room code
             const roomCode = generateSecureRoomCode(6)
             log.debug('Generated room code', { roomCode })
+
+            // Establish HTTP session and get CSRF token
+            const sessionData = await this.establishHttpSession()
+            this.csrfToken = sessionData.csrfToken
+            this.localUserId = sessionData.userId
 
             // Update state to connecting
             actions.setNetworkState('connecting', roomCode, this.localUserId ?? undefined)
@@ -234,27 +253,31 @@ export class SessionManager {
 
             log.debug('Session created successfully')
             return { roomCode, userId }
-
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error))
             ErrorHandler.network(err, {
                 context: 'SessionManager',
                 userMessage: 'Failed to create session. Please try again.',
-                metadata: { operation: 'createSession' }
+                metadata: { operation: 'createSession' },
             })
             actions.setNetworkStatus('error')
             throw err
         }
     }
 
-
     /**
      * Join an existing room
      */
-    async joinSession(roomCode: string, password: string | null = null): Promise<{ userId: string }> {
+    async joinSession(
+        roomCode: string,
+        password: string | null = null
+    ): Promise<{ userId: string }> {
         log.debug('Joining room', { roomCode, hasPassword: !!password })
 
         try {
+            const sessionData = await this.establishHttpSession()
+            this.csrfToken = sessionData.csrfToken
+            this.localUserId = sessionData.userId
             actions.setNetworkState('connecting', roomCode, this.localUserId ?? undefined)
 
             this.networkManager = new WebSocketManager(() => {
@@ -269,14 +292,13 @@ export class SessionManager {
                 false // Don't update URL (already has room code)
             )
 
-            log.debug('Joined room successfully') 
+            log.debug('Joined room successfully')
             return { userId }
-
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error))
             ErrorHandler.silent(err, {
                 context: 'SessionManager',
-                metadata: { operation: 'joinSession', roomCode }
+                metadata: { operation: 'joinSession', roomCode },
             })
             actions.setNetworkStatus('error')
 
@@ -288,13 +310,34 @@ export class SessionManager {
 
             // Show user-friendly error notification if not already shown
             // Password-related errors are handled by the password dialog flow above
-            if (err.message !== 'Password required' &&
+            if (
+                err.message !== 'Password required' &&
                 err.message !== 'Password authentication cancelled' &&
-                err.message !== 'Maximum password attempts exceeded') {
-                this.notificationManager.showError(err.message || 'Failed to join room. Please check the room code.')
+                err.message !== 'Maximum password attempts exceeded'
+            ) {
+                this.notificationManager.showError(
+                    err.message || 'Failed to join room. Please check the room code.'
+                )
             }
 
             throw err
+        }
+    }
+
+    private async establishHttpSession(): Promise<{ userId: string; csrfToken: string }> {
+        const response = await fetch(`${API_BASE_URL}/api/session`, {
+            method: 'GET',
+            credentials: 'include'
+        })
+
+        if (!response.ok) {
+            throw new Error(`Session establishment failed: ${response.status}`)
+        }
+
+        const data = await response.json()
+        return {
+            userId: data.userId,
+            csrfToken: data.csrfToken
         }
     }
 

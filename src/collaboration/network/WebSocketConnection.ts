@@ -1,5 +1,5 @@
 import { actions, selectors, type NetworkStatus } from '../../shared/stores/AppState'
-import { API_BASE_URL, WS_BASE_URL, AUTH_TIMEOUT } from '../../shared/constants'
+import { WS_BASE_URL, AUTH_TIMEOUT } from '../../shared/constants'
 import { ErrorHandler, ErrorCode } from '../../shared/utils/ErrorHandler'
 import type { StatusCallback, NetworkMessage } from '../../shared/types/network'
 import { parseJSON, isValidMessageStructure } from '../../shared/validation'
@@ -7,14 +7,7 @@ import { createLogger } from '../../shared/utils/logger'
 const log = createLogger('WebSocketConnection')
 
 /**
- * Handles low-level WebSocket connection lifecycle
- * Responsibilities:
- * - Establishing and closing WebSocket connections
- * - HTTP session establishment for cookie-based authentication
- * - Event binding (onopen, onmessage, onerror, onclose)
- * - Message serialization and sending
- * - Status updates and callbacks
- * - Authentication timeout management
+ * low-level WebSocket connection lifecycle
  */
 export class WebSocketConnection {
     private socket: WebSocket | null = null
@@ -49,37 +42,24 @@ export class WebSocketConnection {
     /**
      * Establish HTTP session and open WebSocket connection
      */
-    async connect(roomCode: string): Promise<void> {
+    async connect(roomCode: string, csrfToken: string): Promise<void> {
         // Update state with roomCode
         actions.setRoomCode(roomCode)
 
         try {
-            // Establish session via HTTP first (ensures cookie is set reliably)
-            const sessionResponse = await fetch(`${API_BASE_URL}/api/session`, {
-                method: 'GET',
-                credentials: 'include', // Include cookies in request and store set-cookie response
-            })
+            // NOTE: HTTP session already established by SessionManager
+            // cookie will be sent automatically with WebSocket upgrade
 
-            if (!sessionResponse.ok) {
-                throw new Error(`Session establishment failed: ${sessionResponse.status}`)
-            }
-
-            const sessionData = await sessionResponse.json()
-            log.debug('Session established', { userId: sessionData.userId })
-
-            // Debug: Check if cookie was set
-            log.debug('Cookies set', { cookieCount: document.cookie.split(';').length }) 
-
-            // open WebSocket - cookie will be sent automatically
             log.debug('Opening WebSocket connection')
             this.socket = new WebSocket(`${WS_BASE_URL}/ws?room=${encodeURIComponent(roomCode)}`)
-            log.debug('WebSocket object created', { readyState: this.socket.readyState }) 
+            log.debug('WebSocket object created', { readyState: this.socket.readyState })
 
             this.socket.onopen = () => {
                 log.info('Connection opened successfully')
                 // Send authenticate message - authentication will use HTTP cookie
                 const authMsg = {
                     type: 'authenticate',
+                    csrfToken: csrfToken,
                 }
                 this.send(authMsg)
 
@@ -88,7 +68,7 @@ export class WebSocketConnection {
                     ErrorHandler.network(new Error('Authentication timeout'), {
                         context: 'WebSocketConnection',
                         code: ErrorCode.TIMEOUT,
-                        userMessage: 'Connection timed out while authenticating. Please try again.'
+                        userMessage: 'Connection timed out while authenticating. Please try again.',
                     })
                     this.updateStatus('error')
                     if (this.socket) {
@@ -120,17 +100,17 @@ export class WebSocketConnection {
                     code: ErrorCode.CONNECTION_FAILED,
                     metadata: {
                         type: error.type,
-                        readyState: this.socket?.readyState
-                    }
+                        readyState: this.socket?.readyState,
+                    },
                 })
                 this.updateStatus('error')
             }
 
             this.socket.onclose = (event: CloseEvent) => {
-                log.info('Connection closed', { 
-                    code: event.code, 
-                    reason: event.reason, 
-                    wasClean: event.wasClean 
+                log.info('Connection closed', {
+                    code: event.code,
+                    reason: event.reason,
+                    wasClean: event.wasClean,
                 })
                 // Trigger disconnect callback
                 if (this.onDisconnectCallback) {
@@ -144,8 +124,8 @@ export class WebSocketConnection {
                 code: ErrorCode.CONNECTION_FAILED,
                 metadata: {
                     name: err.name,
-                    message: err.message
-                }
+                    message: err.message,
+                },
             })
 
             // Trigger disconnect callback on error
@@ -159,9 +139,9 @@ export class WebSocketConnection {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify(msg))
         } else {
-            log.warn('Cannot send message - socket not open', { 
+            log.warn('Cannot send message - socket not open', {
                 readyState: this.socket?.readyState,
-                messageType: msg.type 
+                messageType: msg.type,
             })
         }
     }
@@ -187,7 +167,7 @@ export class WebSocketConnection {
     }
 
     /**
-     * Disconnect for password authentication (prevents auto-reconnect)
+     * Disconnect for password authentication (prevent auto-reconnect)
      */
     disconnectForAuth(): void {
         // Set flag to prevent auto-reconnect during password authentication

@@ -16,9 +16,7 @@ import { selectors } from '../../shared/stores/AppState'
 import type { WebSocketManager } from '../../collaboration/network/WebSocketManager'
 import type { NetworkMessage, MigrationResult } from '../../shared/types/network'
 
-import { 
-    sanitizeObjectData
-} from '../../shared/validation'
+import { sanitizeObjectData } from '../../shared/validation'
 
 import { createLogger } from '../../shared/utils/logger'
 const log = createLogger('DrawingEngine')
@@ -48,13 +46,13 @@ export class DrawingEngine {
 
     constructor(canvas: HTMLCanvasElement, networkManager: WebSocketManager | null = null) {
         this.canvas = canvas
-        const ctx = canvas.getContext('2d')
+        const ctx = canvas.getContext('2d') // 2d drawing api 
         if (!ctx) {
             throw new Error('Failed to get 2d context from canvas')
         }
         this.ctx = ctx
-        this.networkManager = networkManager
 
+        this.networkManager = networkManager // null in local 
         this.objectManager = new ObjectManager(networkManager)
         this.coordinates = new Coordinates()
         this.needsRedraw = true
@@ -91,15 +89,6 @@ export class DrawingEngine {
         this.resize()
     }
 
-    setupNetworkHandler(): void {
-        // Wire up message handler
-        if (this.networkManager) {
-            this.networkManager.messageHandler = (message: NetworkMessage) => {
-                this.handleNetworkMessage(message)
-            }
-        }
-    }
-
     /**
      * Attach network manager after initialization (for local-first mode)
      * Transitions from local mode to networked mode
@@ -125,80 +114,93 @@ export class DrawingEngine {
         return Promise.resolve({ succeeded: [], failed: [] })
     }
 
+    //--------------------
+    // Network 
+    //--------------------
+
+    setupNetworkHandler(): void {
+        // Wire up message handler
+        if (this.networkManager) {
+            this.networkManager.messageHandler = (message: NetworkMessage) => {
+                this.handleNetworkMessage(message)
+            }
+        }
+    }
+
     handleNetworkMessage(message: NetworkMessage): void {
         try {
             switch (message.type) {
-            case 'network:authenticated':
-                if (message.userId && typeof message.userId === 'string') {
-                    this.objectManager.setUserId(message.userId)
-                }
-                break
-
-            case 'network:objectAdded': {
-                if (!message.object) {
-                    log.error('Invalid objectAdded message: missing object')
+                case 'network:authenticated':
+                    if (message.userId && typeof message.userId === 'string') {
+                        this.objectManager.setUserId(message.userId)
+                    }
                     break
-                }
 
-                const sanitized = sanitizeObjectData(message.object)
-                const addedObj = this.objectManager.addRemoteObject(sanitized)
-                if (addedObj) {
-                    this.renderDirty()
-                }
-                break
-                }
+                case 'network:objectAdded': {
+                    if (!message.object) {
+                        log.error('Invalid objectAdded message: missing object')
+                        break
+                    }
 
-            case 'network:objectUpdated': {
-                if (!message.object) {
-                    log.error('Invalid objectUpdated message: missing object')
-                    break
-                }
-
-                const obj = this.objectManager.getObjectById(message.object.id)
-                if (obj) {
                     const sanitized = sanitizeObjectData(message.object)
-                    this.objectManager.updateRemoteObject(sanitized.id, sanitized)
+                    const addedObj = this.objectManager.addRemoteObject(sanitized)
+                    if (addedObj) {
+                        this.renderDirty()
+                    }
+                    break
+                }
+
+                case 'network:objectUpdated': {
+                    if (!message.object) {
+                        log.error('Invalid objectUpdated message: missing object')
+                        break
+                    }
+
+                    const obj = this.objectManager.getObjectById(message.object.id)
+                    if (obj) {
+                        const sanitized = sanitizeObjectData(message.object)
+                        this.objectManager.updateRemoteObject(sanitized.id, sanitized)
+                        this.renderDirty()
+                    }
+                    break
+                }
+                case 'network:objectDeleted': {
+                    if (!message.objectId) {
+                        log.error('Invalid objectDeleted message: missing objectId')
+                        break
+                    }
+
+                    const deletedObj = this.objectManager.getObjectById(message.objectId)
+                    if (deletedObj) {
+                        this.objectManager.removeRemoteObject(message.objectId)
+                        this.renderDirty()
+                    }
+                    break
+                }
+                case 'network:sync':
+                    if (!message.objects || !Array.isArray(message.objects)) {
+                        log.error('Invalid sync message: missing objects array')
+                        break
+                    }
+
+                    const sanitized = message.objects.map(sanitizeObjectData)
+                    this.objectManager.loadRemoteObjects(sanitized)
                     this.renderDirty()
-                }
-                break
-            }
-            case 'network:objectDeleted': {
-                if (!message.objectId) {
-                    log.error('Invalid objectDeleted message: missing objectId')
                     break
-                }
 
-                const deletedObj = this.objectManager.getObjectById(message.objectId)
-                if (deletedObj) {
-                    this.objectManager.removeRemoteObject(message.objectId)
+                case 'network:userDisconnected':
+                    if (!message.userId) {
+                        log.error('Invalid userDisconnected message: missing userId')
+                        break
+                    }
+
+                    this.remoteCursors.delete(message.userId)
                     this.renderDirty()
-                }
-                break
-            }
-            case 'network:sync':
-                if (!message.objects || !Array.isArray(message.objects)) {
-                    log.error('Invalid sync message: missing objects array')
                     break
-                }
 
-                const sanitized = message.objects.map(sanitizeObjectData)
-                this.objectManager.loadRemoteObjects(sanitized)
-                this.renderDirty()
-                break
-
-            case 'network:userDisconnected':
-                if (!message.userId) {
-                    log.error('Invalid userDisconnected message: missing userId')
+                case 'network:remoteCursorMove':
+                    this.handleRemoteCursor(message)
                     break
-                }
-
-                this.remoteCursors.delete(message.userId)
-                this.renderDirty()
-                break
-
-            case 'network:remoteCursorMove':
-                this.handleRemoteCursor(message)
-                break
             }
         } catch (error) {
             ErrorHandler.handle(error as Error, ErrorCategory.NETWORK, {
@@ -253,12 +255,27 @@ export class DrawingEngine {
         }
     }
 
+    cleanupStaleCursors() {
+        const now = Date.now()
+        const CURSOR_TTL = 10000 // 10 seconds
+
+        for (const [userId, cursor] of this.remoteCursors) {
+            if (now - cursor.lastUpdate > CURSOR_TTL) {
+                this.remoteCursors.delete(userId)
+            }
+        }
+    }
+    
+    //-------------
+    // Tools
+    //-------------
+
     setTool(toolName: keyof typeof this.tools): void {
         if (this.currentTool) {
             this.currentTool.deactivate()
         }
 
-        // Clear selection when switching away from select tool
+        // Clear selection if was using select
         if (this.currentTool === this.tools.select) {
             this.objectManager.clearSelection()
         }
@@ -269,10 +286,6 @@ export class DrawingEngine {
         this.render()
     }
 
-    /**
-     * Get the currently active tool instance based on AppState
-     * @returns The current tool instance, or null if tool name is invalid
-     */
     getCurrentTool(): Tool | null {
         const toolName = selectors.getTool()
         return this.tools[toolName as keyof typeof this.tools] ?? null
@@ -285,74 +298,64 @@ export class DrawingEngine {
         this.render()
     }
 
-    /**
-     * Mark canvas as needing redraw
-     */
-    markDirty(): void {
-        this.needsRedraw = true
-    }
 
-    /**
-     * Get the viewport bounds in world coordinates
-     */
-    getViewportBounds(): Bounds {
-        const { scale, offsetX, offsetY } = this.coordinates
-        return {
-            x: -offsetX / scale,
-            y: -offsetY / scale,
-            width: this.canvas.width / scale,
-            height: this.canvas.height / scale,
-        }
-    }
 
+    //------------------
+    // Render
+    //-------------------
     render(): void {
         if (!this.needsRedraw) {
-            return
+            return // skip if no changes
         }
 
         this.renderFull()
         this.needsRedraw = false
     }
 
-    /**
-     * Convenience method that marks dirty and renders in one call
-     * Use this instead of calling markDirty() + render() separately
-     */
+    
+    // Mark canvas as needing redraw
+    markDirty(): void {
+        this.needsRedraw = true
+    }
+    
+    // Convenience method that marks dirty and renders in one call
     renderDirty(): void {
         this.markDirty()
         this.render()
     }
 
-    /**
-     * Force render - bypasses needsRedraw check for critical updates
-     * Use for network events where rendering must happen immediately
-     */
+    
+    // bypasses needsRedraw 
+    // Used for network events 
     renderForce(): void {
         this.needsRedraw = true
         this.renderFull()
         this.needsRedraw = false
     }
 
-    /**
-     * Full canvas redraw with viewport culling
-     */
+    
+    // Full canvas redraw with viewport culling
     renderFull(): void {
         try {
+            // clear canvas
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
-            // Apply transformations
             this.ctx.save()
+
+            // Apply viewport transform
             const { offsetX, offsetY, scale } = this.coordinates
             this.ctx.translate(offsetX, offsetY)
             this.ctx.scale(scale, scale)
 
-            // Get viewport bounds for culling
+            // viewport bounds for culling
             const viewport = this.getViewportBounds()
 
-            // Render objects (with viewport culling via quadtree)
+            // -- Render -- 
+
+            // objects
             this.objectManager.render(this.ctx, viewport)
 
-            // Render current tool preview with error isolation
+            // current tool
             if (this.currentTool && this.currentTool.renderPreview) {
                 try {
                     this.currentTool.renderPreview(this.ctx)
@@ -361,7 +364,7 @@ export class DrawingEngine {
                 }
             }
 
-            // Render remote cursors with per-cursor error isolation
+            // remote cursors 
             if (this.remoteCursors) {
                 this.remoteCursors.forEach(cursor => {
                     try {
@@ -383,8 +386,19 @@ export class DrawingEngine {
 
             ErrorHandler.handle(error as Error, ErrorCategory.CRITICAL, {
                 context: 'DrawingEngine',
-                userMessage: 'Rendering error occurred. Please refresh if the canvas appears blank.',
+                userMessage:
+                    'Rendering error occurred. Please refresh if the canvas appears blank.',
             })
+        }
+    }
+
+    getViewportBounds(): Bounds {
+        const { scale, offsetX, offsetY } = this.coordinates
+        return {
+            x: -offsetX / scale,
+            y: -offsetY / scale,
+            width: this.canvas.width / scale,
+            height: this.canvas.height / scale,
         }
     }
 
@@ -399,16 +413,6 @@ export class DrawingEngine {
         ctx.restore()
     }
 
-    cleanupStaleCursors() {
-        const now = Date.now()
-        const CURSOR_TTL = 10000 // 10 seconds
-
-        for (const [userId, cursor] of this.remoteCursors) {
-            if (now - cursor.lastUpdate > CURSOR_TTL) {
-                this.remoteCursors.delete(userId)
-            }
-        }
-    }
 
     start(): void {
         this.render()
@@ -433,6 +437,5 @@ export class DrawingEngine {
                 }
             })
         }
-
     }
 }

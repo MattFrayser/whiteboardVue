@@ -1,7 +1,12 @@
 import { actions, selectors } from '../../shared/stores/AppState'
 import { MAX_RECONNECT_ATTEMPTS, ACK_TIMEOUT } from '../../shared/constants'
 import { ErrorHandler } from '../../shared/utils/ErrorHandler'
-import type { MessageHandler, StatusCallback, CursorData, NetworkMessage } from '../../shared/types/network'
+import type {
+    MessageHandler,
+    StatusCallback,
+    CursorData,
+    NetworkMessage,
+} from '../../shared/types/network'
 import type { DrawingObject } from '../../drawing/objects/DrawingObject'
 import { WebSocketConnection } from './WebSocketConnection'
 import { ReconnectionManager } from './ReconnectionManager'
@@ -15,6 +20,7 @@ export class WebSocketManager {
     private reconnectionManager: ReconnectionManager
     private ackTracker: AckTracker
     private handlers: Map<string, (msg: NetworkMessage) => void>
+    private csrfToken: string | null = null
     messageHandler: MessageHandler | null
 
     constructor(messageHandler: MessageHandler | null = null) {
@@ -25,24 +31,25 @@ export class WebSocketManager {
         this.messageHandler = messageHandler // Callback for handling incoming messages
 
         // Register message handlers
-        this.handlers.set('authenticated', (msg) => this.handleAuthenticated(msg))
-        this.handlers.set('room_joined', (msg) => this.handleRoomJoined(msg))
-        this.handlers.set('sync', (msg) => this.handleSync(msg))
-        this.handlers.set('objectAdded', (msg) => this.handleObjectAdded(msg))
-        this.handlers.set('objectUpdated', (msg) => this.handleObjectUpdated(msg))
-        this.handlers.set('objectDeleted', (msg) => this.handleObjectDeleted(msg))
-        this.handlers.set('cursor', (msg) => this.handleCursor(msg))
-        this.handlers.set('userDisconnected', (msg) => this.handleUserDisconnect(msg))
-        this.handlers.set('objectAdded_ack', (msg) => this.handleObjectAddedAck(msg))
-        this.handlers.set('objectAdded_error', (msg) => this.handleObjectAddedError(msg))
-        this.handlers.set('error', (msg) => this.handleError(msg))
+        this.handlers.set('authenticated', msg => this.handleAuthenticated(msg))
+        this.handlers.set('room_joined', msg => this.handleRoomJoined(msg))
+        this.handlers.set('sync', msg => this.handleSync(msg))
+        this.handlers.set('objectAdded', msg => this.handleObjectAdded(msg))
+        this.handlers.set('objectUpdated', msg => this.handleObjectUpdated(msg))
+        this.handlers.set('objectDeleted', msg => this.handleObjectDeleted(msg))
+        this.handlers.set('cursor', msg => this.handleCursor(msg))
+        this.handlers.set('userDisconnected', msg => this.handleUserDisconnect(msg))
+        this.handlers.set('objectAdded_ack', msg => this.handleObjectAddedAck(msg))
+        this.handlers.set('objectAdded_error', msg => this.handleObjectAddedError(msg))
+        this.handlers.set('error', msg => this.handleError(msg))
 
         // Wire up connection callbacks
-        this.connection.onMessage((msg) => this.handleMessage(msg))
+        this.connection.onMessage(msg => this.handleMessage(msg))
         this.connection.onDisconnect(() => this.handleDisconnect())
 
         // Wire up reconnection callback
-        this.reconnectionManager.setReconnectCallback((roomCode) => this.connect(roomCode))
+        this.reconnectionManager.setReconnectCallback((roomCode) => 
+            this.connect(roomCode))
     }
 
     // Expose properties for backward compatibility with tests
@@ -70,7 +77,7 @@ export class WebSocketManager {
     getAckTracker(): AckTracker {
         return this.ackTracker
     }
-    
+
     isConnected(): boolean {
         return this.connection.isConnected()
     }
@@ -83,8 +90,17 @@ export class WebSocketManager {
         this.connection.updateStatus(status)
     }
 
-    async connect(roomCode: string): Promise<void> {
-        await this.connection.connect(roomCode)
+    async connect(roomCode: string, csrfToken?: string): Promise<void> {
+        if (csrfToken) {
+            // Store for reconnection
+            this.csrfToken = csrfToken  
+        }
+        
+        if (!this.csrfToken) {
+            throw new Error('CSRF token required for connection')
+        }
+        
+        await this.connection.connect(roomCode, this.csrfToken)
     }
 
     handleDisconnect(): void {
@@ -107,7 +123,6 @@ export class WebSocketManager {
         }
     }
 
-
     send(msg: Record<string, unknown>): void {
         this.connection.send(msg)
     }
@@ -117,7 +132,7 @@ export class WebSocketManager {
         if (!isValidMessageStructure(msg)) {
             ErrorHandler.silent(new Error('Invalid message structure'), {
                 context: 'WebSocketManager',
-                metadata: { msg }
+                metadata: { msg },
             })
             return
         }
@@ -130,7 +145,6 @@ export class WebSocketManager {
             log.warn('Unknown message type', { type: msg.type, message: msg })
         }
     }
-    
 
     //----------
     // Message Handlers
@@ -243,12 +257,13 @@ export class WebSocketManager {
 
     handleError(error: NetworkMessage): void {
         // Silent error - SessionManager handles user notifications for server errors
-        const message = typeof error === 'object' && error !== null && 'message' in error
-            ? String((error as { message: unknown }).message)
-            : 'Unknown error'
+        const message =
+            typeof error === 'object' && error !== null && 'message' in error
+                ? String((error as { message: unknown }).message)
+                : 'Unknown error'
         ErrorHandler.silent(new Error(message), {
             context: 'WebSocketManager',
-            metadata: error
+            metadata: error,
         })
 
         // Notify message handler about the error (SessionManager will handle user notification)
@@ -256,7 +271,7 @@ export class WebSocketManager {
             const { type: _originalType, ...errorData } = error
             this.messageHandler({
                 type: 'network:error',
-                ...errorData
+                ...errorData,
             })
         }
 
@@ -265,20 +280,23 @@ export class WebSocketManager {
     }
 
     handleObjectAddedAck(msg: NetworkMessage): void {
-        const objectId = typeof msg === 'object' && msg !== null && 'objectId' in msg
-            ? String((msg as { objectId: unknown }).objectId)
-            : ''
+        const objectId =
+            typeof msg === 'object' && msg !== null && 'objectId' in msg
+                ? String((msg as { objectId: unknown }).objectId)
+                : ''
 
         this.ackTracker.handleAck(objectId)
     }
 
     handleObjectAddedError(msg: NetworkMessage): void {
-        const objectId = typeof msg === 'object' && msg !== null && 'objectId' in msg
-            ? String((msg as { objectId: unknown }).objectId)
-            : ''
-        const error = typeof msg === 'object' && msg !== null && 'error' in msg
-            ? String((msg as { error: unknown }).error)
-            : 'Unknown error'
+        const objectId =
+            typeof msg === 'object' && msg !== null && 'objectId' in msg
+                ? String((msg as { objectId: unknown }).objectId)
+                : ''
+        const error =
+            typeof msg === 'object' && msg !== null && 'error' in msg
+                ? String((msg as { error: unknown }).error)
+                : 'Unknown error'
 
         const handled = this.ackTracker.handleError(objectId, error)
 
@@ -286,7 +304,7 @@ export class WebSocketManager {
             // Silent error - object-level failures shouldn't spam users
             ErrorHandler.silent(new Error(error || 'Failed to add object'), {
                 context: 'WebSocketManager',
-                metadata: { objectId, serverError: error }
+                metadata: { objectId, serverError: error },
             })
         }
     }

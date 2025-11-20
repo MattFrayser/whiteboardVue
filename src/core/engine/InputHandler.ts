@@ -70,7 +70,7 @@ export class InputHandler {
         } catch (error) {
             ErrorHandler.silent(error as Error, {
                 context: 'InputHandler',
-                metadata: { event: 'mousedown' }
+                metadata: { event: 'mousedown' },
             })
         }
     }
@@ -96,7 +96,7 @@ export class InputHandler {
                     x: worldPos.x,
                     y: worldPos.y,
                     tool: toolName,
-                    color: color
+                    color: color,
                 })
             }
 
@@ -106,7 +106,7 @@ export class InputHandler {
                 if (currentTool) {
                     currentTool._safeOnMouseMove(worldPos, e)
                 }
-            // right click
+                // right click
             } else if (e.buttons === 2) {
                 e.preventDefault()
                 this.engine.coordinates.pan({ x: e.clientX, y: e.clientY })
@@ -115,7 +115,7 @@ export class InputHandler {
         } catch (error) {
             ErrorHandler.silent(error as Error, {
                 context: 'InputHandler',
-                metadata: { event: 'mousemove' }
+                metadata: { event: 'mousemove' },
             })
         }
     }
@@ -140,14 +140,14 @@ export class InputHandler {
         } catch (error) {
             ErrorHandler.silent(error as Error, {
                 context: 'InputHandler',
-                metadata: { event: 'mouseup' }
+                metadata: { event: 'mouseup' },
             })
         }
     }
 
     /**
-    * Zooming in and out
-    */
+     * Zooming in and out
+     */
     private handleMouseWheel(e: WheelEvent): void {
         e.preventDefault()
         const zoomPoint = { x: e.clientX, y: e.clientY }
@@ -165,7 +165,10 @@ export class InputHandler {
 
             // SelectTool has dynamic cursor based on hover position
             if (currentTool && toolName === 'select' && worldPos) {
-                if ('updateCursor' in currentTool && typeof currentTool.updateCursor === 'function') {
+                if (
+                    'updateCursor' in currentTool &&
+                    typeof currentTool.updateCursor === 'function'
+                ) {
                     // Let SelectTool handle its own cursor (via actions.setCursor)
                     currentTool.updateCursor(worldPos)
                 }
@@ -212,7 +215,10 @@ export class InputHandler {
             // paste (ctrl-v)
             if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
                 e.preventDefault()
-                const worldPos = this.engine.coordinates.viewportToWorld(this.lastMousePos, this.canvas)
+                const worldPos = this.engine.coordinates.viewportToWorld(
+                    this.lastMousePos,
+                    this.canvas
+                )
                 this.engine.objectManager.paste(worldPos.x, worldPos.y)
                 this.engine.renderDirty()
             }
@@ -236,7 +242,7 @@ export class InputHandler {
         } catch (error) {
             ErrorHandler.silent(error as Error, {
                 context: 'InputHandler',
-                metadata: { event: 'keydown', key: e.key }
+                metadata: { event: 'keydown', key: e.key },
             })
         }
     }
