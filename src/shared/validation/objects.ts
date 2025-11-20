@@ -5,7 +5,7 @@ import {
     isHexColor,
     isPositiveNumber,
     isNonNegativeInteger,
-    isValidPointArray
+    isValidPointArray,
 } from './primitives'
 import type { DrawingObjectData } from '../types/common'
 
@@ -163,7 +163,10 @@ function isValidText(data: Record<string, unknown>, isInnerData = false): boolea
 /**
  * Main validator - dispatches to type-specific validators for flat format
  */
-export function isValidDrawingObjectData(data: unknown, isInnerData = false): data is DrawingObjectData {
+export function isValidDrawingObjectData(
+    data: unknown,
+    isInnerData = false
+): data is DrawingObjectData {
     if (!isObject(data)) return false
 
     // Dispatch to type-specific validator
@@ -188,9 +191,9 @@ export function isValidDrawingObjectData(data: unknown, isInnerData = false): da
  * Validate nested object format (from backend)
  */
 export function isValidNestedObject(data: unknown): data is {
-    id: string;
-    type: string;
-    data: DrawingObjectData;
+    id: string
+    type: string
+    data: DrawingObjectData
     zIndex: number
 } {
     if (!isObject(data)) return false
@@ -221,11 +224,13 @@ export function isValidNestedObject(data: unknown): data is {
 /**
  * Validate object (either nested or flat format)
  */
-export function isValidObject(data: unknown): data is DrawingObjectData | {
-    id: string;
-    type: string;
-    data: DrawingObjectData;
-    zIndex: number
-} {
+export function isValidObject(data: unknown): data is
+    | DrawingObjectData
+    | {
+          id: string
+          type: string
+          data: DrawingObjectData
+          zIndex: number
+      } {
     return isValidDrawingObjectData(data) || isValidNestedObject(data)
 }

@@ -1,9 +1,5 @@
-/**
- * Common type definitions shared across the application
- */
-
 // ============================================================================
-// Geometry Types
+// Geometry 
 // ============================================================================
 
 export interface Point {
@@ -23,29 +19,21 @@ export interface ResizeHandle extends Point {
 }
 
 // ============================================================================
-// Drawing Types
+// Drawing 
 // ============================================================================
 
-// ============================================================================
-// Drawing Types
-// ============================================================================
-
-/**
- * Base properties common to all drawing objects
- */
 export interface BaseObjectData {
     id: string
     type: string
     timestamp?: number
     userId?: string
+
+    rotation?: number
+    scaleX?: number
+    scaleY?: number
     [key: string]: unknown
 }
 
-/**
- * Type-specific data schemas matching backend object_schema.go
- */
-
-// LineCoordinates-based shapes (Rectangle, Circle, Line)
 export interface RectangleData extends BaseObjectData {
     type: 'rectangle'
     x1: number
@@ -53,19 +41,19 @@ export interface RectangleData extends BaseObjectData {
     x2: number
     y2: number
     color?: string
-    width?: number  // stroke width
+    width?: number // stroke width
     fill?: string
     [key: string]: unknown
 }
 
 export interface CircleData extends BaseObjectData {
     type: 'circle'
-    x1: number  // center x
-    y1: number  // center y
-    x2: number  // point on radius x
-    y2: number  // point on radius y
+    x1: number // center x
+    y1: number // center y
+    x2: number // point on radius x
+    y2: number // point on radius y
     color?: string
-    width?: number  // stroke width
+    width?: number // stroke width
     fill?: string
     [key: string]: unknown
 }
@@ -77,11 +65,10 @@ export interface LineData extends BaseObjectData {
     x2: number
     y2: number
     color?: string
-    width?: number  // stroke width
+    width?: number // stroke width
     [key: string]: unknown
 }
 
-// Position-based shapes (Text)
 export interface TextData extends BaseObjectData {
     type: 'text'
     x: number
@@ -96,29 +83,21 @@ export interface TextData extends BaseObjectData {
     [key: string]: unknown
 }
 
-// Path-based shapes (Stroke)
 export interface StrokeData extends BaseObjectData {
     type: 'stroke'
     points: Point[]
     color?: string
-    width?: number  // stroke width
+    width?: number // stroke width
     [key: string]: unknown
 }
 
-/**
- * Main drawing object data type - strict discriminated union
- * Use type guards to narrow to specific types
- */
-export type DrawingObjectData =
-    | RectangleData
-    | CircleData
-    | LineData
-    | TextData
-    | StrokeData
+export type DrawingObjectData = 
+    RectangleData | 
+    CircleData | 
+    LineData | 
+    TextData | 
+    StrokeData
 
-/**
- * Type guard functions for discriminated unions
- */
 export function isRectangleData(data: DrawingObjectData): data is RectangleData {
     return data.type === 'rectangle'
 }

@@ -38,7 +38,7 @@ export function sanitizeObjectData(data: DrawingObjectData): DrawingObjectData {
         if (Array.isArray(sanitized.points)) {
             sanitized.points = sanitized.points.map(p => ({
                 x: Math.max(MIN_COORD, Math.min(MAX_COORD, p.x)),
-                y: Math.max(MIN_COORD, Math.min(MAX_COORD, p.y))
+                y: Math.max(MIN_COORD, Math.min(MAX_COORD, p.y)),
             }))
         }
     } else {
@@ -66,13 +66,16 @@ export function sanitizeObjectData(data: DrawingObjectData): DrawingObjectData {
 }
 
 /**
- * Sanitize room code 
+ * Sanitize room code
  */
 export function sanitizeRoomCode(code: string): string {
     if (typeof code !== 'string') {
         return 'INVALID'
     }
-    const sanitized = code.replace(/[^A-Z0-9]/gi, '').substring(0, 10).toUpperCase()
+    const sanitized = code
+        .replace(/[^A-Z0-9]/gi, '')
+        .substring(0, 10)
+        .toUpperCase()
     return sanitized || 'INVALID'
 }
 

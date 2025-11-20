@@ -1,10 +1,3 @@
-/**
- * UI Component Type Definitions
- *
- * Type definitions for UI components including Toolbar, DialogManager,
- * NotificationManager, and other UI-related interfaces.
- */
-
 import type { DrawingEngine } from '../../core/engine/DrawingEngine'
 // ============================================================================
 // Toolbar Types
@@ -16,38 +9,11 @@ export interface ToolbarOptions {
     initialBrushSize?: number
 }
 
-export interface SwatchData {
-    color: string
-    size?: number
-}
-
 // ============================================================================
 // Dialog Types
 // ============================================================================
 
 export interface DialogOptions {
-    title: string
-    message: string
-    confirmText?: string
-    cancelText?: string
-    onConfirm?: () => void
-    onCancel?: () => void
-}
-
-export interface PasswordDialogOptions {
-    roomCode: string
-    errorMessage?: string | null
-    onSubmit: (password: string) => void
-    onCancel: () => void
-}
-
-export interface JoinRoomDialogOptions {
-    roomCode: string
-    onJoin: (roomCode: string) => void
-    onCancel: () => void
-}
-
-export interface ConfirmDialogConfig {
     title: string
     message: string
     confirmText?: string
@@ -78,7 +44,11 @@ export interface NotificationManager {
 
 export interface DialogManager {
     showPasswordDialog(roomCode: string, errorMessage?: string | null): Promise<string | null>
-    showJoinRoomDialog(roomCode: string, onJoin?: (() => void | Promise<void>) | null, onCancel?: (() => void) | null): Promise<boolean>
+    showJoinRoomDialog(
+        roomCode: string,
+        onJoin?: (() => void | Promise<void>) | null,
+        onCancel?: (() => void) | null
+    ): Promise<boolean>
     showConfirmDialog(config?: {
         title?: string
         message?: string

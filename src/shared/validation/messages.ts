@@ -20,10 +20,10 @@ function createMessageValidator<T extends { type: string }>(
     return (msg: unknown): msg is T => {
         // Check if object
         if (!isObject(msg)) return false
-        
+
         // Check type field
         if (msg.type !== schema.type) return false
-        
+
         // Validate required fields
         if (schema.requiredFields) {
             for (const [field, validator] of Object.entries(schema.requiredFields)) {
@@ -32,7 +32,7 @@ function createMessageValidator<T extends { type: string }>(
                 }
             }
         }
-        
+
         // Validate optional fields (if present)
         if (schema.optionalFields) {
             for (const [field, validator] of Object.entries(schema.optionalFields)) {
@@ -41,7 +41,7 @@ function createMessageValidator<T extends { type: string }>(
                 }
             }
         }
-        
+
         return true
     }
 }
@@ -52,8 +52,8 @@ export const isAuthenticatedMessage = createMessageValidator<{
 }>({
     type: 'authenticated',
     optionalFields: {
-        userId: isString
-    }
+        userId: isString,
+    },
 })
 
 export const isRoomJoinedMessage = createMessageValidator<{
@@ -62,8 +62,8 @@ export const isRoomJoinedMessage = createMessageValidator<{
 }>({
     type: 'room_joined',
     optionalFields: {
-        color: isHexColor
-    }
+        color: isHexColor,
+    },
 })
 
 export const isSyncMessage = createMessageValidator<{
@@ -72,9 +72,8 @@ export const isSyncMessage = createMessageValidator<{
 }>({
     type: 'sync',
     requiredFields: {
-        objects: (val): val is DrawingObjectData[] => 
-            isArray(val) && val.every(isValidObject)
-    }
+        objects: (val): val is DrawingObjectData[] => isArray(val) && val.every(isValidObject),
+    },
 })
 
 export const isObjectAddedMessage = createMessageValidator<{
@@ -84,11 +83,11 @@ export const isObjectAddedMessage = createMessageValidator<{
 }>({
     type: 'objectAdded',
     requiredFields: {
-        object: isValidObject
+        object: isValidObject,
     },
     optionalFields: {
-        userId: isString
-    }
+        userId: isString,
+    },
 })
 
 export const isObjectUpdatedMessage = createMessageValidator<{
@@ -98,11 +97,11 @@ export const isObjectUpdatedMessage = createMessageValidator<{
 }>({
     type: 'objectUpdated',
     requiredFields: {
-        object: isValidObject
+        object: isValidObject,
     },
     optionalFields: {
-        userId: isString
-    }
+        userId: isString,
+    },
 })
 
 export const isObjectDeletedMessage = createMessageValidator<{
@@ -112,11 +111,11 @@ export const isObjectDeletedMessage = createMessageValidator<{
 }>({
     type: 'objectDeleted',
     requiredFields: {
-        objectId: isString
+        objectId: isString,
     },
     optionalFields: {
-        userId: isString
-    }
+        userId: isString,
+    },
 })
 
 export const isCursorMessage = createMessageValidator<{
@@ -133,8 +132,8 @@ export const isCursorMessage = createMessageValidator<{
         x: isNumber,
         y: isNumber,
         color: isHexColor,
-        tool: isString
-    }
+        tool: isString,
+    },
 })
 
 export const isUserDisconnectedMessage = createMessageValidator<{
@@ -143,8 +142,8 @@ export const isUserDisconnectedMessage = createMessageValidator<{
 }>({
     type: 'userDisconnected',
     requiredFields: {
-        userId: isString
-    }
+        userId: isString,
+    },
 })
 
 export const isErrorMessage = createMessageValidator<{
@@ -155,6 +154,6 @@ export const isErrorMessage = createMessageValidator<{
     type: 'error',
     optionalFields: {
         code: isString,
-        message: isString
-    }
+        message: isString,
+    },
 })

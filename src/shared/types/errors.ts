@@ -1,5 +1,4 @@
- /* ErrorTypes
- *
+/* 
  * Centralized error categories, codes, and user-friendly messages
  */
 
@@ -14,7 +13,6 @@ export const ErrorCategory = {
 
 export type ErrorCategoryType = (typeof ErrorCategory)[keyof typeof ErrorCategory]
 
-// Error Codes
 export const ErrorCode = {
     // Network errors
     CONNECTION_FAILED: 'CONNECTION_FAILED',
@@ -45,7 +43,8 @@ export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode]
 // User-friendly error messages
 export const ErrorMessages: Record<ErrorCodeType, string> = {
     // Network
-    [ErrorCode.CONNECTION_FAILED]: 'Unable to connect to the server. Please check your internet connection and try again.',
+    [ErrorCode.CONNECTION_FAILED]:
+        'Unable to connect to the server. Please check your internet connection and try again.',
     [ErrorCode.AUTHENTICATION_FAILED]: 'Authentication failed. Please try reconnecting.',
     [ErrorCode.TIMEOUT]: 'The connection timed out. Please try again.',
     [ErrorCode.SERVER_ERROR]: 'Server error occurred. Please try again later.',
@@ -57,13 +56,16 @@ export const ErrorMessages: Record<ErrorCodeType, string> = {
     [ErrorCode.INVALID_ROOM_CODE]: 'Invalid room code. Please check and try again.',
 
     // Storage
-    [ErrorCode.STORAGE_QUOTA_EXCEEDED]: 'Storage quota exceeded. Your work is still saved in memory, but automatic saving is disabled. Consider exporting your work.',
-    [ErrorCode.STORAGE_UNAVAILABLE]: 'Local storage is unavailable. Your work will not be saved automatically.',
+    [ErrorCode.STORAGE_QUOTA_EXCEEDED]:
+        'Storage quota exceeded. Your work is still saved in memory, but automatic saving is disabled. Consider exporting your work.',
+    [ErrorCode.STORAGE_UNAVAILABLE]:
+        'Local storage is unavailable. Your work will not be saved automatically.',
     [ErrorCode.SAVE_FAILED]: 'Failed to save your work. Please try exporting your data.',
     [ErrorCode.LOAD_FAILED]: 'Failed to load saved data. Starting with a blank canvas.',
 
     // Critical
-    [ErrorCode.COMPONENT_INIT_FAILED]: 'A component failed to initialize. Some features may not work correctly.',
+    [ErrorCode.COMPONENT_INIT_FAILED]:
+        'A component failed to initialize. Some features may not work correctly.',
     [ErrorCode.RENDER_FAILED]: 'Rendering error occurred. Please refresh the page.',
     [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred. Please try again.',
 }

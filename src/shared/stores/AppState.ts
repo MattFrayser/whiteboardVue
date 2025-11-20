@@ -1,8 +1,5 @@
 /**
- * Application State Definition
- * Centralized state structure for the whiteboard application
- *
- * This serves as the single source of truth for application state.
+ * Single source of truth for application state.
  * All components subscribe to relevant slices of this state.
  */
 
@@ -12,7 +9,6 @@ import { clampBrushSize, validateColor } from '../validation'
 import { RemoteCursor } from '../types'
 
 // Type definitions for the application state
-// Tool is now dynamic based on ToolRegistry - any registered tool name is valid
 export type Tool = string
 export type NetworkStatus = 'local' | 'connecting' | 'connected' | 'disconnected' | 'error'
 
@@ -66,55 +62,53 @@ interface AppStateShape extends Record<string, unknown> {
 }
 
 const initialState: AppStateShape = {
-
     // UI State: Drawing tool settings
     ui: {
-        tool: 'draw',           // Current tool: 'draw', 'select', 'erase', 'text'
-        color: DEFAULT_COLOR,   // Current drawing color
-        brushSize: 5,           // Current brush size
-        cursor: 'crosshair',    // Current cursor style
+        tool: 'draw', 
+        color: DEFAULT_COLOR, 
+        brushSize: 5, 
+        cursor: 'crosshair', 
     },
 
     // Viewport: Camera transform (pan/zoom)
     viewport: {
-        offsetX: 0,             // Pan offset X
-        offsetY: 0,             // Pan offset Y
-        scale: 1,               // Zoom scale
+        offsetX: 0, 
+        offsetY: 0, 
+        scale: 1, 
     },
 
     // Selection: Currently selected objects
     selection: {
-        objectIds: [],          // IDs of selected objects
-        bounds: null,           // Bounding box { x, y, width, height }
+        objectIds: [], // IDs of selected objects
+        bounds: null, // Bounding box { x, y, width, height }
     },
 
     // History: Undo/redo state
     history: {
-        canUndo: false,         // Can undo?
-        canRedo: false,         // Can redo?
-        pointer: -1,            // Current position in history
-        size: 0,                // Total history size
+        canUndo: false, 
+        canRedo: false, 
+        pointer: -1, // Current position in history
+        size: 0, 
     },
 
     // Network: WebSocket connection state
     network: {
-        status: 'local',        // 'local' | 'connecting' | 'connected' | 'disconnected' | 'error'
-        roomCode: null,         // Current room code (null in local mode)
-        userId: null,           // Current user's ID (temporary local ID in local mode, server ID when connected)
-        userColor: null,        // User's assigned color in collaborative session
-        users: [],              // Other connected users [{ id, color, cursor }]
-        remoteCursors: {},      // Remote user cursors Record<userId, RemoteCursor>
-        isAuthenticating: false, // Whether currently in authentication flow
-        reconnectAttempts: 0,   // Number of reconnection attempts
+        status: 'local', 
+        roomCode: null, // null in local mode
+        userId: null, 
+        userColor: null, // users color in collab mode 
+        users: [], // [{ id, color, cursor }]
+        remoteCursors: {}, // <userId, RemoteCursor>
+        isAuthenticating: false, 
+        reconnectAttempts: 0, 
     },
 }
-
 
 export const appState = new StateStore<AppStateShape>(initialState)
 
 /**
- * State selectors and actions- convenient getters and setters
- * These are optional but make it easier/cleaner to access
+ * State selectors and actions
+ * easier/cleaner access
  */
 export const selectors = {
     // UI selectors
@@ -243,7 +237,11 @@ export const actions = {
     resetReconnectAttempts: () => {
         appState.set('network.reconnectAttempts', 0)
     },
-    setNetworkState: (status: NetworkStatus, roomCode: string | null = null, userId: string | null = null) => {
+    setNetworkState: (
+        status: NetworkStatus,
+        roomCode: string | null = null,
+        userId: string | null = null
+    ) => {
         const updates: Record<string, unknown> = { 'network.status': status }
         if (roomCode !== null) updates['network.roomCode'] = roomCode
         if (userId !== null) updates['network.userId'] = userId

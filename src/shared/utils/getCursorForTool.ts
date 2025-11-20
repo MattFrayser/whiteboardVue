@@ -1,10 +1,3 @@
-/**
- * Get cursor style for a given tool
- *
- * Centralized tool→cursor mapping logic
- * Eliminates duplication between Toolbar and InputHandler
- */
-
 import { CURSORS } from '../constants'
 import type { Tool } from '../stores/AppState'
 

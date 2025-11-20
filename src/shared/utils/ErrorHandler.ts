@@ -15,7 +15,6 @@
 import type { NotificationManager, DialogManager } from '../types'
 import {
     ErrorCategory,
-    
     ErrorMessages,
     DefaultMessages,
     type ErrorCategoryType,
@@ -45,10 +44,7 @@ export class ErrorHandler {
     /**
      * Initialize ErrorHandler with UI managers
      */
-    static init(
-        notificationManager: NotificationManager,
-        dialogManager: DialogManager
-    ): void {
+    static init(notificationManager: NotificationManager, dialogManager: DialogManager): void {
         this.notificationManager = notificationManager
         this.dialogManager = dialogManager
     }
@@ -225,10 +221,7 @@ export class ErrorHandler {
     /**
      * Convenience method for validation errors
      */
-    static validation(
-        error: Error | string,
-        options: ErrorHandlerOptions = {}
-    ): ErrorHandleResult {
+    static validation(error: Error | string, options: ErrorHandlerOptions = {}): ErrorHandleResult {
         return this.handle(error, ErrorCategory.VALIDATION, options)
     }
 

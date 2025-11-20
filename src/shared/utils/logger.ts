@@ -1,14 +1,9 @@
-/**
- * Structured logging utility for frontend
- * Environment-aware with log levels
- */
-
 export enum LogLevel {
     DEBUG = 0,
     INFO = 1,
     WARN = 2,
     ERROR = 3,
-    NONE = 4
+    NONE = 4,
 }
 
 class Logger {
@@ -40,9 +35,8 @@ class Logger {
                 break
             default:
                 // Default: debug in development, info in production
-                this.currentLevel = this.environment === 'production'
-                    ? LogLevel.INFO
-                    : LogLevel.DEBUG
+                this.currentLevel =
+                    this.environment === 'production' ? LogLevel.INFO : LogLevel.DEBUG
         }
     }
 
@@ -50,7 +44,12 @@ class Logger {
         return level >= this.currentLevel
     }
 
-    private formatMessage(level: string, component: string, message: string, data?: unknown): string {
+    private formatMessage(
+        level: string,
+        component: string,
+        message: string,
+        data?: unknown
+    ): string {
         const timestamp = new Date().toISOString()
         let formatted = `[${timestamp}] ${level} [${component}] ${message}`
         if (data !== undefined) {
@@ -79,22 +78,20 @@ class Logger {
 
     error(component: string, message: string, error?: Error | unknown): void {
         if (this.shouldLog(LogLevel.ERROR)) {
-            const errorData = error instanceof Error
-                ? { message: error.message, stack: error.stack }
-                : error
+            const errorData =
+                error instanceof Error ? { message: error.message, stack: error.stack } : error
             console.error(this.formatMessage('ERROR', component, message, errorData))
         }
     }
 
-    /**
-     * Create a scoped logger for a specific component
-     */
+    
+    // scoped logger for a specific component
     scope(component: string) {
         return {
             debug: (message: string, data?: unknown) => this.debug(component, message, data),
             info: (message: string, data?: unknown) => this.info(component, message, data),
             warn: (message: string, data?: unknown) => this.warn(component, message, data),
-            error: (msg: string, error?: Error | unknown) => this.error(component, msg, error)
+            error: (msg: string, error?: Error | unknown) => this.error(component, msg, error),
         }
     }
 }
