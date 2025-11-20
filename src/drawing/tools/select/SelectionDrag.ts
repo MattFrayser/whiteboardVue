@@ -1,10 +1,3 @@
-/**
- * Handles dragging/moving selected objects
- * - Tracks drag state and offset
- * - Moves objects during drag
- * - Records move operations in history
- */
-
 import type { Point, Bounds } from '../../../shared/types'
 import type { DrawingObject } from '../../objects/DrawingObject'
 import type { DrawingEngine } from '../../../core/engine/DrawingEngine'
@@ -14,11 +7,10 @@ import { actions } from '../../../shared/stores/AppState'
 export class SelectionDrag {
     private engine: DrawingEngine
 
-    // Drag state
     isDragging: boolean
     dragStart: Point | null
     dragStartOriginal: Point | null // For calculating total displacement
-    
+
     // Store original bounds for quadtree updates
     draggedObjectsBounds: Map<DrawingObject, Bounds>
 
@@ -35,7 +27,6 @@ export class SelectionDrag {
             this.engine.objectManager.selectObject(object, addToSelection)
         }
 
-        // Original bounds are stored for quadtree updates 
         this.draggedObjectsBounds.clear()
         this.engine.objectManager.selectedObjects.forEach(obj => {
             this.draggedObjectsBounds.set(obj, obj.getBounds())
@@ -66,10 +57,7 @@ export class SelectionDrag {
         this.engine.renderDirty()
     }
 
-    /**
-     * Finish drag operation
-     * Records operation in history and broadcasts updates
-     */
+    // Records operation in history and broadcasts updates
     finishDrag(worldPos: Point): void {
         if (!this.isDragging) {
             return
@@ -94,7 +82,7 @@ export class SelectionDrag {
             const totalDx = worldPos.x - this.dragStartOriginal.x
             const totalDy = worldPos.y - this.dragStartOriginal.y
 
-            // only want to add to history if actual movement happened 
+            // only want to add to history if actual movement happened
             if (Math.abs(totalDx) > 0.01 || Math.abs(totalDy) > 0.01) {
                 const userId = this.engine.objectManager.userId
                 if (userId) {

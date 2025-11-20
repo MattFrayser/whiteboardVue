@@ -3,12 +3,8 @@ import { BaseShapeTool } from '../base/BaseShapeTool'
 import type { Point, LineData } from '../../../shared/types'
 import type { DrawingObject } from '../../objects/DrawingObject'
 import { MIN_SHAPE_SIZE } from '../../../shared/constants'
-/**
- * Line drawing tool
- * Draws straight lines from point to point
- */
+
 export class LineTool extends BaseShapeTool {
-    // Expose currentShape as currentLine for backward compatibility with tests
     get currentLine(): Line | null {
         return this.currentShape as Line | null
     }
@@ -27,8 +23,7 @@ export class LineTool extends BaseShapeTool {
         // Calculate line length
         const line = shape as Line
         const length = Math.sqrt(
-            Math.pow(line.data.x2 - line.data.x1, 2) +
-                Math.pow(line.data.y2 - line.data.y1, 2)
+            Math.pow(line.data.x2 - line.data.x1, 2) + Math.pow(line.data.y2 - line.data.y1, 2)
         )
         return length > MIN_SHAPE_SIZE
     }

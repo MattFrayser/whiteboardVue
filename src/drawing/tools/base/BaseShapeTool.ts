@@ -12,8 +12,8 @@ import { selectors } from '../../../shared/stores/AppState'
  * - Mouse up: Validate and add shape to canvas
  *
  * Subclasses  implement:
- * - createShape(): 
- * - isShapeValid(): 
+ * - createShape():
+ * - isShapeValid():
  */
 export abstract class BaseShapeTool extends Tool {
     protected startPoint: Point | null

@@ -4,13 +4,8 @@ import type { Point, RectangleData } from '../../../shared/types'
 import type { DrawingObject } from '../../objects/DrawingObject'
 import { selectors } from '../../../shared/stores/AppState'
 import { MIN_SHAPE_SIZE } from '../../../shared/constants'
-/**
- * Rectangle drawing tool
- * Draws rectangles from corner to corner
- * Hold Shift to create filled rectangles
- */
+
 export class RectangleTool extends BaseShapeTool {
-    // Expose currentShape as currentRect for backward compatibility with tests
     get currentRect(): Rectangle | null {
         return this.currentShape as Rectangle | null
     }
@@ -26,7 +21,7 @@ export class RectangleTool extends BaseShapeTool {
         const shapeData: RectangleData = {
             ...baseData,
             type: 'rectangle',
-            fill: e.shiftKey ? selectors.getColor() : undefined
+            fill: e.shiftKey ? selectors.getColor() : undefined,
         }
 
         return new Rectangle(null, shapeData, 0)

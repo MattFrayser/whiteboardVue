@@ -44,7 +44,7 @@ export class DrawTool extends Tool {
     }
 
     override onMouseUp(_worldPos: Point, _e: MouseEvent): void {
-         if (this.currentStroke && this.currentStroke.data.points.length > 1) {
+        if (this.currentStroke && this.currentStroke.data.points.length > 1) {
             // Apply Douglas-Peucker simplification to reduce point count
             // Only simplify if we have more than 5 points (otherwise not worth it)
             if (this.currentStroke.data.points.length > 5) {

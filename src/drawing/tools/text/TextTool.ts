@@ -1,6 +1,11 @@
 import { Text } from '../../objects/types/Text'
 import { Tool } from '../base/Tool'
-import { SELECTION_COLOR, FONT_SIZE_MULTIPLIER, TEXT_BLUR_DELAY, TEXT_FOCUS_DELAY } from '../../../shared/constants'
+import {
+    SELECTION_COLOR,
+    FONT_SIZE_MULTIPLIER,
+    TEXT_BLUR_DELAY,
+    TEXT_FOCUS_DELAY,
+} from '../../../shared/constants'
 import type { Point } from '../../../shared/types'
 import type { DrawingEngine } from '../../../core/engine/DrawingEngine'
 import { selectors } from '../../../shared/stores/AppState'
@@ -27,7 +32,6 @@ export class TextTool extends Tool {
             this.finishEditing()
         }
 
-        // Create text input at click position
         this.createTextInput(worldPos)
     }
 
@@ -38,7 +42,7 @@ export class TextTool extends Tool {
         this.inputElement.style.position = 'absolute'
         this.inputElement.style.zIndex = '10000'
 
-        // Position input at click location
+        // Position at worldPos
         const viewportPos = this.engine.coordinates.worldToViewport(worldPos)
         const canvasRect = this.engine.canvas.getBoundingClientRect()
         this.inputElement.style.left = `${canvasRect.left + viewportPos.x}px`
@@ -55,7 +59,7 @@ export class TextTool extends Tool {
 
         document.body.appendChild(this.inputElement)
 
-        // Store bound event handlers for cleanup
+        // Store for cleanup
         this.keydownHandler = (e: KeyboardEvent) => {
             if (e.key === 'Enter') {
                 this.finishEditing()
@@ -69,7 +73,6 @@ export class TextTool extends Tool {
             this.finishEditing()
         }
 
-        // Handle input events
         this.inputElement.addEventListener('keydown', this.keydownHandler)
 
         // Delay blur handler to prevent immediate firing from mousedown event
@@ -98,20 +101,22 @@ export class TextTool extends Tool {
         const text = this.inputElement.value.trim()
         if (text) {
             const MAX_TEXT_LENGTH = 10000
-            const sanitizedText = text.length > MAX_TEXT_LENGTH 
-                ? text.substring(0, MAX_TEXT_LENGTH) 
-                : text
+            const sanitizedText =
+                text.length > MAX_TEXT_LENGTH ? text.substring(0, MAX_TEXT_LENGTH) : text
 
-            // Create text object
-            const textObj = new Text(null, {
-                id: '',
-                type: 'text',
-                x: this.Position.x,
-                y: this.Position.y,
-                text: sanitizedText,
-                color: selectors.getColor(),
-                fontSize: selectors.getBrushSize() * FONT_SIZE_MULTIPLIER,
-            }, 0)
+            const textObj = new Text(
+                null,
+                {
+                    id: '',
+                    type: 'text',
+                    x: this.Position.x,
+                    y: this.Position.y,
+                    text: sanitizedText,
+                    color: selectors.getColor(),
+                    fontSize: selectors.getBrushSize() * FONT_SIZE_MULTIPLIER,
+                },
+                0
+            )
 
             this.engine.objectManager.addObject(textObj)
             this.engine.renderDirty()

@@ -5,6 +5,7 @@ import type { Bounds } from '../../shared/types'
 import type { ObjectManager } from './ObjectManager'
 import type { ObjectStore } from '../../core/spatial/ObjectStore'
 import type { HistoryManager } from '../../storage/history/HistoryManager'
+
 /**
  * Manages object selection state and operations
  */
@@ -12,22 +13,23 @@ export class SelectionManager {
     objectManager: ObjectManager
     objectStore: ObjectStore
     historyManager: HistoryManager
-    constructor(objectManager: ObjectManager, objectStore: ObjectStore, historyManager: HistoryManager) {
+    constructor(
+        objectManager: ObjectManager,
+        objectStore: ObjectStore,
+        historyManager: HistoryManager
+    ) {
         this.objectManager = objectManager
         this.objectStore = objectStore
         this.historyManager = historyManager
-
     }
 
-    // Thinking about caching here, but not sure if preformance gains
-    // are worth extra complexity
+    // Thinking about caching here, but not sure if preformance gains are worth
     get selectedObjects() {
         const selectedIds = appState.get('selection.objectIds') as string[]
         return selectedIds
             .map((id: string) => this.objectStore.getObjectById(id))
             .filter((obj: DrawingObject | undefined): obj is DrawingObject => obj !== undefined)
     }
-
 
     // Multi is used for selecting mutiple objects
     selectObject(object: DrawingObject, multi = false) {
@@ -110,7 +112,6 @@ export class SelectionManager {
         // Update state
         actions.setSelection(newIds)
     }
-
 
     moveSelected(dx: number, dy: number) {
         if (this.selectedObjects.length === 0) {

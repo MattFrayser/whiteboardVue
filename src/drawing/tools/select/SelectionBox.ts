@@ -1,19 +1,15 @@
-/**
- * Handles box/rectangle selection 
- * - Tracks selection rectangle start/end
- * - Renders selection rectangle preview
- * - Selects objects within rectangle
- */
-
 import type { Point, Bounds } from '../../../shared/types'
 import type { DrawingEngine } from '../../../core/engine/DrawingEngine'
-import { SELECTION_COLOR, SELECTION_RECT_FILL, SELECTION_RECT_DASH } from '../../../shared/constants'
+import {
+    SELECTION_COLOR,
+    SELECTION_RECT_FILL,
+    SELECTION_RECT_DASH,
+} from '../../../shared/constants'
 import { actions } from '../../../shared/stores/AppState'
 
 export class SelectionBox {
     private engine: DrawingEngine
 
-    // Box selection state
     isSelecting: boolean
     selectionStart: Point | null
     selectionEnd: Point | null
@@ -25,20 +21,17 @@ export class SelectionBox {
         this.selectionEnd = null
     }
 
-
     startSelection(worldPos: Point, clearExisting: boolean): void {
         if (clearExisting) {
             this.engine.objectManager.clearSelection()
         }
-        
+
         this.isSelecting = true
         this.selectionStart = worldPos
         this.selectionEnd = worldPos
     }
 
-    /**
-     * Update selection box as mouse moves
-     */
+    // used as mouse moves
     updateSelection(worldPos: Point): void {
         if (!this.isSelecting) {
             return
@@ -49,9 +42,7 @@ export class SelectionBox {
         this.engine.renderDirty()
     }
 
-    /**
-     * Finish box selection - select all objects in rectangle
-     */
+    // mouse up, get all obj inside rect
     finishSelection(addToSelection: boolean): void {
         if (!this.isSelecting) {
             return
@@ -66,9 +57,8 @@ export class SelectionBox {
         this.engine.renderDirty()
     }
 
-    /**
-     * Calculate selection rectangle bounds
-     */
+
+    // calc and return bounds
     private getSelectionRect(): Bounds | null {
         if (!this.selectionStart || !this.selectionEnd) {
             return null
@@ -82,9 +72,6 @@ export class SelectionBox {
         return { x, y, width, height }
     }
 
-    /**
-     * Render selection rectangle preview
-     */
     renderPreview(ctx: CanvasRenderingContext2D): void {
         if (!this.isSelecting || !this.selectionStart || !this.selectionEnd) {
             return

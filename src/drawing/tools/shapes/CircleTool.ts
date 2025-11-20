@@ -5,13 +5,9 @@ import type { DrawingObject } from '../../objects/DrawingObject'
 import { selectors } from '../../../shared/stores/AppState'
 import { MIN_SHAPE_SIZE } from '../../../shared/constants'
 
-/**
- * Circle drawing tool
- * Draws circles from center point to edge (radius determined by drag distance)
- * Hold Shift to create filled circles
- */
 export class CircleTool extends BaseShapeTool {
     // Expose currentShape as currentCircle for backward compatibility with tests
+    // will fix tests
     get currentCircle(): Circle | null {
         return this.currentShape as Circle | null
     }
@@ -23,18 +19,16 @@ export class CircleTool extends BaseShapeTool {
     protected createShape(startPos: Point, e: MouseEvent): DrawingObject {
         const baseData = this.createBaseShapeData(startPos)
 
-        // Create typed CircleData
         const shapeData: CircleData = {
             ...baseData,
             type: 'circle',
-            fill: e.shiftKey ? selectors.getColor() : undefined
+            fill: e.shiftKey ? selectors.getColor() : undefined,
         }
 
         return new Circle(null, shapeData, 0)
     }
 
     protected isShapeValid(shape: DrawingObject): boolean {
-        // Calculate radius from center to edge (shape should be a Circle)
         const circle = shape as Circle
         const radius = Math.sqrt(
             Math.pow(circle.data.x2 - circle.data.x1, 2) +

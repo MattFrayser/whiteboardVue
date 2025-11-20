@@ -19,15 +19,8 @@ export class Tool {
         this.active = false
     }
 
-    _handleError(error: unknown, eventType: string, worldPos: Point): void {
-        ErrorHandler.handle(error instanceof Error ? error : new Error(String(error)), ErrorCategory.SILENT, {
-            context: `${this.constructor.name}`,
-            metadata: { eventType, worldPos },
-            showNotification: false // Don't spam users with tool interaction errors
-        })
-    }
 
-     // Safe wrapper for onMouseDown with error handling
+    // Safe wrapper for onMouseDown with error handling
     _safeWrap(
         eventType: 'mousedown' | 'mousemove' | 'mouseup',
         handler: (worldPos: Point, e: MouseEvent) => void,
@@ -57,4 +50,16 @@ export class Tool {
     onMouseMove(_worldPos: Point, _e: MouseEvent): void {}
     onMouseUp(_worldPos: Point, _e: MouseEvent): void {}
     renderPreview(_ctx: CanvasRenderingContext2D): void {}
+
+    _handleError(error: unknown, eventType: string, worldPos: Point): void {
+        ErrorHandler.handle(
+            error instanceof Error ? error : new Error(String(error)),
+            ErrorCategory.SILENT,
+            {
+                context: `${this.constructor.name}`,
+                metadata: { eventType, worldPos },
+                showNotification: false, // Don't spam users with tool interaction errors
+            }
+        )
+    }
 }

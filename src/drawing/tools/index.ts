@@ -17,7 +17,7 @@ ToolRegistry.register('draw', DrawTool, {
 ToolRegistry.register('select', SelectTool, {
     name: 'select',
     cursor: 'default',
-    keyboardShortcuts: ['s', 'v'], // s for select, v for select 
+    keyboardShortcuts: ['s', 'v'], // s for select, v for select
 })
 
 ToolRegistry.register('eraser', EraserTool, {
