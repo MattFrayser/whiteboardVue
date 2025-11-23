@@ -27,6 +27,38 @@ export class CircleTool extends BaseShapeTool {
 
         return new Circle(null, shapeData, 0)
     }
+    override onMouseMove(worldPos: Point, _e: MouseEvent): void {
+
+        if (this.currentShape && this.startPoint) {
+            // Calculate bounding box from start corner to current corner
+            const minX = Math.min(this.startPoint.x, worldPos.x)
+            const minY = Math.min(this.startPoint.y, worldPos.y)
+            const maxX = Math.max(this.startPoint.x, worldPos.x)
+            const maxY = Math.max(this.startPoint.y, worldPos.y)
+
+            const width = maxX - minX
+            const height = maxY - minY
+
+            // Calculate center of bounding box
+            const centerX = minX + width / 2
+            const centerY = minY + height / 2
+
+            // Use the larger dimension to make a perfect circle
+            const size = Math.max(width, height)
+            const radius = size / 2
+
+            // Update circle data: (x1, y1) = center, (x2, y2) = edge point
+            this.currentShape.data.x1 = centerX
+            this.currentShape.data.y1 = centerY
+            this.currentShape.data.x2 = centerX + radius
+            this.currentShape.data.y2 = centerY
+
+            const newBounds = this.currentShape.getBounds()
+
+            this.lastBounds = newBounds
+            this.engine.renderDirty()
+        }
+    }
 
     protected isShapeValid(shape: DrawingObject): boolean {
         const circle = shape as Circle
